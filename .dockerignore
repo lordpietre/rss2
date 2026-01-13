@@ -1,0 +1,10 @@
+.git
+pgdata
+pgdata-replica
+redis-data
+hf_cache
+
+venv
+__pycache__
+*.pyc
+*.log

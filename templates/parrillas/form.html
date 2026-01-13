@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+
+{% block title %}Nueva Parrilla{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1>🎬 Nueva Parrilla de Video</h1>
+        <p>Configura un resumen automático de noticias</p>
+    </div>
+
+    <div class="form-card">
+        <form method="POST" action="{{ url_for('parrillas.nueva') }}">
+            <div class="form-group">
+                <label for="nombre">Nombre de la Parrilla*</label>
+                <input type="text" id="nombre" name="nombre" required placeholder="Ej: Noticias de Bulgaria"
+                    class="form-control">
+            </div>
+
+            <div class="form-group">
+                <label for="descripcion">Descripción</label>
+                <textarea id="descripcion" name="descripcion" rows="3" class="form-control"
+                    placeholder="Descripción opcional..."></textarea>
+            </div>
+
+            <hr>
+
+            <h3>Filtros de Contenido</h3>
+            <div class="form-group">
+                <label for="tipo_filtro">Tipo de Filtro*</label>
+                <select id="tipo_filtro" name="tipo_filtro" class="form-control" onchange="toggleFiltros()">
+                    <option value="pais">Por País</option>
+                    <option value="categoria">Por Categoría</option>
+                    <option value="entidad">Por Persona/Organización</option>
+                    <option value="custom">Personalizado</option>
+                </select>
+            </div>
+
+            <div id="filtro_pais" class="filtro-section">
+                <div class="form-group">
+                    <label for="pais_id">País</label>
+                    <select id="pais_id" name="pais_id" class="form-control">
+                        <option value="">Seleccionar País...</option>
+                        {% for p in paises %}
+                        <option value="{{ p.id }}">{{ p.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div id="filtro_categoria" class="filtro-section" style="display:none">
+                <div class="form-group">
+                    <label for="categoria_id">Categoría</label>
+                    <select id="categoria_id" name="categoria_id" class="form-control">
+                        <option value="">Seleccionar Categoría...</option>
+                        {% for c in categorias %}
+                        <option value="{{ c.id }}">{{ c.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div id="filtro_entidad" class="filtro-section" style="display:none">
+                <div class="form-row">
+                    <div class="form-group col-md-8">
+                        <label for="entidad_nombre">Nombre Entidad</label>
+                        <input type="text" id="entidad_nombre" name="entidad_nombre" class="form-control"
+                            placeholder="Ej: Donald Trump">
+                    </div>
+                    <div class="form-group col-md-4">
+                        <label for="entidad_tipo">Tipo</label>
+                        <select id="entidad_tipo" name="entidad_tipo" class="form-control">
+                            <option value="persona">Persona</option>
+                            <option value="organizacion">Organización</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <hr>
+
+            <h3>Configuración de Generación</h3>
+            <div class="form-row">
+                <div class="form-group col-md-6">
+                    <label for="max_noticias">Máx. Noticias</label>
+                    <input type="number" id="max_noticias" name="max_noticias" value="5" min="1" max="20"
+                        class="form-control">
+                </div>
+                <div class="form-group col-md-6">
+                    <label for="duracion_maxima">Duración Máx. (segundos)</label>
+                    <input type="number" id="duracion_maxima" name="duracion_maxima" value="180" class="form-control">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group col-md-6">
+                    <label for="idioma_voz">Idioma Voz</label>
+                    <select id="idioma_voz" name="idioma_voz" class="form-control">
+                        <option value="es">Español</option>
+                        <option value="en">Inglés</option>
+                    </select>
+                </div>
+                <div class="form-group col-md-6">
+                    <label for="frecuencia">Frecuencia</label>
+                    <select id="frecuencia" name="frecuencia" class="form-control">
+                        <option value="manual">Manual</option>
+                        <option value="daily">Diaria</option>
+                        <option value="weekly">Semanal</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group checkbox-group">
+                <label>
+                    <input type="checkbox" name="include_images" checked> Incluir Imágenes
+                </label>
+                <label>
+                    <input type="checkbox" name="include_subtitles" checked> Generar Subtítulos
+                </label>
+                <label>
+                    <input type="checkbox" name="activo" checked> Activa
+                </label>
+            </div>
+
+            <div class="form-actions">
+                <a href="{{ url_for('parrillas.index') }}" class="btn btn-secondary">Cancelar</a>
+                <button type="submit" class="btn btn-primary">Crear Parrilla</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .form-card {
+        background: var(--paper-color);
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        max-width: 800px;
+        margin: 0 auto;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-row {
+        display: flex;
+        gap: 20px;
+    }
+
+    .col-md-6 {
+        flex: 0 0 calc(50% - 10px);
+    }
+
+    .col-md-8 {
+        flex: 0 0 calc(66.66% - 10px);
+    }
+
+    .col-md-4 {
+        flex: 0 0 calc(33.33% - 10px);
+    }
+
+    label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.9);
+        font-size: 1rem;
+    }
+
+    .checkbox-group {
+        display: flex;
+        gap: 20px;
+        margin-top: 10px;
+    }
+
+    .form-actions {
+        margin-top: 30px;
+        display: flex;
+        justify-content: flex-end;
+        gap: 15px;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 500;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+
+    .btn-primary {
+        background: var(--accent-color);
+        color: white;
+    }
+
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+    }
+
+    .btn:hover {
+        opacity: 0.9;
+        transform: translateY(-1px);
+    }
+
+    hr {
+        margin: 30px 0;
+        border: none;
+        border-top: 1px solid var(--border-color);
+    }
+</style>
+
+<script>
+    function toggleFiltros() {
+        const tipo = document.getElementById('tipo_filtro').value;
+        document.querySelectorAll('.filtro-section').forEach(el => el.style.display = 'none');
+
+        if (tipo === 'pais') document.getElementById('filtro_pais').style.display = 'block';
+        if (tipo === 'categoria') document.getElementById('filtro_categoria').style.display = 'block';
+        if (tipo === 'entidad') document.getElementById('filtro_entidad').style.display = 'block';
+    }
+
+    // Init
+    toggleFiltros();
+</script>
+{% endblock %}

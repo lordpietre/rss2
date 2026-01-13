@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Registrarse - The Daily Feed{% endblock %}
+
+{% block content %}
+<div style="max-width: 500px; margin: 40px auto; padding: 30px; background: #f9f9f9; border-radius: 10px;">
+    <h2 style="text-align: center; margin-bottom: 30px;">Crear Cuenta</h2>
+
+    <form method="post" action="{{ url_for('auth.register') }}">
+        <div style="margin-bottom: 20px;">
+            <label for="username" style="display: block; margin-bottom: 5px; font-weight: 500;">Nombre de usuario
+                *</label>
+            <input type="text" id="username" name="username" required minlength="3" maxlength="50"
+                value="{{ username or '' }}"
+                style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+            <small style="color: #666; font-size: 12px;">Mínimo 3 caracteres. Solo letras, números, - y _</small>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+            <label for="email" style="display: block; margin-bottom: 5px; font-weight: 500;">Email *</label>
+            <input type="email" id="email" name="email" required value="{{ email or '' }}"
+                style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+        </div>
+
+        <div style="margin-bottom: 20px;">
+            <label for="password" style="display: block; margin-bottom: 5px; font-weight: 500;">Contraseña *</label>
+            <input type="password" id="password" name="password" required minlength="6" maxlength="128"
+                style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+            <small style="color: #666; font-size: 12px;">Mínimo 6 caracteres</small>
+        </div>
+
+        <div style="margin-bottom: 30px;">
+            <label for="password_confirm" style="display: block; margin-bottom: 5px; font-weight: 500;">Confirmar
+                contraseña *</label>
+            <input type="password" id="password_confirm" name="password_confirm" required minlength="6" maxlength="128"
+                style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+        </div>
+
+        <button type="submit"
+            style="width: 100%; padding: 12px; background: #6c63ff; color: white; border: none; border-radius: 5px; font-size: 16px; font-weight: 600; cursor: pointer;">
+            Crear cuenta
+        </button>
+    </form>
+
+    <div style="text-align: center; margin-top: 20px;">
+        <p style="color: #666;">¿Ya tienes cuenta? <a href="{{ url_for('auth.login') }}"
+                style="color: #6c63ff; text-decoration: none; font-weight: 500;">Inicia sesión</a></p>
+    </div>
+</div>
+{% endblock %}

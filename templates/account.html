@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}Tu Cuenta - {{ user.username }}{% endblock %}
+
+{% block content %}
+<div style="max-width: 900px; margin: 20px auto;">
+    <h2 style="margin-bottom: 30px;"><i class="fas fa-user-circle"></i> Tu Cuenta</h2>
+
+    <!-- User Info Card -->
+    <div style="background: #f9f9f9; padding: 25px; border-radius: 10px; margin-bottom: 25px;">
+        <h3 style="margin-top: 0; color: #6c63ff;">Información del Perfil</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div style="text-align: center; margin-bottom: 15px;">
+                    {% if user.avatar_url %}
+                        <img src="{{ user.avatar_url }}" alt="Avatar" style="width: 120px; height: 120px; object-fit: cover; border-radius: 50%; border: 3px solid #6c63ff; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    {% else %}
+                        <div style="width: 120px; height: 120px; background: #e0e0e0; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto; color: #888; font-size: 50px;">
+                            <i class="fas fa-user"></i>
+                        </div>
+                    {% endif %}
+                    <form action="{{ url_for('account.upload_avatar') }}" method="post" enctype="multipart/form-data" style="margin-top: 15px;">
+                        <input type="file" name="avatar" id="avatar" accept="image/*" style="display: none;" onchange="this.form.submit()">
+                        <label for="avatar" style="cursor: pointer; padding: 6px 12px; border: 1px solid #6c63ff; color: #6c63ff; background: transparent; border-radius: 4px; font-size: 14px; transition: all 0.2s;">
+                            <i class="fas fa-camera"></i> Cambiar foto
+                        </label>
+                    </form>
+                </div>
+            </div>
+            <div>
+                <strong>Usuario:</strong> {{ user.username }}
+            </div>
+            <div>
+                <strong>Email:</strong> {{ user.email }}
+            </div>
+            <div>
+                <strong>Miembro desde:</strong> {{ user.created_at.strftime('%d/%m/%Y') }}
+            </div>
+            <div>
+                <strong>Último acceso:</strong> {{ user.last_login.strftime('%d/%m/%Y %H:%M') if user.last_login else
+                'N/A' }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Card -->
+    <div style="background: #f9f9f9; padding: 25px; border-radius: 10px; margin-bottom: 25px;">
+        <h3 style="margin-top: 0; color: #6c63ff;">Estadísticas</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+            <div style="text-align: center; padding: 15px; background: white; border-radius: 8px;">
+                <div style="font-size: 32px; font-weight: bold; color: #6c63ff;">{{ favorites_count }}</div>
+                <div style="color: #666; margin-top: 5px;">Favoritos guardados</div>
+            </div>
+            <div style="text-align: center; padding: 15px; background: white; border-radius: 8px;">
+                <div style="font-size: 32px; font-weight: bold; color: #6c63ff;">{{ searches_count }}</div>
+                <div style="color: #666; margin-top: 5px;">Búsquedas realizadas</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Searches -->
+    {% if recent_searches %}
+    <div style="background: #f9f9f9; padding: 25px; border-radius: 10px; margin-bottom: 25px;">
+        <h3 style="margin-top: 0; color: #6c63ff;">Búsquedas Recientes</h3>
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="border-bottom: 2px solid #ddd;">
+                        <th style="padding: 10px; text-align: left;">Búsqueda</th>
+                        <th style="padding: 10px; text-align: center;">Resultados</th>
+                        <th style="padding: 10px; text-align: right;">Fecha</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for search in recent_searches %}
+                    <tr style="border-bottom: 1px solid #eee;">
+                        <td style="padding: 10px;">
+                            <a href="/api/search?q={{ search.query | urlencode }}"
+                                style="color: #6c63ff; text-decoration: none;">
+                                {{ search.query }}
+                            </a>
+                        </td>
+                        <td style="padding: 10px; text-align: center;">{{ search.results_count }}</td>
+                        <td style="padding: 10px; text-align: right; color: #666; font-size: 14px;">
+                            {{ search.searched_at.strftime('%d/%m/%Y %H:%M') }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if searches_count > 10 %}
+        <div style="text-align: center; margin-top: 15px;">
+            <a href="{{ url_for('account.search_history') }}"
+                style="color: #6c63ff; text-decoration: none; font-weight: 500;">
+                Ver historial completo →
+            </a>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Recent Favorites -->
+    {% if recent_favorites %}
+    <div style="background: #f9f9f9; padding: 25px; border-radius: 10px; margin-bottom: 25px;">
+        <h3 style="margin-top: 0; color: #6c63ff;">Favoritos Recientes</h3>
+        <div style="display: grid; gap: 15px;">
+            {% for noticia in recent_favorites %}
+            <div style="display: flex; gap: 15px; padding: 15px; background: white; border-radius: 8px;">
+                {% if noticia.imagen_url %}
+                <img src="{{ noticia.imagen_url }}" alt=""
+                    style="width: 100px; height: 70px; object-fit: cover; border-radius: 5px;">
+                {% endif %}
+                <div style="flex: 1;">
+                    {% if noticia.traduccion_id %}
+                    <a href="/noticia?tr_id={{ noticia.traduccion_id }}"
+                        style="color: #333; text-decoration: none; font-weight: 500;">
+                        {{ noticia.titulo_trad or noticia.titulo }}
+                    </a>
+                    {% else %}
+                    <a href="/noticia?id={{ noticia.id }}"
+                        style="color: #333; text-decoration: none; font-weight: 500;">
+                        {{ noticia.titulo }}
+                    </a>
+                    {% endif %}
+                    <div style="color: #666; font-size: 12px; margin-top: 5px;">
+                        Guardado: {{ noticia.created_at.strftime('%d/%m/%Y') }}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <div style="text-align: center; margin-top: 15px;">
+            <a href="{{ url_for('favoritos.view_favorites') }}"
+                style="color: #6c63ff; text-decoration: none; font-weight: 500;">
+                Ver todos los favoritos →
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Account Actions -->
+    <div style="background: #f9f9f9; padding: 25px; border-radius: 10px;">
+        <h3 style="margin-top: 0; color: #6c63ff;">Acciones</h3>
+
+        <!-- Change Password Form -->
+        <details style="margin-bottom: 20px;">
+            <summary style="cursor: pointer; font-weight: 500; padding: 10px; background: white; border-radius: 5px;">
+                <i class="fas fa-key"></i> Cambiar contraseña
+            </summary>
+            <form method="post" action="{{ url_for('account.change_password') }}"
+                style="margin-top: 15px; padding: 15px; background: white; border-radius: 5px;">
+                <div style="margin-bottom: 15px;">
+                    <label for="current_password" style="display: block; margin-bottom: 5px;">Contraseña actual</label>
+                    <input type="password" id="current_password" name="current_password" required
+                        style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label for="new_password" style="display: block; margin-bottom: 5px;">Nueva contraseña</label>
+                    <input type="password" id="new_password" name="new_password" required minlength="6"
+                        style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label for="new_password_confirm" style="display: block; margin-bottom: 5px;">Confirmar nueva
+                        contraseña</label>
+                    <input type="password" id="new_password_confirm" name="new_password_confirm" required minlength="6"
+                        style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+                <button type="submit"
+                    style="padding: 10px 20px; background: #6c63ff; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                    Actualizar contraseña
+                </button>
+            </form>
+        </details>
+
+        <form method="post" action="{{ url_for('auth.logout') }}">
+            <button type="submit"
+                style="padding: 12px 24px; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px;">
+                <i class="fas fa-sign-out-alt"></i> Cerrar sesión
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

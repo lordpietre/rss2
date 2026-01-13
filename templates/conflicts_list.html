@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}Conflictos{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div style="margin-bottom: 2rem;">
+        <h2><i class="fas fa-exclamation-triangle"></i> Conflictos Monitorizados</h2>
+        <p>Define temas o conflictos para generar líneas de tiempo automáticas basadas en palabras clave.</p>
+    </div>
+
+    <!-- Create Form -->
+    <div class="card" style="margin-bottom: 2rem;">
+        <h3>Crear Nuevo Conflicto</h3>
+        <form action="{{ url_for('conflicts.create') }}" method="POST">
+            <div class="filter-row">
+                <div class="filter-group" style="flex: 2;">
+                    <label>Nombre del Conflicto</label>
+                    <input type="text" name="name" placeholder="Ej: Camboya vs Tailandia" required>
+                </div>
+                <div class="filter-group" style="flex: 3;">
+                    <label>Palabras Clave (separadas por coma)</label>
+                    <input type="text" name="keywords" placeholder="Ej: Camboya, Tailandia, Preah Vihear" required>
+                </div>
+                <div class="filter-group">
+                    <label>&nbsp;</label>
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">Crear</button>
+                </div>
+            </div>
+            <div style="margin-top: 10px;">
+                <label style="font-weight: 600; font-size: 0.9rem;">Descripción (Opcional)</label>
+                <input type="text" name="description" style="width: 100%;"
+                    placeholder="Breve descripción del contexto...">
+            </div>
+        </form>
+    </div>
+
+    <!-- List -->
+    <div class="conflicts-grid">
+        {% for c in conflicts %}
+        <div class="card conflict-card">
+            <div class="conflict-header">
+                <h3>{{ c.name }}</h3>
+                <form action="{{ url_for('conflicts.delete', id=c.id) }}" method="POST"
+                    onsubmit="return confirm('¿Eliminar este conflicto?');">
+                    <button type="submit" class="btn-icon" title="Eliminar"><i class="fas fa-trash"></i></button>
+                </form>
+            </div>
+            <p class="conflict-desc">{{ c.description or 'Sin descripción' }}</p>
+            <div class="keyword-tags">
+                {% for k in c.keywords.split(',') %}
+                {% if k.strip() %}
+                <span class="badge">{{ k.strip() }}</span>
+                {% endif %}
+                {% endfor %}
+            </div>
+            <div style="margin-top: 1rem; text-align: right;">
+                <a href="{{ url_for('conflicts.timeline', id=c.id) }}" class="btn">
+                    <i class="fas fa-stream"></i> Ver Línea de Tiempo
+                </a>
+            </div>
+        </div>
+        {% else %}
+        <p style="text-align: center; color: #666;">No hay conflictos definidos.</p>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+    .conflicts-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        gap: 20px;
+    }
+
+    .conflict-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 10px;
+    }
+
+    .conflict-header h3 {
+        margin: 0;
+        font-size: 1.4rem;
+        color: var(--accent-color);
+    }
+
+    .conflict-desc {
+        color: #666;
+        font-size: 0.9rem;
+        margin-bottom: 15px;
+        min-height: 40px;
+    }
+
+    .keyword-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+    }
+
+    .btn-icon {
+        background: none;
+        border: none;
+        color: #999;
+        cursor: pointer;
+        padding: 5px;
+    }
+
+    .btn-icon:hover {
+        color: #e74c3c;
+    }
+
+    .dark-mode .conflict-desc {
+        color: #aaa;
+    }
+</style>
+{% endblock %}

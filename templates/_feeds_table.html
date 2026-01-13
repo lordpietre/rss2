@@ -1,0 +1,128 @@
+<!-- Tabla -->
+<div id="feeds-table-container" class="feed-body" style="padding: 0;">
+    <div class="mt-2" style="margin: 10px 15px;">
+        {% set activos = total_feeds - feeds_caidos %}
+        <strong style="color: #27ae60;">{{ activos }} Activos</strong>
+        <span class="text-muted" style="margin-left: 5px;">(de {{ total_feeds }} Feeds)</span>
+
+        {% if filtro_pais_id or filtro_categoria_id or filtro_estado %}
+        <span class="text-muted" style="font-size:0.9em; margin-left: 10px;">(con filtros aplicados)</span>
+        {% endif %}
+    </div>
+
+    <table style="width:100%; border-collapse: collapse;">
+        <thead>
+            <tr style="background-color: rgba(0,0,0,0.05);">
+                <th style="padding: 12px 15px; text-align: left;">Nombre</th>
+                <th style="padding: 12px 15px; text-align: left;">Categoría</th>
+                <th style="padding: 12px 15px; text-align: left;">País</th>
+                <th style="padding: 12px 15px; text-align: center;">Noticias</th>
+                <th style="padding: 12px 15px; text-align: center;">Estado</th>
+                <th style="padding: 12px 15px; text-align: center;">Fallos</th>
+                <th style="padding: 12px 15px; text-align: right;">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for feed in feeds %}
+            <tr {% if feed.fallos and feed.fallos> 0 %}style="background-color: rgba(192,57,43,0.05);" {% endif %}>
+                <td style="padding: 12px 15px; border-top: 1px solid var(--border-color);">
+                    <a href="{{ feed.url }}" target="_blank" title="{{ feed.url }}">{{ feed.nombre }}</a>
+                </td>
+
+                <td style="padding: 12px 15px; border-top: 1px solid var(--border-color);">
+                    {{ feed.categoria or 'N/A' }}
+                </td>
+
+                <td style="padding: 12px 15px; border-top: 1px solid var(--border-color);">
+                    {{ feed.pais or 'Global' }}
+                </td>
+
+                <td style="padding: 12px 15px; text-align:center; border-top: 1px solid var(--border-color);">
+                    <span class="badge"
+                        style="background: rgba(52, 152, 219, 0.1); color: #3498db; padding: 2px 8px; border-radius: 10px;">
+                        {{ feed.noticias_count or 0 }}
+                    </span>
+                </td>
+
+                <td style="padding: 12px 15px; text-align: center; border-top: 1px solid var(--border-color);">
+                    {% if not feed.activo %}
+                    <span style="color: #c0392b; font-weight: bold;" title="Inactivo">KO</span>
+                    {% elif feed.fallos and feed.fallos >= 5 %}
+                    <span style="color: #e67e22; font-weight: bold; cursor: help;"
+                        title="{{ feed.last_error or (feed.fallos ~ ' fallos') }}">⚠️</span>
+                    {% elif feed.fallos and feed.fallos > 0 %}
+                    <span style="color: #f39c12; font-weight: bold; cursor: help;"
+                        title="{{ feed.last_error or (feed.fallos ~ ' fallos') }}">OK</span>
+                    {% else %}
+                    <span style="color: #27ae60; font-weight: bold;">OK</span>
+                    {% endif %}
+                </td>
+
+                <td style="padding: 12px 15px; text-align:center; border-top: 1px solid var(--border-color);">
+                    {{ feed.fallos or 0 }}
+                </td>
+
+                <td style="padding: 12px 15px; text-align:right; border-top: 1px solid var(--border-color);">
+                    <a href="{{ url_for('feeds.edit_feed', feed_id=feed.id) }}" class="btn btn-small btn-info">
+                        <i class="fas fa-edit"></i>
+                    </a>
+
+                    <a href="{{ url_for('feeds.delete_feed', feed_id=feed.id) }}" class="btn btn-small btn-danger"
+                        onclick="return confirm('¿Estás seguro?')">
+                        <i class="fas fa-trash"></i>
+                    </a>
+
+                    {% if not feed.activo %}
+                    <a href="{{ url_for('feeds.reactivar_feed', feed_id=feed.id) }}" class="btn btn-small">
+                        <i class="fas fa-sync-alt"></i>
+                    </a>
+                    {% endif %}
+                </td>
+
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" style="padding:20px; text-align:center;">
+                    No hay feeds para mostrar.
+                    <a href="{{ url_for('feeds.add_feed') }}">Añade el primero</a>.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Paginación -->
+{% if total_pages > 1 %}
+<nav class="pagination">
+    {% if page > 1 %}
+    <a href="{{ url_for('feeds.list_feeds',
+                            page=page-1,
+                            pais_id=filtro_pais_id,
+                            categoria_id=filtro_categoria_id,
+                            estado=filtro_estado) }}" class="page-link"
+        onclick="handlePageClick(event, this.href)">&laquo; Anterior</a>
+    {% endif %}
+
+    {% for p in range(1, total_pages + 1) %}
+    {% if p == page %}
+    <a href="#" class="page-link active">{{ p }}</a>
+    {% else %}
+    <a href="{{ url_for('feeds.list_feeds',
+                                page=p,
+                                pais_id=filtro_pais_id,
+                                categoria_id=filtro_categoria_id,
+                                estado=filtro_estado) }}" class="page-link"
+        onclick="handlePageClick(event, this.href)">{{ p }}</a>
+    {% endif %}
+    {% endfor %}
+
+    {% if page < total_pages %} <a href="{{ url_for('feeds.list_feeds',
+                            page=page+1,
+                            pais_id=filtro_pais_id,
+                            categoria_id=filtro_categoria_id,
+                            estado=filtro_estado) }}" class="page-link" onclick="handlePageClick(event, this.href)">
+        Siguiente &raquo;</a>
+        {% endif %}
+</nav>
+{% endif %}

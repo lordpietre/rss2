@@ -1,0 +1,29 @@
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Install system dependencies for lxml and general build
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libxml2-dev \
+    libxslt-dev \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install python dependencies
+RUN pip install --no-cache-dir \
+    psycopg2-binary \
+    requests \
+    newspaper3k \
+    lxml_html_clean \
+    python-dotenv
+
+# Copy application code
+COPY . /app
+
+# Set environment
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+
+# Run the worker daemon
+CMD ["python", "-m", "workers.url_worker_daemon"]

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Importar Fuentes URL{% endblock %}
+
+{% block content %}
+<h1>Importar Fuentes URL</h1>
+
+<div class="card">
+    <form method="post" enctype="multipart/form-data" action="{{ url_for('restore_urls') }}">
+        <label>Archivo CSV:</label>
+        <input type="file" name="file" required>
+
+        <button class="btn" style="margin-top:15px;">Importar</button>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Cancelar</a>
+    </form>
+</div>
+{% endblock %}

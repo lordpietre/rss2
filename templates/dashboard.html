@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-grid">
+    <div class="stat-card">
+        <div class="stat-number">{{ stats.feeds_totales }}</div>
+        <div class="stat-label">Feeds Totales</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ stats.noticias_totales }}</div>
+        <div class="stat-label">Noticias Totales</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ stats.feeds_caidos }}</div>
+        <div class="stat-label">Feeds Caídos</div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h3>Gestión de Feeds RSS</h3>
+            </div>
+            <div class="card-body">
+                <p>
+                    Exporta tu lista de feeds RSS o restaura/importa desde un archivo CSV.
+                    Además, puedes ir al organizador avanzado de feeds para filtrarlos
+                    por país, categoría y estado.
+                </p>
+
+                <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
+                    <a href="{{ url_for('feeds.list_feeds') }}" class="btn btn-secondary">
+                        <i class="fas fa-list"></i> Ver / Gestionar Feeds
+                    </a>
+                </div>
+
+                <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:15px;">
+                    <a href="{{ url_for('feeds.list_feeds', estado='activos') }}" class="btn btn-small">
+                        <i class="fas fa-check-circle"></i> Feeds activos
+                    </a>
+                    <a href="{{ url_for('feeds.list_feeds', estado='inactivos') }}" class="btn btn-small btn-danger">
+                        <i class="fas fa-times-circle"></i> Feeds caídos/inactivos
+                    </a>
+                    <a href="{{ url_for('feeds.list_feeds', estado='errores') }}" class="btn btn-small btn-info">
+                        <i class="fas fa-exclamation-triangle"></i> Feeds con errores
+                    </a>
+                </div>
+
+                <hr style="margin: 15px 0; border: 0; border-top: 1px solid var(--border-color);">
+
+                <a href="{{ url_for('backup_feeds') }}" class="btn">
+                    <i class="fas fa-download"></i> Exportar Feeds
+                </a>
+                <a href="{{ url_for('restore_feeds') }}" class="btn btn-info">
+                    <i class="fas fa-upload"></i> Importar Feeds
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h3>Gestión de Fuentes URL</h3>
+            </div>
+            <div class="card-body">
+                <p>Exporta tu lista de fuentes URL o restaura/importa desde un archivo CSV.</p>
+                <a href="{{ url_for('backup_urls') }}" class="btn">
+                    <i class="fas fa-download"></i> Exportar URLs
+                </a>
+                <a href="{{ url_for('restore_urls') }}" class="btn btn-info">
+                    <i class="fas fa-upload"></i> Importar Fuentes URL
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3>Operaciones del Sistema</h3>
+    </div>
+    <div class="card-body">
+        <p>Genera o restaura una copia de seguridad completa de todas tus fuentes y noticias.</p>
+
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <a href="{{ url_for('backup_completo') }}" class="btn btn-secondary">
+                <i class="fas fa-archive"></i> Backup Completo (.zip)
+            </a>
+
+            <a href="{{ url_for('restore_completo') }}" class="btn btn-info">
+                <i class="fas fa-upload"></i> Restaurar Backup (.zip)
+            </a>
+        </div>
+    </div>
+</div>
+
+{% if top_tags and top_tags|length > 0 %}
+<div class="card">
+    <div class="card-header">
+        <h3>Top tags (últimas 24h)</h3>
+    </div>
+    <div class="card-body" style="padding:0;">
+        <table style="width:100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background-color: rgba(0,0,0,0.05);">
+                    <th style="padding: 12px 15px; text-align: left;">Tag</th>
+                    <th style="padding: 12px 15px; text-align: left;">Tipo</th>
+                    <th style="padding: 12px 15px; text-align: right;">Apariciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in top_tags %}
+                <tr>
+                    <td style="padding: 12px 15px; border-top: 1px solid var(--border-color);">
+                        {{ t.valor }}
+                    </td>
+                    <td style="padding: 12px 15px; border-top: 1px solid var(--border-color); text-transform: capitalize;">
+                        {{ t.tipo }}
+                    </td>
+                    <td style="padding: 12px 15px; border-top: 1px solid var(--border-color); text-align: right;">
+                        {{ t.apariciones }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="card">
+    <div class="card-header">
+        <h3>Top tags (últimas 24h)</h3>
+    </div>
+    <div class="card-body">
+        <p style="color: var(--text-color-light); margin: 0;">No hay tags para mostrar todavía.</p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+

@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Fuentes URL{% endblock %}
+
+{% block content %}
+<div class="card feed-detail-card">
+    <div class="feed-header">
+        <h2>Lista de Fuentes URL ({{ fuentes|length }})</h2>
+        <div class="nav-actions">
+            <a href="{{ url_for('urls.add_url_source') }}" class="btn btn-small">
+                <i class="fas fa-plus"></i> Añadir URL
+            </a>
+        </div>
+    </div>
+
+    <div class="feed-body" style="padding: 0;">
+        <table style="width:100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background-color: rgba(0,0,0,0.05);">
+                    <th style="padding: 12px 15px; text-align: left;">Nombre</th>
+                    <th style="padding: 12px 15px; text-align: left;">Categoría</th>
+                    <th style="padding: 12px 15px; text-align: left;">País</th>
+                    <th style="padding: 12px 15px; text-align: left;">Idioma</th>
+                    <th style="padding: 12px 15px; text-align: center;">Noticias</th>
+                    <th style="padding: 12px 15px; text-align: left;">Estado</th>
+                    <th style="padding: 12px 15px; text-align: left;">Últ. Chequeo</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for f in fuentes %}
+                <tr>
+                    <td style="padding:12px 15px;border-top:1px solid var(--border-color);">
+                        <a href="{{ f.url }}" target="_blank" title="{{ f.url }}">{{ f.nombre }}</a>
+                    </td>
+                    <td style="padding:12px 15px;border-top:1px solid var(--border-color);">
+                        {{ f.categoria or "N/A" }}
+                    </td>
+                    <td style="padding:12px 15px;border-top:1px solid var(--border-color);">
+                        {{ f.pais or "Global" }}
+                    </td>
+                    <td style="padding:12px 15px;border-top:1px solid var(--border-color);">
+                        {{ f.idioma or "n/a" }}
+                    </td>
+                    <td style="padding:12px 15px;border-top:1px solid var(--border-color); text-align:center;">
+                        <span class="badge"
+                            style="background: rgba(52, 152, 219, 0.1); color: #3498db; padding: 2px 8px; border-radius: 10px;">
+                            {{ f.noticias_count or 0 }}
+                        </span>
+                    </td>
+                    <td style="padding:12px 15px;border-top:1px solid var(--border-color);">
+                        {% if f.last_status == 'OK' %}
+                        <span class="status-badge"
+                            style="background:#28a745; color:white; padding:4px 8px; border-radius:4px; font-size:0.85em;">OK</span>
+                        {% elif f.last_status %}
+                        <span class="status-badge"
+                            style="background:#dc3545; color:white; padding:4px 8px; border-radius:4px; font-size:0.85em; cursor:help;"
+                            title="{{ f.status_message }} (Code: {{ f.last_http_code }})">
+                            {{ f.last_status }}
+                        </span>
+                        {% else %}
+                        <span class="status-badge"
+                            style="background:#6c757d; color:white; padding:4px 8px; border-radius:4px; font-size:0.85em;">Pendiente</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding:12px 15px;border-top:1px solid var(--border-color);">
+                        {{ f.last_check.strftime('%d/%m %H:%M') if f.last_check else "-" }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" style="padding:20px;text-align:center;">
+                        No hay fuentes URL registradas.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

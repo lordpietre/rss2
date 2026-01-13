@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block title %}Gestionar Feeds RSS{% endblock %}
+
+{% block content %}
+
+<div class="card feed-detail-card">
+    <div class="feed-header">
+        <h2>Lista de Feeds RSS</h2>
+
+        <div class="nav-actions" style="display:flex; gap:8px; align-items:center;">
+
+            <!-- 🔵 Exportar feeds CSV (con filtros aplicados) -->
+            <a href="#" id="export-btn" class="btn btn-small btn-secondary" onclick="exportFilteredFeeds(event)">
+                <i class="fas fa-download"></i> Exportar Feeds
+            </a>
+
+            <!-- 🟣 Importar feeds CSV -->
+            <a href="{{ url_for('backup.restore_feeds') }}" class="btn btn-small btn-secondary">
+                <i class="fas fa-upload"></i> Importar Feeds
+            </a>
+
+            <!-- 🟢 Añadir feed -->
+            <a href="{{ url_for('feeds.add_feed') }}" class="btn btn-small">
+                <i class="fas fa-plus"></i> Añadir Feed
+            </a>
+        </div>
+    </div>
+
+    <!-- Filtros avanzados -->
+    <div class="feed-body" style="padding: 15px 15px 0 15px;">
+        <form class="feed-filters" method="get" action="{{ url_for('feeds.list_feeds') }}" id="filter-form">
+            <div class="filter-row">
+
+                <div class="filter-group">
+                    <label for="pais_id">País</label>
+                    <select name="pais_id" id="pais_id" onchange="reloadTable()">
+                        <option value="">Todos los países</option>
+                        {% for p in paises %}
+                        <option value="{{ p.id }}" {% if filtro_pais_id is not none and p.id==filtro_pais_id|int
+                            %}selected{% endif %}>
+                            {{ p.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label for="categoria_id">Categoría</label>
+                    <select name="categoria_id" id="categoria_id" onchange="reloadTable()">
+                        <option value="">Todas las categorías</option>
+                        {% for c in categorias %}
+                        <option value="{{ c.id }}" {% if filtro_categoria_id is not none and
+                            c.id==filtro_categoria_id|int %}selected{% endif %}>
+                            {{ c.nombre }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label for="estado">Estado</label>
+                    <select name="estado" id="estado" onchange="reloadTable()">
+                        <option value="" {% if not filtro_estado %}selected{% endif %}>Todos</option>
+                        <option value="activos" {% if filtro_estado=="activos" %}selected{% endif %}>Activos</option>
+                        <option value="inactivos" {% if filtro_estado=="inactivos" %}selected{% endif %}>Inactivos
+                        </option>
+                        <option value="errores" {% if filtro_estado=="errores" %}selected{% endif %}>Con errores
+                        </option>
+                    </select>
+                </div>
+
+                <div class="filter-group" style="flex: 0 0 auto; display:flex; gap:10px; align-self: flex-end;">
+                    <!-- Button can be hidden if we fully rely on onchange, but useful for accessibility or clearing -->
+                    <a href="{{ url_for('feeds.list_feeds') }}" class="btn btn-secondary">
+                        Limpiar
+                    </a>
+                </div>
+
+            </div>
+        </form>
+    </div>
+
+    <!-- Container for dynamic table -->
+    <div id="table-container">
+        {% include '_feeds_table.html' %}
+    </div>
+
+</div>
+
+<script>
+    async function reloadTable(urlOverride) {
+        const form = document.getElementById('filter-form');
+        const container = document.getElementById('table-container');
+
+        // Visual indicator
+        container.style.opacity = '0.5';
+
+        let url;
+        if (urlOverride) {
+            url = urlOverride;
+        } else {
+            const formData = new FormData(form);
+            const params = new URLSearchParams(formData);
+            url = `${form.action}?${params.toString()}`;
+        }
+
+        try {
+            const response = await fetch(url, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            const html = await response.text();
+            container.innerHTML = html;
+
+            // Update URL without reload
+            window.history.pushState({}, '', url);
+        } catch (error) {
+            console.error('Error reloading table:', error);
+            alert('Error al actualizar la lista.');
+        } finally {
+            container.style.opacity = '1';
+        }
+    }
+
+    function handlePageClick(event, url) {
+        event.preventDefault();
+        reloadTable(url);
+    }
+
+    function exportFilteredFeeds(event) {
+        event.preventDefault();
+
+        // Capturar valores actuales de los filtros
+        const paisId = document.getElementById('pais_id').value;
+        const categoriaId = document.getElementById('categoria_id').value;
+        const estado = document.getElementById('estado').value;
+
+        // Construir URL con parámetros
+        const params = new URLSearchParams();
+        if (paisId) params.append('pais_id', paisId);
+        if (categoriaId) params.append('categoria_id', categoriaId);
+        if (estado) params.append('estado', estado);
+
+        const exportUrl = `/export_feeds_filtered?${params.toString()}`;
+
+        // Redirigir para descargar
+        window.location.href = exportUrl;
+    }
+</script>
+
+{% endblock %}

@@ -1,0 +1,337 @@
+models/
+├── __init__.py              # Paquete Python (vacío)
+├── categorias.py            # Operaciones con categorías
+├── feeds.py                 # Operaciones con feeds RSS
+├── noticias.py              # Búsqueda y consulta de noticias
+└── paises.py                # Operaciones con países
+└── traducciones.py          # Operaciones con traducciones
+
+init.py
+Propósito: Archivo necesario para que Python reconozca este directorio como un paquete.
+
+Contenido: Vacío o comentario explicativo.
+
+Uso: Permite importar módulos desde models:
+
+python
+from models.noticias import buscar_noticias
+categorias.py
+Propósito: Maneja todas las operaciones relacionadas con categorías de noticias.
+
+Funciones principales:
+
+get_categorias(conn) -> List[Dict]
+Descripción: Obtiene todas las categorías disponibles ordenadas alfabéticamente.
+
+Parámetros:
+
+conn: Conexión a PostgreSQL activa
+
+Consulta SQL:
+
+sql
+SELECT id, nombre FROM categorias ORDER BY nombre;
+Retorna: Lista de diccionarios con estructura:
+
+python
+[
+    {"id": 1, "nombre": "Política"},
+    {"id": 2, "nombre": "Deportes"},
+    ...
+]
+Uso típico: Para llenar dropdowns de filtrado en la interfaz web.
+
+feeds.py
+Propósito: Maneja operaciones relacionadas con feeds RSS.
+
+Funciones principales:
+
+get_feed_by_id(conn, feed_id: int) -> Optional[Dict]
+Descripción: Obtiene un feed específico por su ID.
+
+Parámetros:
+
+conn: Conexión a PostgreSQL
+
+feed_id: ID numérico del feed
+
+Consulta SQL:
+
+sql
+SELECT * FROM feeds WHERE id = %s;
+Retorna: Un diccionario con todos los campos del feed o None si no existe.
+
+get_feeds_activos(conn) -> List[Dict]
+Descripción: Obtiene todos los feeds activos y no caídos.
+
+Criterios de activos:
+
+activo = TRUE
+
+fallos < 5 (o NULL)
+
+Consulta SQL:
+
+sql
+SELECT id, nombre, url, categoria_id, pais_id, fallos, activo
+FROM feeds
+WHERE activo = TRUE
+  AND (fallos IS NULL OR fallos < 5)
+ORDER BY id;
+Retorna: Lista de feeds activos para el ingestor RSS.
+
+Uso crítico: Esta función es utilizada por rss_ingestor.py para determinar qué feeds procesar.
+
+noticias.py
+Propósito: Módulo más complejo que maneja todas las operaciones de búsqueda y consulta de noticias.
+
+Funciones auxiliares:
+
+_extraer_tags_por_traduccion(cur, traduccion_ids: List[int]) -> Dict[int, List[tuple]]
+Descripción: Función privada que obtiene tags agrupados por ID de traducción.
+
+Parámetros:
+
+cur: Cursor de base de datos
+
+traduccion_ids: Lista de IDs de traducciones
+
+Consulta SQL:
+
+sql
+SELECT tn.traduccion_id, tg.valor, tg.tipo
+FROM tags_noticia tn
+JOIN tags tg ON tg.id = tn.tag_id
+WHERE tn.traduccion_id = ANY(%s);
+Retorna: Diccionario donde:
+
+Clave: traduccion_id
+
+Valor: Lista de tuplas (valor_tag, tipo_tag)
+
+Optimización: Evita el problema N+1 al cargar tags.
+
+Funciones principales:
+
+buscar_noticias(...) -> Tuple[List[Dict], int, int, Dict]
+Descripción: Búsqueda avanzada con múltiples filtros, paginación y traducciones.
+
+Parámetros:
+
+conn: Conexión a PostgreSQL
+
+page: Número de página (1-based)
+
+per_page: Noticias por página
+
+q: Término de búsqueda (opcional)
+
+categoria_id: Filtrar por categoría (opcional)
+
+continente_id: Filtrar por continente (opcional)
+
+pais_id: Filtrar por país (opcional)
+
+fecha: Filtrar por fecha exacta YYYY-MM-DD (opcional)
+
+lang: Idioma objetivo para traducciones (default: "es")
+
+use_tr: Incluir traducciones en búsqueda (default: True)
+
+Retorna: Tupla con 4 elementos:
+
+noticias: Lista de noticias con datos completos
+
+total_results: Total de resultados (sin paginación)
+
+total_pages: Total de páginas calculado
+
+tags_por_tr: Diccionario de tags por traducción
+
+Características de búsqueda:
+
+Filtrado por fecha: Coincidencia exacta de fecha
+
+Filtrado geográfico: País o continente (jerárquico)
+
+Filtrado por categoría: Selección única
+
+Búsqueda de texto:
+
+Búsqueda full-text con PostgreSQL (websearch_to_tsquery)
+
+Búsqueda ILIKE en múltiples campos
+
+Incluye campos originales y traducidos
+
+Paginación: Offset/Limit estándar
+
+Traducciones: JOIN condicional con tabla traducciones
+
+Optimización: Single query para contar y obtener datos
+
+Consulta SQL principal (simplificada):
+
+sql
+-- Contar total
+SELECT COUNT(DISTINCT n.id)
+FROM noticias n
+-- joins con categorias, paises, traducciones
+WHERE [condiciones dinámicas]
+
+-- Obtener datos paginados
+SELECT
+    n.id, n.titulo, n.resumen, n.url, n.fecha,
+    n.imagen_url, n.fuente_nombre,
+    c.nombre AS categoria,
+    p.nombre AS pais,
+    t.id AS traduccion_id,
+    t.titulo_trad AS titulo_traducido,
+    t.resumen_trad AS resumen_traducido,
+    -- flag de traducción disponible
+    CASE WHEN t.id IS NOT NULL THEN TRUE ELSE FALSE END AS tiene_traduccion,
+    -- campos originales
+    n.titulo AS titulo_original,
+    n.resumen AS resumen_original
+FROM noticias n
+-- joins...
+WHERE [condiciones dinámicas]
+ORDER BY n.fecha DESC NULLS LAST, n.id DESC
+LIMIT %s OFFSET %s
+Campos retornados por noticia:
+
+python
+{
+    "id": 123,
+    "titulo": "Título original",
+    "resumen": "Resumen original",
+    "url": "https://ejemplo.com/noticia",
+    "fecha": datetime(...),
+    "imagen_url": "https://.../imagen.jpg",
+    "fuente_nombre": "BBC News",
+    "categoria": "Política",
+    "pais": "España",
+    "traduccion_id": 456,  # o None
+    "titulo_traducido": "Título en español",
+    "resumen_traducido": "Resumen en español",
+    "tiene_traduccion": True,  # o False
+    "titulo_original": "Original title",
+    "resumen_original": "Original summary"
+}
+Uso en la aplicación: Esta función es el corazón de la búsqueda en la web, utilizada por los blueprints de Flask.
+
+paises.py
+Propósito: Maneja operaciones relacionadas con países.
+
+Funciones principales:
+
+get_paises(conn) -> List[Dict]
+Descripción: Obtiene todos los países ordenados alfabéticamente.
+
+Parámetros:
+
+conn: Conexión a PostgreSQL
+
+Consulta SQL:
+
+sql
+SELECT id, nombre FROM paises ORDER BY nombre;
+Retorna: Lista de diccionarios con id y nombre de cada país.
+
+Uso típico: Para dropdowns de filtrado por país en la interfaz web.
+
+traducciones.py
+Propósito: Maneja operaciones relacionadas con traducciones específicas.
+
+Funciones principales:
+
+get_traduccion(conn, traduccion_id: int) -> Optional[Dict]
+Descripción: Obtiene una traducción específica por su ID.
+
+Parámetros:
+
+conn: Conexión a PostgreSQL
+
+traduccion_id: ID numérico de la traducción
+
+Consulta SQL:
+
+sql
+SELECT * FROM traducciones WHERE id = %s;
+Retorna: Diccionario con todos los campos de la traducción o None.
+
+Campos incluidos: id, noticia_id, lang_from, lang_to, titulo_trad, resumen_trad, status, error, created_at, etc.
+
+Uso típico: Para páginas de detalle de traducciones o debugging.
+
+Patrones de Diseño Observados
+1. Separación de Responsabilidades
+Cada archivo maneja una entidad específica de la base de datos
+
+Lógica de consultas separada de lógica de negocio
+
+2. Interfaz Consistente
+Todas las funciones reciben conn como primer parámetro
+
+Retornan diccionarios (usando DictCursor)
+
+Nombres descriptivos y consistentes
+
+3. Optimización de Consultas
+Uso de _extraer_tags_por_traduccion para evitar N+1 queries
+
+Consultas COUNT y SELECT en la misma transacción
+
+Índices implícitos en ORDER BY fecha DESC
+
+4. Manejo de Traducciones
+JOIN condicional con tabla traducciones
+
+Flag tiene_traduccion para fácil verificación en frontend
+
+Campos originales siempre disponibles como fallback
+
+5. Seguridad
+Uso de parámetros preparados (%s)
+
+No concatenación directa de strings en SQL
+
+Validación implícita de tipos
+
+Flujo de Datos Típico
+python
+# En un blueprint de Flask
+from db import get_conn
+from models.noticias import buscar_noticias
+
+def ruta_buscar():
+    conn = get_conn()
+    try:
+        noticias, total, paginas, tags = buscar_noticias(
+            conn=conn,
+            page=request.args.get('page', 1, type=int),
+            per_page=20,
+            q=request.args.get('q', ''),
+            categoria_id=request.args.get('categoria_id'),
+            pais_id=request.args.get('pais_id'),
+            lang='es'
+        )
+        # Procesar resultados...
+    finally:
+        conn.close()
+Dependencias y Relaciones
+Requisito: psycopg2.extras.DictCursor para retornar diccionarios
+
+Usado por: Todos los blueprints en routers/
+
+Base de datos: Asume estructura de tablas específica (feeds, noticias, traducciones, etc.)
+
+Índices necesarios: Para optimizar búsquedas, se recomiendan índices en:
+
+noticias(fecha DESC, id DESC)
+
+traducciones(noticia_id, lang_to, status)
+
+feeds(activo, fallos)
+
+

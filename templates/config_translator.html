@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% block title %}Configurar Traductor{% endblock %}
+
+{% block content %}
+<div class="config-form-page">
+    <h2><i class="fas fa-language"></i> Configuración del Traductor</h2>
+
+    <form method="POST" class="config-form">
+        <div class="form-group">
+            <label for="target_langs">
+                <i class="fas fa-globe"></i> Idiomas Destino
+            </label>
+            <input type="text" id="target_langs" name="target_langs" value="{{ config.target_langs }}"
+                placeholder="es,en,fr">
+            <small>Separados por coma. Ej: es,en,fr</small>
+        </div>
+
+        <div class="form-group">
+            <label for="translator_batch">
+                <i class="fas fa-layer-group"></i> Tamaño de Batch
+            </label>
+            <select id="translator_batch" name="translator_batch">
+                {% for b in [8, 16, 32, 64, 128] %}
+                <option value="{{ b }}" {% if config.translator_batch|int==b %}selected{% endif %}>{{ b }}</option>
+                {% endfor %}
+            </select>
+            <small>Número de textos a traducir por lote (8-128)</small>
+        </div>
+
+        <div class="form-group">
+            <label for="universal_model">
+                <i class="fas fa-brain"></i> Modelo Universal
+            </label>
+            <select id="universal_model" name="universal_model">
+                {% set models = [
+                ('facebook/nllb-200-distilled-600M', 'NLLB-200 Distilled 600M (Rápido / Default)'),
+                ('facebook/nllb-200-distilled-1.3B', 'NLLB-200 Distilled 1.3B (Mejor Calidad / Lento)'),
+                ('facebook/nllb-200-1.3B', 'NLLB-200 1.3B (Raw / Lento)'),
+                ('facebook/nllb-200-3.3B', 'NLLB-200 3.3B (Máxima Calidad / Muy Lento / Requiere mucha RAM)')
+                ] %}
+                {% for m_id, m_name in models %}
+                <option value="{{ m_id }}" {% if config.universal_model==m_id %}selected{% endif %}>{{ m_name }}
+                </option>
+                {% endfor %}
+            </select>
+            <small>Selecciona el modelo de traducción. Actualmente usando: <strong>{{ config.universal_model
+                    }}</strong></small>
+            <div class="alert alert-warning" style="margin-top: 10px; font-size: 0.9em; display: none;"
+                id="model-warning">
+                <i class="fas fa-exclamation-triangle"></i> <strong>Atención:</strong> Cambiar el modelo eliminará todas
+                las traducciones existentes para regenerarlas con el nuevo modelo.
+            </div>
+        </div>
+
+        <script>
+            document.getElementById('universal_model').addEventListener('change', function () {
+                var current = "{{ config.universal_model }}";
+                var warning = document.getElementById('model-warning');
+                if (this.value !== current) {
+                    warning.style.display = 'block';
+                } else {
+                    warning.style.display = 'none';
+                }
+            });
+        </script>
+
+        <div class="form-group">
+            <label for="ct2_compute_type">
+                <i class="fas fa-microchip"></i> Tipo de Cuantización
+            </label>
+            <select id="ct2_compute_type" name="ct2_compute_type">
+                <option value="auto" {% if config.ct2_compute_type=='auto' %}selected{% endif %}>auto</option>
+                <option value="int8" {% if config.ct2_compute_type=='int8' %}selected{% endif %}>int8 (más rápido, menos
+                    preciso)</option>
+                <option value="float16" {% if config.ct2_compute_type=='float16' %}selected{% endif %}>float16 (más
+                    preciso)</option>
+                <option value="int8_float16" {% if config.ct2_compute_type=='int8_float16' %}selected{% endif %}>
+                    int8_float16 (balance)</option>
+            </select>
+            <small>Requiere reiniciar el contenedor</small>
+        </div>
+
+        <div class="form-actions">
+            <a href="{{ url_for('config.config_home') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Volver
+            </a>
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> Guardar
+            </button>
+        </div>
+    </form>
+</div>
+
+<style>
+    .config-form-page h2 {
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .config-form {
+        max-width: 500px;
+        background: var(--card-bg, #fff);
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .form-group {
+        margin-bottom: 1.25rem;
+    }
+
+    .form-group label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+    }
+
+    .form-group input,
+    .form-group select {
+        width: 100%;
+        padding: 0.6rem 0.75rem;
+        border: 1px solid var(--border-color, #ddd);
+        border-radius: 8px;
+        font-size: 1rem;
+        background: var(--input-bg, #fff);
+        color: var(--text-color, #333);
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+        outline: none;
+        border-color: var(--secondary-color, #6c63ff);
+        box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.15);
+    }
+
+    .form-group small {
+        display: block;
+        margin-top: 0.35rem;
+        color: var(--text-muted, #666);
+        font-size: 0.8rem;
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 1rem;
+        justify-content: flex-end;
+        margin-top: 1.5rem;
+    }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.6rem 1rem;
+        border: none;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        cursor: pointer;
+        text-decoration: none;
+    }
+
+    .btn-primary {
+        background: var(--secondary-color, #6c63ff);
+        color: #fff;
+    }
+
+    .btn-secondary {
+        background: #6c757d;
+        color: #fff;
+    }
+
+    .dark-mode .config-form {
+        background: var(--card-bg-dark, #1e1e1e);
+    }
+
+    .dark-mode .form-group input,
+    .dark-mode .form-group select {
+        background: #2a2a2a;
+        border-color: #444;
+        color: #eee;
+    }
+</style>
+{% endblock %}

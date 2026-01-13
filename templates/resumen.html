@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}Resumen Diario - {{ current_date.strftime('%d/%m/%Y') }}{% endblock %}
+
+{% block content %}
+<div class="summary-header">
+    <div class="date-nav">
+        <a href="{{ url_for('resumen.diario', date=prev_date) }}" class="btn btn-small btn-secondary">
+            <i class="fas fa-chevron-left"></i> Anterior
+        </a>
+        <h1>Resumen Diario <small>{{ current_date.strftime('%d/%m/%Y') }}</small></h1>
+        {% if next_date %}
+        <a href="{{ url_for('resumen.diario', date=next_date) }}" class="btn btn-small btn-secondary">
+            Siguiente <i class="fas fa-chevron-right"></i>
+        </a>
+        {% else %}
+        <span style="width: 100px;"></span>
+        {% endif %}
+    </div>
+</div>
+
+{% if not noticias_by_cat %}
+<div class="card" style="text-align: center; padding: 40px;">
+    <i class="far fa-newspaper" style="font-size: 3rem; color: #ccc; margin-bottom: 20px;"></i>
+    <h3>No hay noticias para este día</h3>
+    <p>Prueba navegando a días anteriores.</p>
+</div>
+{% else %}
+
+<div class="summary-grid">
+    {% for categoria, noticias in noticias_by_cat.items() %}
+    <div class="category-block card">
+        <h2 class="category-title">{{ categoria }}</h2>
+        <ul class="summary-list">
+            {% for n in noticias %}
+            <li class="summary-item">
+                {% if n.imagen_url %}
+                <div class="summary-img">
+                    <img src="{{ n.imagen_url }}" loading="lazy" onerror="this.style.display='none'">
+                </div>
+                {% endif %}
+                <div class="summary-content">
+                    <h3><a href="{{ url_for('noticia.detalle_noticia', noticia_id=n.id) }}">{{ n.titulo }}</a></h3>
+                    <div class="meta">
+                        {{ n.time_str }} | {{ n.fuente }}
+                    </div>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        <div style="text-align: center; margin-top: 15px;">
+            <a href="{{ url_for('home.home', categoria_id=noticias[0].categoria_id, fecha=current_date) }}"
+                class="btn btn-small btn-outline">Ver más de {{ categoria }}</a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% endif %}
+
+<style>
+    .summary-header {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+    .date-nav {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        max-width: 800px;
+        margin: 0 auto;
+    }
+
+    .date-nav h1 {
+        margin: 0;
+        font-family: var(--primary-font);
+    }
+
+    .date-nav h1 small {
+        display: block;
+        font-size: 0.5em;
+        color: #777;
+        font-family: var(--secondary-font);
+        margin-top: 5px;
+    }
+
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        gap: 20px;
+    }
+
+    .category-title {
+        border-bottom: 2px solid var(--accent-color);
+        padding-bottom: 10px;
+        margin-top: 0;
+        margin-bottom: 20px;
+        font-family: var(--primary-font);
+    }
+
+    .summary-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .summary-item {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 20px;
+        border-bottom: 1px dotted var(--border-color);
+        padding-bottom: 20px;
+    }
+
+    .summary-item:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+
+    .summary-img {
+        width: 80px;
+        height: 80px;
+        flex-shrink: 0;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .summary-img img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .summary-content h3 {
+        margin: 0 0 5px 0;
+        font-size: 1.1rem;
+        line-height: 1.3;
+    }
+
+    .summary-content h3 a {
+        text-decoration: none;
+        color: var(--text-color);
+    }
+
+    .summary-content h3 a:hover {
+        color: var(--accent-color);
+    }
+
+    .meta {
+        font-size: 0.8rem;
+        color: #888;
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,697 @@
+{% extends "base.html" %}
+
+{% block title %}Monitor de Entidades{% endblock %}
+
+{% block content %}
+<div class="monitor-layout">
+    <!-- PANEL IZQUIERDO: FILTROS -->
+    <aside class="monitor-sidebar card">
+        <div class="sidebar-header">
+            <h3><i class="fas fa-filter"></i> Filtros</h3>
+        </div>
+
+        <div class="filter-section">
+            <label class="filter-label"><i class="fas fa-globe"></i> País</label>
+            <div class="custom-dropdown big-dropdown" id="countryDropdown">
+                <input type="text" id="countrySearch" class="form-control big-search" placeholder="Buscar país..."
+                    value="Global" readonly>
+                <div class="dropdown-results static-results" id="dropdownResults"></div>
+            </div>
+        </div>
+
+        <div class="filter-section">
+            <label class="filter-label"><i class="far fa-calendar-alt"></i> Fecha</label>
+            <input type="date" id="datePicker" class="form-control big-date" placeholder="Seleccionar fecha">
+        </div>
+
+        <div class="filter-actions content-center">
+            <button id="clearFilters" class="btn btn-secondary full-btn">
+                <i class="fas fa-times-circle"></i> Limpiar Filtros
+            </button>
+        </div>
+
+        <div class="active-filters-summary">
+            <span class="badge" id="timeRangeBadge">Global | Últimos 30 días</span>
+        </div>
+    </aside>
+
+    <!-- PANEL DERECHO: CONTENIDO Y TABS -->
+    <main class="monitor-main">
+        <!-- TABS DE NAVEGACIÓN -->
+        <div class="monitor-tabs">
+            <button class="monitor-tab active" onclick="switchTab('personas')">
+                <i class="fas fa-user-tie"></i> Personas
+            </button>
+            <button class="monitor-tab" onclick="switchTab('organizaciones')">
+                <i class="fas fa-building"></i> Organizaciones
+            </button>
+            <button class="monitor-tab" onclick="switchTab('lugares')">
+                <i class="fas fa-globe-americas"></i> Lugares
+            </button>
+        </div>
+
+        <!-- CONTENIDO TABS -->
+        <div class="tab-content-container">
+
+
+            <!-- TAB: PERSONAS -->
+            <div id="tab-personas" class="tab-pane active fade-in">
+                <div class="card stats-card full-height">
+                    <!-- Eliminado header redundante, ya está en el tab -->
+                    <div class="entities-container">
+                        <!-- Lista a la izquierda -->
+                        <div class="list-box scroll-y">
+                            <div class="list-header-row">
+                                <span>Entidad</span>
+                                <span>Menciones</span>
+                            </div>
+                            <ol class="entity-list" id="peopleList"></ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: ORGANIZACIONES -->
+            <div id="tab-organizaciones" class="tab-pane fade-in">
+                <div class="card stats-card full-height">
+                    <div class="entities-container">
+                        <div class="list-box scroll-y">
+                            <div class="list-header-row">
+                                <span>Organización</span>
+                                <span>Menciones</span>
+                            </div>
+                            <ol class="entity-list" id="orgsList"></ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: LUGARES -->
+            <div id="tab-lugares" class="tab-pane fade-in">
+                <div class="card stats-card full-height">
+                    <div class="entities-container">
+                        <div class="list-box scroll-y">
+                            <div class="list-header-row">
+                                <span>Lugar</span>
+                                <span>Menciones</span>
+                            </div>
+                            <ol class="entity-list" id="placesList"></ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // --- TABS LOGIC ---
+    function switchTab(tabName) {
+        // Hide all tabs
+        document.querySelectorAll('.tab-pane').forEach(el => {
+            el.classList.remove('active');
+            el.style.display = 'none'; // Force hide
+        });
+        document.querySelectorAll('.monitor-tab').forEach(el => el.classList.remove('active'));
+
+        // Show selected
+        const selected = document.getElementById('tab-' + tabName);
+        if (selected) {
+            selected.classList.add('active');
+            selected.style.display = 'block'; // Force show
+        }
+
+        // Update button
+        const btns = document.querySelectorAll('.monitor-tab');
+        btns.forEach(btn => {
+            if (btn.innerHTML.toLowerCase().includes(tabName)) {
+                btn.classList.add('active');
+            }
+        });
+    }
+
+    // --- ORIGINAL LOGIC ADAPTED ---
+    // Charts removed per user request
+
+    function updateAll(country, date) {
+        loadPeople(country, date);
+        loadOrgs(country);
+        loadPlaces(country);
+    }
+
+    function loadPeople(country, date) {
+        let url = '/stats/api/entities/people';
+        const params = [];
+        if (country && country !== 'global') params.push(`country=${encodeURIComponent(country)}`);
+        if (date) params.push(`date=${encodeURIComponent(date)}`);
+        if (params.length > 0) url += '?' + params.join('&');
+
+        const badge = document.getElementById('timeRangeBadge');
+        if (badge) {
+            const countryText = (country && country !== 'global') ? country.toUpperCase() : 'GLOBAL';
+            const dateText = date ? date : 'Últimos 30 días';
+            badge.textContent = `${countryText} | ${dateText}`;
+        }
+
+        const list = document.getElementById('peopleList');
+        if (list) list.innerHTML = '<div class="loading-spinner">Cargando...</div>';
+
+        fetch(url)
+            .then(response => {
+                if (!response.ok) throw new Error('Error en la carga');
+                return response.json();
+            })
+            .then(data => {
+                if (list) list.innerHTML = '';
+
+                if (!data.labels || data.labels.length === 0) {
+                    if (list) list.innerHTML = '<div class="no-data"><i class="fas fa-info-circle"></i> No hay datos</div>';
+                    return;
+                }
+
+                // Render List
+                if (list) {
+                    data.labels.forEach((name, index) => {
+                        const li = document.createElement('li');
+                        const imgUrl = data.images && data.images[index] ? data.images[index] : null;
+                        const summary = data.summaries && data.summaries[index] ? data.summaries[index] : null;
+
+                        let imgHtml = (imgUrl && imgUrl !== "NO_IMAGE")
+                            ? `<img src="${imgUrl}" class="entity-avatar" alt="${name}">`
+                            : `<div class="entity-avatar-placeholder">${name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}</div>`;
+
+                        let tooltipHtml = summary ? `<div class="entity-tooltip"><strong>${name}</strong><hr>${summary}</div>` : '';
+
+                        li.innerHTML = `
+                            <div class="entity-item-wrapper" style="display: flex; align-items: center; gap: 12px; flex: 1;">
+                                ${imgHtml}
+                                <span class="entity-name">${name}</span>
+                                ${tooltipHtml}
+                            </div>
+                            <span class="entity-count-badge">${data.data[index]}</span>
+                        `;
+                        list.appendChild(li);
+                    });
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                if (list) list.innerHTML = '<div class="error-msg">Error loaded data</div>';
+            });
+    }
+
+    function loadOrgs(country) {
+        let url = '/stats/api/entities/orgs';
+        if (country && country !== 'global') url += `?country=${encodeURIComponent(country)}`;
+
+        const list = document.getElementById('orgsList');
+        if (list) list.innerHTML = '<li>Cargando...</li>';
+
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                if (list) {
+                    list.innerHTML = '';
+                    if (!data.labels || data.labels.length === 0) {
+                        list.innerHTML = '<li class="no-data">No hay datos</li>';
+                        return;
+                    }
+
+                    data.labels.forEach((name, index) => {
+                        const li = document.createElement('li');
+                        let imgUrl = data.images && data.images[index];
+                        const summary = data.summaries && data.summaries[index];
+
+                        let imgHtml = (imgUrl && imgUrl !== "NO_IMAGE")
+                            ? `<img src="${imgUrl}" class="entity-avatar" alt="${name}">`
+                            : `<div class="entity-avatar-placeholder">${name.substring(0, 2).toUpperCase()}</div>`;
+
+                        let tooltipHtml = summary ? `<div class="entity-tooltip"><strong>${name}</strong><hr>${summary}</div>` : '';
+
+                        li.innerHTML = `
+                                <div class="entity-item-wrapper" style="display: flex; align-items: center; width: 100%; gap: 12px;">
+                                    ${imgHtml}
+                                    <span class="entity-name">${name}</span>
+                                    ${tooltipHtml}
+                                </div>
+                                <span class="entity-count-badge">${data.data[index]}</span>
+                            `;
+                        list.appendChild(li);
+                    });
+                }
+            })
+            .catch(err => { });
+    }
+
+    function loadPlaces(country) {
+        let url = '/stats/api/entities/places';
+        if (country && country !== 'global') url += `?country=${encodeURIComponent(country)}`;
+
+        const list = document.getElementById('placesList');
+        if (list) list.innerHTML = '<li>Cargando...</li>';
+
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                if (list) {
+                    list.innerHTML = '';
+                    if (!data.labels || data.labels.length === 0) {
+                        list.innerHTML = '<li class="no-data">No hay datos</li>';
+                        return;
+                    }
+
+                    data.labels.forEach((name, index) => {
+                        const li = document.createElement('li');
+                        let imgUrl = data.images && data.images[index];
+                        const summary = data.summaries && data.summaries[index];
+
+                        let imgHtml = (imgUrl && imgUrl !== "NO_IMAGE")
+                            ? `<img src="${imgUrl}" class="entity-avatar" alt="${name}">`
+                            : `<div class="entity-avatar-placeholder">${name.substring(0, 2).toUpperCase()}</div>`;
+
+                        let tooltipHtml = summary ? `<div class="entity-tooltip"><strong>${name}</strong><hr>${summary}</div>` : '';
+
+                        li.innerHTML = `
+                                <div class="entity-item-wrapper" style="display: flex; align-items: center; width: 100%; gap: 12px;">
+                                    ${imgHtml}
+                                    <span class="entity-name">${name}</span>
+                                    ${tooltipHtml}
+                                </div>
+                                <span class="entity-count-badge">${data.data[index]}</span>
+                            `;
+                        list.appendChild(li);
+                    });
+                }
+            })
+            .catch(err => { });
+    }
+
+    // --- FILTERS & DROPDOWN LOGIC ---
+    document.getElementById('clearFilters').addEventListener('click', function () {
+        const cs = document.getElementById('countrySearch');
+        if (cs) {
+            cs.value = 'Global';
+            cs.setAttribute('readonly', 'readonly');
+        }
+        document.getElementById('datePicker').value = '';
+        renderResults(''); // Reset db
+        updateAll('global', null);
+    });
+
+    document.getElementById('datePicker').addEventListener('change', function (e) {
+        const currentCountry = document.getElementById('countrySearch').value;
+        const country = currentCountry === 'Global' ? 'global' : currentCountry;
+        updateAll(country, e.target.value);
+    });
+
+    function selectCountry(displayText, value) {
+        countrySearch.value = displayText;
+        // dropdownResults is now always visible or handled via CSS, lets just update query
+        const currentDate = document.getElementById('datePicker').value;
+        updateAll(value, currentDate || null);
+    }
+
+    // Updated Country Logic
+    let allCountries = [];
+    const countrySearch = document.getElementById('countrySearch');
+    const dropdownResults = document.getElementById('dropdownResults');
+
+    fetch('/stats/api/countries/list')
+        .then(res => res.json())
+        .then(data => {
+            allCountries = data;
+            renderResults(''); // Render initial full list
+        })
+        .catch(err => console.error('Error loading countries:', err));
+
+    function renderResults(filterText) {
+        const filter = filterText || '';
+        dropdownResults.innerHTML = '';
+
+        if (!filter || 'global'.includes(filter.toLowerCase())) {
+            const globalItem = document.createElement('div');
+            globalItem.className = 'dropdown-item';
+            globalItem.innerHTML = '🌍 <strong>Global</strong>';
+            globalItem.onclick = () => selectCountry('Global', 'global');
+            dropdownResults.appendChild(globalItem);
+        }
+
+        const filtered = allCountries.filter(c =>
+            !filter || c.name.toLowerCase().includes(filter.toLowerCase())
+        );
+
+        filtered.forEach(c => {
+            const item = document.createElement('div');
+            item.className = 'dropdown-item';
+            item.innerHTML = `<span class="flag">${c.flag}</span> <span class="name">${c.name}</span>`;
+            item.onclick = () => selectCountry(c.name, c.name);
+            dropdownResults.appendChild(item);
+        });
+    }
+
+    countrySearch.addEventListener('input', (e) => {
+        countrySearch.removeAttribute('readonly');
+        renderResults(e.target.value);
+    });
+
+    countrySearch.addEventListener('click', () => {
+        countrySearch.removeAttribute('readonly');
+        countrySearch.value = '';
+        countrySearch.focus();
+        renderResults('');
+    });
+
+    // Initial
+    switchTab('personas'); // Default tab
+    updateAll('global', null);
+
+    // Mouse Tooltips
+    document.addEventListener('mousemove', function (e) {
+        const tooltips = document.querySelectorAll('.entity-tooltip');
+        if (tooltips.length === 0) return;
+        tooltips.forEach(tooltip => {
+            const style = window.getComputedStyle(tooltip);
+            if (tooltip.style.visibility === 'visible' || style.visibility === 'visible') {
+                let x = e.clientX + 20;
+                let y = e.clientY - 40;
+                if (x + 400 > window.innerWidth) x = window.innerWidth - 420;
+                if (y + 300 > window.innerHeight) y = window.innerHeight - 310;
+                tooltip.style.left = x + 'px';
+                tooltip.style.top = y + 'px';
+            }
+        });
+    });
+</script>
+
+<style>
+    /* LAYOUT MACRO */
+    .monitor-layout {
+        display: flex;
+        gap: 20px;
+        align-items: flex-start;
+        padding-bottom: 40px;
+        min-height: 85vh;
+    }
+
+    .monitor-sidebar {
+        width: 320px;
+        flex-shrink: 0;
+        background: var(--bg-card);
+        padding: 20px;
+        border-radius: 12px;
+        position: sticky;
+        top: 20px;
+        height: auto;
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+        border: 1px solid var(--border-color);
+    }
+
+    /* FIX: Moved out of nesting */
+    .entity-item-wrapper img {
+        max-width: none;
+        /* Reset global limits */
+    }
+
+    .entity-avatar {
+        width: 50px !important;
+        height: 50px !important;
+        min-width: 50px !important;
+        max-width: 50px !important;
+        flex-shrink: 0 !important;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid var(--border-color);
+        display: block;
+        margin-right: 15px;
+    }
+
+    .entity-item-wrapper {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        overflow: hidden;
+    }
+
+    .monitor-main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        min-width: 0;
+        /* Prevent flex overflow */
+    }
+
+    /* SIDEBAR STYLES */
+    .sidebar-header h3 {
+        color: var(--text-primary);
+        margin-top: 0;
+        border-bottom: 2px solid var(--border-color);
+        padding-bottom: 15px;
+        margin-bottom: 20px;
+        font-size: 1.4em;
+    }
+
+    .filter-section {
+        margin-bottom: 25px;
+    }
+
+    .filter-label {
+        display: block;
+        margin-bottom: 10px;
+        color: var(--text-secondary);
+        font-weight: 600;
+        font-size: 0.9em;
+    }
+
+    .big-search {
+        font-size: 1.1em;
+        padding: 12px;
+        border: 2px solid var(--border-color);
+        background: var(--bg-input);
+    }
+
+    .big-date {
+        font-size: 1em;
+        padding: 10px;
+    }
+
+    .custom-dropdown.big-dropdown {
+        width: 100%;
+        position: relative;
+    }
+
+    .dropdown-results.static-results {
+        position: relative;
+        /* In flow, not floating */
+        border: 1px solid var(--border-color);
+        background: var(--bg-body);
+        max-height: 400px;
+        /* TALLER */
+        overflow-y: auto;
+        margin-top: 5px;
+        display: block;
+        /* Always visible or toggleable */
+        border-radius: 8px;
+    }
+
+    .dropdown-item {
+        padding: 12px 15px;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 1.05em;
+    }
+
+    .dropdown-item:last-child {
+        border-bottom: none;
+    }
+
+    .filter-actions {
+        margin-top: auto;
+        padding-top: 20px;
+    }
+
+    .full-btn {
+        width: 100%;
+        justify-content: center;
+        padding: 12px;
+    }
+
+    .active-filters-summary {
+        margin-top: 20px;
+        text-align: center;
+    }
+
+    /* TABS STYLES */
+    .monitor-tabs {
+        display: flex;
+        gap: 10px;
+        border-bottom: 2px solid var(--border-color);
+        padding-bottom: 0px;
+    }
+
+    .monitor-tab {
+        background: transparent;
+        border: none;
+        color: var(--text-secondary);
+        font-size: 1.1em;
+        padding: 12px 25px;
+        cursor: pointer;
+        font-weight: 600;
+        position: relative;
+        transition: all 0.2s;
+        border-radius: 8px 8px 0 0;
+    }
+
+    .monitor-tab:hover {
+        color: var(--text-primary);
+        background: var(--bg-hover);
+    }
+
+    .monitor-tab.active {
+        color: var(--accent-color);
+        background: var(--bg-card);
+        border-bottom: 3px solid var(--accent-color);
+    }
+
+    /* CONTENT AREAS */
+    .tab-pane {
+        display: none;
+    }
+
+    .tab-pane.active {
+        display: block;
+        animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(5px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .full-height {
+        min-height: 700px;
+        padding: 0;
+        overflow: hidden;
+    }
+
+    .entities-container {
+        display: block;
+        height: 700px;
+        width: 100%;
+    }
+
+    .list-box {
+        width: 100%;
+        height: 100%;
+        border-right: none;
+        overflow-y: auto;
+        padding: 0;
+        background: var(--bg-card);
+    }
+
+    .scroll-y {
+        overflow-y: auto;
+    }
+
+    .chart-box {
+        flex: 1;
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--bg-body);
+        /* Slightly darker for contrast */
+    }
+
+    .list-header-row {
+        position: sticky;
+        top: 0;
+        background: var(--bg-header);
+        padding: 10px 15px;
+        display: flex;
+        justify-content: space-between;
+        font-weight: 700;
+        border-bottom: 2px solid var(--border-color);
+        z-index: 10;
+    }
+
+    .entity-list {
+        display: flex;
+        flex-direction: column;
+        /* Force single column list */
+        row-gap: 0;
+    }
+
+    .entity-list li {
+        padding: 12px 15px;
+        margin: 0;
+        border-bottom: 1px solid var(--border-color);
+        transition: background 0.1s;
+    }
+
+    .entity-list li:hover {
+        background: var(--bg-hover);
+    }
+
+    .entity-count-badge {
+        background: var(--accent-color);
+        color: #fff;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 0.85em;
+        font-weight: 700;
+    }
+
+    /* UTILITIES */
+    .entity-tooltip {
+        position: fixed;
+        visibility: hidden;
+        z-index: 9999;
+        background: var(--paper-color);
+        border: 1px solid var(--accent-color);
+        padding: 15px;
+        border-radius: 8px;
+        width: 300px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+
+    /* RESPONSIVE */
+    @media (max-width: 1100px) {
+        .monitor-layout {
+            flex-direction: column;
+        }
+
+        .monitor-sidebar {
+            width: 100%;
+            position: static;
+            max-height: none;
+        }
+
+        .entities-container.row-layout {
+            flex-direction: column;
+            height: auto;
+        }
+
+        .list-box {
+            flex: none;
+            border-right: none;
+            height: 500px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .chart-box {
+            height: 400px;
+        }
+    }
+</style>
+{% endblock %}

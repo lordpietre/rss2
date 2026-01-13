@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Editar Fuente URL{% endblock %}
+
+{% block content %}
+<h1>Editar Fuente: {{ fuente.nombre }}</h1>
+
+<div class="card">
+    <form action="{{ url_for('edit_url_source', url_id=fuente.id) }}" method="post">
+
+        <label for="nombre">Nombre</label>
+        <input type="text" id="nombre" name="nombre" value="{{ fuente.nombre }}" required>
+
+        <label for="url" style="margin-top:15px;">URL</label>
+        <input type="url" id="url" name="url" value="{{ fuente.url }}" required>
+
+        <label for="categoria_id" style="margin-top:15px;">Categoría</label>
+        <select id="categoria_id" name="categoria_id">
+            <option value="">— Sin categoría —</option>
+            {% for c in categorias %}
+                <option value="{{ c.id }}" {% if c.id == fuente.categoria_id %}selected{% endif %}>
+                    {{ c.nombre }}
+                </option>
+            {% endfor %}
+        </select>
+
+        <label for="pais_id" style="margin-top:15px;">País</label>
+        <select id="pais_id" name="pais_id">
+            <option value="">— Sin país —</option>
+            {% for p in paises %}
+                <option value="{{ p.id }}" {% if p.id == fuente.pais_id %}selected{% endif %}>
+                    {{ p.nombre }}
+                </option>
+            {% endfor %}
+        </select>
+
+        <label for="idioma" style="margin-top:15px;">Idioma (2 letras)</label>
+        <input id="idioma" name="idioma" value="{{ fuente.idioma }}" maxlength="2" required>
+
+        <div style="display:flex;justify-content:end;gap:10px;margin-top:20px;">
+            <a href="{{ url_for('manage_urls') }}" class="btn btn-secondary">Cancelar</a>
+            <button class="btn" type="submit">Actualizar</button>
+        </div>
+
+    </form>
+</div>
+
+{% endblock %}
+

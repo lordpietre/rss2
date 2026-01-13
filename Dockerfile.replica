@@ -1,0 +1,12 @@
+FROM postgres:18-alpine
+
+# Copy initialization script
+COPY init-replica/init-replica.sh /docker-entrypoint-initdb.d/
+
+# Make script executable
+RUN chmod +x /docker-entrypoint-initdb.d/init-replica.sh
+
+# Set environment for replication
+ENV PRIMARY_HOST=db
+ENV REPLICATION_USER=replicator
+ENV REPLICATION_PASSWORD=replica_password

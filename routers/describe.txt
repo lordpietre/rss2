@@ -1,0 +1,494 @@
+routers/
+├── __init__.py              # Paquete Python (vacío)
+├── home.py                  # Página principal y búsqueda de noticias
+├── feeds.py                 # Gestión de feeds RSS
+├── urls.py                  # Gestión de fuentes de URL
+├── noticia.py               # Página de detalle de noticia
+├── eventos.py               # Visualización de eventos por país
+└── backup.py                # Importación/exportación de feeds
+
+init.py
+Propósito: Archivo necesario para que Python reconozca este directorio como un paquete.
+
+Contenido: Vacío o comentario explicativo.
+
+Uso: Permite importar blueprints desde routers:
+
+python
+from routers.home import home_bp
+home.py
+Propósito: Blueprint para la página principal y búsqueda de noticias.
+
+Ruta base: / y /home
+
+Blueprints definidos:
+
+home_bp = Blueprint("home", __name__)
+
+Rutas:
+
+@home_bp.route("/") y @home_bp.route("/home")
+Método: GET
+Descripción: Página principal con sistema de búsqueda avanzada.
+
+Parámetros de consulta soportados:
+
+page: Número de página (default: 1)
+
+per_page: Resultados por página (default: 20, range: 10-100)
+
+q: Término de búsqueda
+
+categoria_id: Filtrar por categoría
+
+continente_id: Filtrar por continente
+
+pais_id: Filtrar por país
+
+fecha: Filtrar por fecha (YYYY-MM-DD)
+
+lang: Idioma para mostrar (default: "es")
+
+orig: Si está presente, mostrar sólo originales sin traducciones
+
+Funcionalidades:
+
+Paginación: Sistema robusto con límites
+
+Búsqueda avanzada: Usa models.noticias.buscar_noticias()
+
+Soporte AJAX: Si X-Requested-With: XMLHttpRequest, retorna solo _noticias_list.html
+
+Filtros combinados: Todos los filtros pueden usarse simultáneamente
+
+Manejo de fechas: Conversión segura de strings a date
+
+Variables de contexto para template:
+
+noticias: Lista de noticias con datos completos
+
+total_results: Total de resultados
+
+total_pages: Total de páginas
+
+categorias, paises: Para dropdowns de filtros
+
+tags_por_tr: Diccionario de tags por traducción
+
+Templates utilizados:
+
+noticias.html: Página completa (HTML)
+
+_noticias_list.html: Fragmento para AJAX (solo lista de noticias)
+
+Características especiales:
+
+use_tr = not bool(request.args.get("orig")): Controla si mostrar traducciones
+
+lang = (request.args.get("lang") or DEFAULT_TRANSLATION_LANG or DEFAULT_LANG).lower()[:5]: Manejo seguro de idioma
+
+feeds.py
+Propósito: Blueprint para la gestión completa de feeds RSS.
+
+Ruta base: /feeds
+
+Blueprints definidos:
+
+feeds_bp = Blueprint("feeds", __name__, url_prefix="/feeds")
+
+Rutas:
+
+@feeds_bp.route("/") - list_feeds()
+Método: GET
+Descripción: Listado paginado de feeds con filtros avanzados.
+
+Parámetros de filtro:
+
+pais_id: Filtrar por país
+
+categoria_id: Filtrar por categoría
+
+estado: "activos", "inactivos", "errores" o vacío para todos
+
+Características:
+
+Paginación (50 feeds por página)
+
+Contador de totales
+
+Ordenamiento: país → categoría → nombre
+
+@feeds_bp.route("/add", methods=["GET", "POST"]) - add_feed()
+Método: GET y POST
+Descripción: Formulario para añadir nuevo feed.
+
+Campos del formulario:
+
+nombre: Nombre del feed (requerido)
+
+descripcion: Descripción opcional
+
+url: URL del feed RSS (requerido)
+
+categoria_id: Categoría (select dropdown)
+
+pais_id: País (select dropdown)
+
+idioma: Código de idioma (2 letras, opcional)
+
+Validaciones:
+
+idioma se normaliza a minúsculas y máximo 2 caracteres
+
+Campos opcionales convertidos a None si vacíos
+
+@feeds_bp.route("/<int:feed_id>/edit", methods=["GET", "POST"]) - edit_feed(feed_id)
+Método: GET y POST
+Descripción: Editar feed existente.
+
+Funcionalidades:
+
+Pre-carga datos actuales del feed
+
+Mismo formulario que add_feed pero con datos existentes
+
+Campo adicional: activo (checkbox)
+
+@feeds_bp.route("/<int:feed_id>/delete") - delete_feed(feed_id)
+Método: GET
+Descripción: Eliminar feed por ID.
+
+Nota: DELETE simple sin confirmación en frontend (depende de template).
+
+@feeds_bp.route("/<int:feed_id>/reactivar") - reactivar_feed(feed_id)
+Método: GET
+Descripción: Reactivar feed que tiene fallos.
+
+Acción: Establece activo=TRUE y fallos=0.
+
+Templates utilizados:
+
+feeds_list.html: Listado principal
+
+add_feed.html: Formulario de añadir
+
+edit_feed.html: Formulario de editar
+
+urls.py
+Propósito: Blueprint para gestión de fuentes de URL (no feeds RSS).
+
+Ruta base: /urls
+
+Blueprints definidos:
+
+urls_bp = Blueprint("urls", __name__, url_prefix="/urls")
+
+Rutas:
+
+@urls_bp.route("/") - manage_urls()
+Método: GET
+Descripción: Lista todas las fuentes de URL registradas.
+
+Datos mostrados: ID, nombre, URL, categoría, país, idioma.
+
+@urls_bp.route("/add_source", methods=["GET", "POST"]) - add_url_source()
+Método: GET y POST
+Descripción: Añadir/actualizar fuente de URL.
+
+Características únicas:
+
+Usa ON CONFLICT (url) DO UPDATE: Si la URL ya existe, actualiza
+
+idioma default: "es" si no se especifica
+
+Mismos campos que feeds pero para URLs individuales
+
+Templates utilizados:
+
+urls_list.html: Listado
+
+add_url_source.html: Formulario
+
+noticia.py
+Propósito: Blueprint para página de detalle de noticia individual.
+
+Ruta base: /noticia
+
+Blueprints definidos:
+
+noticia_bp = Blueprint("noticia", __name__)
+
+Rutas:
+
+@noticia_bp.route("/noticia") - noticia()
+Método: GET
+Descripción: Muestra detalle completo de una noticia.
+
+Parámetros de consulta:
+
+tr_id: ID de traducción (prioritario)
+
+id: ID de noticia original (si no hay tr_id)
+
+Flujo de datos:
+
+Si hay tr_id: Obtiene datos combinados de traducción y noticia original
+
+Si solo hay id: Obtiene solo datos originales
+
+Si no hay ninguno: Redirige a home con mensaje de error
+
+Datos obtenidos:
+
+Información básica: título, resumen, URL, fecha, imagen, fuente
+
+Datos de traducción (si aplica): idiomas, títulos/resúmenes traducidos
+
+Metadatos: categoría, país
+
+Tags: Etiquetas asociadas a la traducción
+
+Noticias relacionadas: Hasta 8, ordenadas por score de similitud
+
+Consultas adicionales (solo si hay traducción):
+
+Tags: SELECT tg.valor, tg.tipo FROM tags_noticia...
+
+Noticias relacionadas: SELECT n2.url, n2.titulo... FROM related_noticias...
+
+Templates utilizados:
+
+noticia.html: Página de detalle completa
+
+eventos.py
+Propósito: Blueprint para visualización de eventos agrupados por país.
+
+Ruta base: /eventos_pais
+
+Blueprints definidos:
+
+eventos_bp = Blueprint("eventos", __name__, url_prefix="/eventos_pais")
+
+Rutas:
+
+@eventos_bp.route("/") - eventos_pais()
+Método: GET
+Descripción: Lista eventos (clusters de noticias) filtrados por país.
+
+Parámetros de consulta:
+
+pais_id: ID del país (obligatorio para ver eventos)
+
+page: Número de página (default: 1)
+
+lang: Idioma para traducciones (default: "es")
+
+Funcionalidades:
+
+Lista de países: Siempre visible para selección
+
+Eventos paginados: 30 por página
+
+Noticias por evento: Agrupadas bajo cada evento
+
+Datos completos: Cada noticia con originales y traducidos
+
+Estructura de datos:
+
+Países: Lista completa para dropdown
+
+Eventos: Paginados, con título, fechas, conteo de noticias
+
+Noticias por evento: Diccionario {evento_id: [noticias...]}
+
+Consultas complejas:
+
+Agrupación con GROUP BY y MAX(p.nombre)
+
+JOIN múltiple: eventos ↔ traducciones ↔ noticias ↔ países
+
+Subconsulta para noticias por evento usando ANY(%s)
+
+Variables de contexto:
+
+paises, eventos, noticias_por_evento
+
+pais_nombre: Nombre del país seleccionado
+
+total_eventos, total_pages, page, lang
+
+Templates utilizados:
+
+eventos_pais.html: Página principal
+
+backup.py
+Propósito: Blueprint para importación y exportación de feeds en CSV.
+
+Ruta base: /backup_feeds y /restore_feeds
+
+Blueprints definidos:
+
+backup_bp = Blueprint("backup", __name__)
+
+Rutas:
+
+@backup_bp.route("/backup_feeds") - backup_feeds()
+Método: GET
+Descripción: Exporta todos los feeds a CSV.
+
+Características:
+
+Incluye joins con categorías y países para nombres legibles
+
+Codificación UTF-8 con BOM
+
+Nombre de archivo: feeds_backup.csv
+
+Usa io.StringIO y io.BytesIO para evitar archivos temporales
+
+Campos exportados:
+
+Todos los campos de feeds más nombres de categoría y país
+
+@backup_bp.route("/restore_feeds", methods=["GET", "POST"]) - restore_feeds()
+Método: GET y POST
+Descripción: Restaura feeds desde CSV (reemplazo completo).
+
+Flujo de restauración:
+
+GET: Muestra formulario de subida
+
+POST:
+
+Valida archivo y encabezados CSV
+
+TRUNCATE feeds RESTART IDENTITY CASCADE: Borra todo antes de importar
+
+Procesa cada fila con validación
+
+Estadísticas: importados, saltados, fallidos
+
+Validaciones:
+
+Encabezados exactos esperados
+
+URL y nombre no vacíos
+
+Conversión segura de tipos (int, bool)
+
+Normalización de idioma (2 caracteres minúsculas)
+
+Limpieza de datos:
+
+python
+row = {k: (v.strip().rstrip("ç") if v else "") for k, v in row.items()}
+Manejo de booleanos:
+
+python
+activo = str(row["activo"]).lower() in ("true", "1", "t", "yes", "y")
+Templates utilizados:
+
+restore_feeds.html: Formulario de subida
+
+Patrones de Diseño Comunes
+1. Estructura de Blueprints
+python
+# Definición estándar
+bp = Blueprint("nombre", __name__, url_prefix="/ruta")
+
+# Registro en app.py
+app.register_blueprint(bp)
+2. Manejo de Conexiones a BD
+python
+with get_conn() as conn:
+    # Usar conn para múltiples operaciones
+    # conn.autocommit = True si es necesario
+3. Paginación Consistente
+python
+page = max(int(request.args.get("page", 1)), 1)
+per_page = 50  # o variable
+offset = (page - 1) * per_page
+4. Manejo de Parámetros de Filtro
+python
+where = []
+params = []
+
+if pais_id:
+    where.append("f.pais_id = %s")
+    params.append(int(pais_id))
+
+where_sql = "WHERE " + " AND ".join(where) if where else ""
+5. Flash Messages
+python
+flash("Operación exitosa", "success")
+flash("Error: algo salió mal", "error")
+6. Redirecciones
+python
+return redirect(url_for("blueprint.funcion"))
+7. Manejo de Formularios
+python
+if request.method == "POST":
+    # Procesar datos
+    return redirect(...)
+# GET: mostrar formulario
+return render_template("form.html", datos=...)
+Seguridad y Validaciones
+1. SQL Injection
+Todos los parámetros usan %s con psycopg2
+
+No hay concatenación de strings en SQL
+
+2. Validación de Entrada
+Conversión segura a int: int(valor) if valor else None
+
+Limpieza de strings: .strip(), normalización
+
+Rangos: min(max(per_page, 10), 100)
+
+3. Manejo de Archivos
+Validación de tipo de contenido
+
+Decodificación UTF-8 con manejo de BOM
+
+Uso de io para evitar archivos temporales
+
+Optimizaciones
+1. JOINs Eficientes
+LEFT JOIN para datos opcionales
+
+GROUP BY cuando es necesario
+
+Uso de índices implícitos en ORDER BY
+
+2. Batch Operations
+TRUNCATE ... RESTART IDENTITY más rápido que DELETE
+
+Inserción fila por fila con validación
+
+3. Manejo de Memoria
+io.StringIO para CSV en memoria
+
+Cursors con DictCursor para acceso por nombre
+
+Dependencias entre Blueprints
+text
+home.py
+  └── usa: models.noticias.buscar_noticias()
+       └── usa: _extraer_tags_por_traduccion()
+
+feeds.py
+  └── usa: models.categorias.get_categorias()
+  └── usa: models.paises.get_paises()
+
+urls.py
+  └── usa: models.categorias.get_categorias()
+  └── usa: models.paises.get_paises()
+
+noticia.py
+  └── consultas directas (no usa models/)
+
+eventos.py
+  └── consultas directas (no usa models/)
+
+backup.py
+  └── consultas directas (no usa models/)

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Añadir Nuevo Feed{% endblock %}
+
+{% block content %}
+    <header>
+        <h1>Añadir Nuevo Feed</h1>
+        <p class="subtitle">Introduce los detalles de la nueva fuente de noticias RSS.</p>
+        <a href="{{ url_for('dashboard') }}" class="top-link" style="margin-top:15px;">← Volver al Dashboard</a>
+    </header>
+
+    <div class="form-section">
+        <form action="{{ url_for('add_feed') }}" method="post" autocomplete="off">
+            <div>
+                <label for="nombre">Nombre del feed</label>
+                <input id="nombre" name="nombre" type="text" placeholder="Ej: Noticias de Tecnología" required>
+            </div>
+
+            <div style="margin-top:15px;">
+                <label for="url">URL del RSS</label>
+                <input id="url" name="url" type="url" placeholder="https://ejemplo.com/rss" required>
+            </div>
+
+            <div style="margin-top:15px;">
+                <label for="descripcion">Descripción</label>
+                <textarea id="descripcion" name="descripcion" rows="2" placeholder="Breve descripción del contenido del feed"></textarea>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-top: 15px;">
+                <div>
+                    <label for="categoria_id">Categoría</label>
+                    <select id="categoria_id" name="categoria_id" required>
+                        <option value="">— Elige categoría —</option>
+                        {% for cat in categorias %}
+                            <option value="{{ cat.id }}">{{ cat.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="pais_id">País</label>
+                    <select name="pais_id" id="pais_id">
+                        <option value="">— Global / No aplica —</option>
+                        {% for pais in paises %}
+                            <option value="{{ pais.id }}">{{ pais.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="idioma">Idioma (código)</label>
+                    <input id="idioma" name="idioma" type="text" maxlength="2" placeholder="ej: es, en">
+                </div>
+            </div>
+
+            <button type="submit" class="btn" style="margin-top: 25px; width: 100%;">Añadir Feed</button>
+        </form>
+    </div>
+{% endblock %}

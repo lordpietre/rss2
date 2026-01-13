@@ -1,0 +1,64 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+venv/
+.env
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+pgdata/
+pgdata-replica/
+pgdata.failed_restore/
+pgdata-replica.old.*/
+redis-data/
+hf_cache/
+models/nllb-ct2/
+qdrant_storage/
+*.log
+*.db
+*.sqlite
+*.sqlite3
+data/
+*.mp4
+*.mp3
+*.wav
+*.srt
+*.tar.gz
+*.zip
+*.bak
+*.old
+
+
+# ==================================================================================
+# SECURITY FILES - NEVER COMMIT THESE
+# ==================================================================================
+# Environment files with credentials
+.env
+.env.backup*
+.env.generated
+.env.local
+.env.*.local
+
+# Database backups
+*.sql
+backup_*.sql
+
+# Redis backups
+*.rdb
+redis_backup_*.rdb
+
+# Qdrant backups
+qdrant_backup_*.tar.gz
+
+# Docker compose with real credentials (if you create variations)
+docker-compose.override.yml

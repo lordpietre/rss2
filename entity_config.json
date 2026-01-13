@@ -1,0 +1,262 @@
+{
+	"blacklist": [
+		"Indicó",
+		"Insistió",
+		"levier",
+		"Dios",
+		"Elefantes",
+		"AbidjanTV.net",
+		"Gabón",
+		"París",
+		"Bingerville",
+		"Biankouma",
+		"Bouaké",
+		"Cote",
+		"Costa",
+		"Pugh",
+		"Gracias",
+		"Tesla",
+		"Netflix",
+		"Disney",
+		"Ford",
+		"Continúe",
+		"Cenizas",
+		"Victoria",
+		"Fiscalía",
+		"Detalles",
+		"Presiones",
+		"Fuertes",
+		"Industria",
+		"Dios",
+		"Nuestro",
+		"Según",
+		"Finanzas",
+		"Enterate",
+		"Presupuesto",
+		"Adiós",
+		"Quién",
+		"Cuándo",
+		"Hablando",
+		"Términos",
+		"Agregó",
+		"Blockchain",
+		"blockchain",
+		"Bitcoin",
+		"Trono",
+		"Robotaxi",
+		"Penalidades",
+		"Deportes",
+		"Candidato",
+		"Parecía",
+		"Declaraciones",
+		"Había",
+		"Hermanos",
+		"Hombre de Dios",
+		"Creyendo",
+		"Renacimiento",
+		"Cristo",
+		"Señor",
+		"Jefe de Estado",
+		"Educación",
+		"Dice",
+		"Estoy",
+		"Expresaron",
+		"Bondi",
+		"Suspechoso",
+		"Sydney",
+		"Amazon",
+		"L'FC Andorra",
+		"Delanteros",
+		"Lee",
+		"Leé",
+		"Lea",
+		"Presione",
+		"Carrera",
+		"Alejandría",
+		"Javier Romero Communications and Marketing Officer Statistical Institute of Belize jromero@mail.sib.org.bz",
+		"Copyright",
+		"Allah",
+		"Crack",
+		"Akbar",
+		"Getty Images",
+                "Buffalo Bills",
+		"Comandantes",
+		"Gigantes",
+		"Anónimo",
+		"Raadiouudised",
+		"Eswatini",
+		"Stock",
+		"Ethio Telecom",
+		"DPWH",
+		"Obras Públicas",
+		"Malacañang",
+		"Sigue",
+		"Becas",
+		"Crédito",
+		"Claro",
+		"Reaccione",
+		"Indique",
+		"Pakistán",
+		"Tolo News",
+		"Gladbach",
+		"Alger"
+
+	],
+	"synonyms": {
+		"Alassane Ouattara": [
+			"Ouattara",
+			"M. Ouattara",
+			"Presidente Ouattara"
+		],
+		"Alexander Stubb": [
+			"Stubb"
+		],
+		"Brice Clotaire Oligui Nguema": [
+			"Oligui Nguema"
+		],
+		"Dr. Mahamudu Bawumia": [
+			"Dr. Bawumia"
+		],
+		"John Dramani Mahama": [
+			"John Mahama",
+			"Mahama"
+		],
+		"Antoine Semenyo": [
+			"Semenyo"
+		],
+		"Kim Jong Un": [
+			"Kim Jong"
+	        ],
+		"Daniel Noboa": [
+			"Noboa"
+		],
+		"Donald Trump": [
+			"Trump",
+			"Mr. Trump"
+		],
+		"Nayib Bukele": [
+			"Bukele"
+		],
+		"Peter Pellegrini": [
+			"Pellegrini"
+		],
+		"Robert Fico": [
+			"Fico"
+		],
+		"Vladimir Putin": [
+			"Putin",
+			"V. Putin"
+		],
+		"Emmanuel Macron": [
+			"Macron",
+			"Presidente Macron"
+		],
+		"Pedro Sánchez": [
+			"Sánchez",
+			"Pedro Sanchez"
+		],
+		"Nicolás Maduro": [
+			"Maduro"
+		],
+		"Lula da Silva": [
+			"Lula",
+			"Luiz Inácio Lula da Silva"
+		],
+		"Jeffrey Epstein": [
+			"Epstein"
+		],
+		"José Antonio Kast": [
+			"Kast"
+		],
+		"Jake Paul": [
+			"Paul"
+		],
+		"Lionel Messi": [
+			"Messi",
+			"Lionel Andres Messi",
+			"Leo Messi"
+		],
+		"Luis Caputo": [
+			"Caputo"
+		],
+		"Javier Milei": [
+			"Milei"
+		],
+		 "Mia Amor Mottley": [
+       			"Mia Mottley",
+			"Mottley"
+		],
+		"Elon Musk": [
+			"Musk"
+		],
+		"Ibrahim Traoré": [
+			"Traoré",
+			"Ibrahim Traore",
+			"Capitán Ibrahim TRAORÉ"
+		],
+		"Friedrich Merz": [
+			"Merz"
+		],
+		"Edi Rama": [
+			"Rama"
+		],
+		"Fabiola Hoxha": [
+			"Hoxha"
+		],
+		"Hugo Broos": [
+			"Broos"
+		],
+		"Himad Abdelli": [
+			"Abdelli"
+		],
+		"Abdelmadjid Tebboune": [
+			"Tebboune",
+			"Abdul Majid Tabon",
+			"Tabon"
+		],
+		"Ibrahim Maza": [
+			"Maza"
+		],
+		"Shehbaz Sharif": [
+			"Sharif"
+		],
+		"Lindsey Vonn": [
+			"Vonn"
+		],
+		"Erdogan": [
+			"Rəcəb Tayyib Erdoğan"
+		],
+		"Evo Morales": [
+			"Morales"
+		],
+		"Petteri Orpo": [
+			"Orpo"
+		],
+		"Abdel Fattah Al-Sisi": [
+			"Sisi"
+		],
+		"Sharif Osman Hadi": [
+			"Osman Hadi",
+			"Hadi",
+			"Hadir",
+			"Osmán Hadi"
+		],
+		"Nikol Pashinyan": [
+			"Pashinyan"
+                ],
+		"René Benko": [
+			"Benko"
+		],
+		"Bashar al-Assad": [
+			"Assad"
+		],
+		"Hugo Motta": [
+			"Motta"
+		],
+		"Viktor Orbán": [
+			"Víctor Orbán",
+			"Orbán",
+			"Orban"
+		]
+	}
+}

@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}Restaurar Noticias{% endblock %}
+
+{% block content %}
+<div class="config-form-page">
+    <h2><i class="fas fa-upload"></i> Restaurar Noticias</h2>
+
+    <div class="restore-warning">
+        <i class="fas fa-exclamation-triangle"></i>
+        <p>Esta acción importará noticias y traducciones desde un archivo de backup.
+            Las noticias existentes con el mismo ID serán actualizadas.</p>
+    </div>
+
+    <form method="POST" enctype="multipart/form-data" class="config-form">
+        <div class="form-group">
+            <label for="file">
+                <i class="fas fa-file-upload"></i> Archivo de Backup (JSON)
+            </label>
+            <input type="file" id="file" name="file" required>
+            <small>Selecciona un archivo JSON generado por el backup</small>
+        </div>
+
+        <div class="form-actions">
+            <a href="{{ url_for('config.config_home') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Cancelar
+            </a>
+            <button type="submit" class="btn btn-primary" onclick="showLoading()">
+                <i class="fas fa-upload"></i> Restaurar Backup
+            </button>
+        </div>
+    </form>
+
+    <div id="loading-overlay"
+        style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:9999; flex-direction:column; justify-content:center; align-items:center; color:white;">
+        <i class="fas fa-spinner fa-spin fa-3x" style="margin-bottom:20px;"></i>
+        <h2>Restaurando noticias...</h2>
+        <p>Por favor espere, esto puede tardar unos minutos.</p>
+    </div>
+
+    <script>
+        function showLoading() {
+            const fileInput = document.querySelector('input[name="file"]');
+            if (fileInput && fileInput.files.length > 0) {
+                document.getElementById('loading-overlay').style.display = 'flex';
+            }
+        }
+    </script>
+</div>
+
+<style>
+    .config-form-page h2 {
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .restore-warning {
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        padding: 1rem;
+        background: #fff3cd;
+        border-left: 4px solid #ffc107;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+        max-width: 500px;
+    }
+
+    .restore-warning i {
+        color: #856404;
+        font-size: 1.25rem;
+        flex-shrink: 0;
+    }
+
+    .restore-warning p {
+        margin: 0;
+        color: #856404;
+        font-size: 0.9rem;
+    }
+
+    .config-form {
+        max-width: 500px;
+        background: var(--card-bg, #fff);
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .form-group {
+        margin-bottom: 1.25rem;
+    }
+
+    .form-group label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+    }
+
+    .form-group input[type="file"] {
+        width: 100%;
+        padding: 0.6rem;
+        border: 2px dashed var(--border-color, #ddd);
+        border-radius: 8px;
+        background: var(--input-bg, #fafafa);
+    }
+
+    .form-group small {
+        display: block;
+        margin-top: 0.35rem;
+        color: var(--text-muted, #666);
+        font-size: 0.8rem;
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 1rem;
+        justify-content: flex-end;
+        margin-top: 1.5rem;
+    }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.6rem 1rem;
+        border: none;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        cursor: pointer;
+        text-decoration: none;
+    }
+
+    .btn-secondary {
+        background: #6c757d;
+        color: #fff;
+    }
+
+    .btn-warning {
+        background: #ffc107;
+        color: #212529;
+    }
+
+    .dark-mode .config-form {
+        background: var(--card-bg-dark, #1e1e1e);
+    }
+
+    .dark-mode .restore-warning {
+        background: #332701;
+        border-color: #ffc107;
+    }
+
+    .dark-mode .restore-warning p,
+    .dark-mode .restore-warning i {
+        color: #ffc107;
+    }
+</style>
+{% endblock %}

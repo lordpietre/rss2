@@ -1,0 +1,550 @@
+{% extends "base.html" %}
+{% block title %}Últimas Noticias RSS{% endblock %}
+
+{% block content %}
+<div class="card" style="padding: 1.5rem;">
+    <!-- 🔥 CORREGIDO: url_for('home.home') -->
+    <form method="get" action="{{ url_for('home.home') }}" id="filter-form">
+        <input type="hidden" name="page" id="page" value="{{ page or 1 }}">
+        <input type="hidden" name="per_page" id="per_page" value="{{ per_page or 20 }}">
+        <input type="hidden" name="lang" id="lang" value="{{ (lang or 'es') }}">
+        {% if not use_tr %}
+        <input type="hidden" name="orig" id="orig" value="1">
+        {% else %}
+        <input type="hidden" name="orig" id="orig" value="">
+        {% endif %}
+        <input type="hidden" name="semantic" id="semantic" value="{{ '1' if use_semantic else '' }}">
+
+        <div class="filter-main-row" style="display: flex; gap: 10px; width: 100%;">
+            <div class="filter-search-box" style="flex: 1;">
+                <input type="search" name="q" id="q" placeholder="Buscar noticias..." value="{{ q or '' }}"
+                    style="width: 100%; padding: 0.8rem 1rem; font-size: 1.1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+            </div>
+
+            <div class="filter-actions" style="display: flex; gap: 5px;">
+                <button type="submit" class="btn" style="padding: 0.8rem 1.2rem; border-radius: 8px;" title="Buscar">
+                    <i class="fas fa-search"></i>
+                </button>
+                <a href="{{ url_for('home.home') }}" class="btn btn-secondary"
+                    style="padding: 0.8rem 1.2rem; border-radius: 8px;" title="Limpiar filtros">
+                    <i class="fas fa-eraser"></i>
+                </a>
+            </div>
+        </div>
+
+        <div class="filter-row">
+            <div class="filter-group">
+                <label for="categoria_id">Categoría</label>
+                <select name="categoria_id" id="categoria_id">
+                    <option value="">— Todas —</option>
+                    {% for cat in categorias %}
+                    <option value="{{ cat.id }}" {% if cat_id==cat.id %}selected{% endif %}>{{ cat.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="continente_id">Continente</label>
+                <select name="continente_id" id="continente_id">
+                    <option value="">— Todos —</option>
+                    {% for cont in continentes %}
+                    <option value="{{ cont.id }}" {% if cont_id==cont.id %}selected{% endif %}>{{ cont.nombre }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="pais_id">País</label>
+                <select name="pais_id" id="pais_id">
+                    <option value="">— Todos —</option>
+                    {% for pais in paises %}
+                    <option value="{{ pais.id }}" data-continente-id="{{ pais.continente_id }}" {% if pais_id==pais.id
+                        %}selected{% endif %}>
+                        {{ pais.nombre|country_flag }} {{ pais.nombre }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="fecha">Fecha</label>
+                <input type="date" name="fecha" id="fecha" value="{{ fecha_filtro or '' }}">
+            </div>
+
+            <div class="filter-group toggle-group">
+                <label class="switch" style="margin-bottom: 0;">
+                    <input type="checkbox" id="semantic-toggle" {% if use_semantic %}checked{% endif %}>
+                    <span class="slider"></span>
+                </label>
+                <span style="font-size: 0.85rem; font-weight: 600;">Búsqueda IA</span>
+            </div>
+        </div>
+    </form>
+</div>
+
+
+
+{% if session.get('user_id') and recent_searches_with_results and not q and page == 1 %}
+<div class="search-history-home" style="margin-bottom: 3rem; padding: 0 10px;">
+    <h3 style="margin-bottom: 20px; color: var(--text-color); font-weight: 600; padding-left: 10px;">
+        <i class="fas fa-history"></i> Tu Actividad Reciente
+    </h3>
+    <div class="timeline-container">
+        {% for search in recent_searches_with_results %}
+        <div class="timeline-item" id="search-block-{{ search.id }}">
+            <div class="timeline-dot"></div>
+            <div class="timeline-content search-block-container">
+                <button onclick="confirmDeleteSearch('{{ search.id }}')" class="btn-delete-search"
+                    title="Eliminar este bloque">
+                    <i class="fas fa-times"></i>
+                </button>
+
+                {% set search_url = url_for('home.home', q=search.query, pais_id=search.pais_id,
+                categoria_id=search.categoria_id) %}
+                <a href="{{ search_url }}" class="search-block-link" style="text-decoration: none; color: inherit;">
+                    <div class="card search-history-card">
+                        <div class="timeline-header">
+                            <div class="timeline-title">
+                                {% if search.query %}
+                                <span class="search-query">"{{ search.query }}"</span>
+                                {% endif %}
+                                {% if search.pais_nombre %}
+                                <span class="search-tag"><i class="fas fa-globe-americas"></i> {{ search.pais_nombre
+                                    }}</span>
+                                {% endif %}
+                                {% if search.categoria_nombre %}
+                                <span class="search-tag"><i class="fas fa-tag"></i> {{ search.categoria_nombre }}</span>
+                                {% endif %}
+                                {% if not search.query and not search.pais_nombre and not search.categoria_nombre %}
+                                <span class="search-query">Búsqueda General</span>
+                                {% endif %}
+                            </div>
+                            <div class="timeline-meta">
+                                <span title="{{ search.searched_at.strftime('%d/%m/%Y %H:%M') }}">
+                                    {{ search.searched_at.strftime('%H:%M') }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="search-results-preview">
+                            {% if search.noticias %}
+                            <ul class="timeline-news-list">
+                                {% for noticia in search.noticias %}
+                                <li>
+                                    {% if noticia.traduccion_id %}
+                                    <a href="{{ url_for('noticia.noticia', tr_id=noticia.traduccion_id) }}"
+                                        class="result-tile-link">
+                                        {% else %}
+                                        <a href="{{ url_for('noticia.noticia', id=noticia.id) }}"
+                                            class="result-tile-link">
+                                            {% endif %}
+                                            <span class="result-title">
+                                                {{ noticia.titulo_traducido if noticia.tiene_traduccion else
+                                                noticia.titulo_original }}
+                                            </span>
+                                            <span class="result-source">{{ noticia.fuente_nombre }}</span>
+                                        </a>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                            {% else %}
+                            <p class="no-results">Sin resultados nuevos</p>
+                            {% endif %}
+                        </div>
+
+                        <div class="timeline-footer">
+                            <i class="far fa-newspaper"></i> {{ search.results_count }} resultados encontrados
+                            <span class="view-more">Ver ahora <i class="fas fa-arrow-right"></i></span>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+    .timeline-container {
+        position: relative;
+        padding-left: 30px;
+        border-left: 2px solid rgba(108, 99, 255, 0.3);
+        /* Var accent-color opacity */
+        margin-left: 10px;
+    }
+
+    .timeline-item {
+        position: relative;
+        margin-bottom: 30px;
+    }
+
+    .timeline-dot {
+        position: absolute;
+        left: -37px;
+        top: 20px;
+        width: 12px;
+        height: 12px;
+        background: var(--accent-color, #6c63ff);
+        border-radius: 50%;
+        border: 2px solid var(--bg-color, #f4f6f8);
+        box-shadow: 0 0 0 4px rgba(108, 99, 255, 0.2);
+    }
+
+    .timeline-content {
+        position: relative;
+    }
+
+    .search-history-card {
+        padding: 0;
+        border-radius: 12px;
+        border: 1px solid rgba(0, 0, 0, 0.05);
+        background: var(--card-bg, #fff);
+        overflow: hidden;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .timeline-header {
+        padding: 15px 20px;
+        background: rgba(108, 99, 255, 0.05);
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .timeline-title {
+        font-weight: 600;
+        font-size: 1.1rem;
+        color: var(--text-color);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .search-query {
+        color: var(--accent-color);
+        font-weight: 700;
+    }
+
+    .search-tag {
+        font-size: 0.85rem;
+        background: rgba(0, 0, 0, 0.05);
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-weight: normal;
+        color: #666;
+    }
+
+    .timeline-meta {
+        font-size: 0.85rem;
+        color: #888;
+        white-space: nowrap;
+        margin-left: 10px;
+    }
+
+    .search-results-preview {
+        padding: 15px 20px;
+    }
+
+    .timeline-news-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .timeline-news-list li {
+        margin-bottom: 10px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .timeline-news-list li:last-child {
+        margin-bottom: 0;
+        padding-bottom: 0;
+        border-bottom: none;
+    }
+
+    .result-title {
+        display: block;
+        font-size: 0.95rem;
+        font-weight: 500;
+        color: var(--text-color);
+        line-height: 1.4;
+        margin-bottom: 4px;
+        transition: color 0.2s;
+    }
+
+    .result-source {
+        font-size: 0.8rem;
+        color: #888;
+    }
+
+    .result-tile-link:hover .result-title {
+        color: var(--accent-color);
+    }
+
+    .timeline-footer {
+        padding: 10px 20px;
+        background: rgba(0, 0, 0, 0.02);
+        border-top: 1px solid rgba(0, 0, 0, 0.05);
+        font-size: 0.85rem;
+        color: #666;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .view-more {
+        color: var(--accent-color);
+        font-weight: 500;
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+
+    .btn-delete-search {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 10;
+        border: none;
+        background: #fff;
+        color: #ccc;
+        cursor: pointer;
+        transition: all 0.2s;
+        padding: 6px;
+        border-radius: 50%;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .search-block-container:hover .btn-delete-search {
+        color: #ff4d4d;
+    }
+
+    .timeline-item:hover .search-history-card {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+    }
+
+    .timeline-item:hover .view-more {
+        opacity: 1;
+    }
+
+    /* Dark Mode Adjustments */
+    .dark-mode .timeline-container {
+        border-left-color: rgba(108, 99, 255, 0.2);
+    }
+
+    .dark-mode .timeline-dot {
+        border-color: #1a2635;
+        /* Dark bg */
+    }
+
+    .dark-mode .search-history-card {
+        background: #252e3e;
+        border-color: #333;
+    }
+
+    .dark-mode .timeline-header {
+        background: rgba(255, 255, 255, 0.03);
+        border-bottom-color: #333;
+    }
+
+    .dark-mode .search-tag {
+        background: rgba(255, 255, 255, 0.1);
+        color: #ccc;
+    }
+
+    .dark-mode .timeline-news-list li {
+        border-bottom-color: #333;
+    }
+
+    .dark-mode .timeline-footer {
+        background: rgba(0, 0, 0, 0.2);
+        border-top-color: #333;
+    }
+
+    .dark-mode .btn-delete-search {
+        background: #333;
+        color: #666;
+    }
+
+    .dark-mode .result-source {
+        color: #777;
+    }
+
+    .no-results {
+        text-align: center;
+        color: #888;
+        font-style: italic;
+        padding: 10px;
+    }
+</style>
+
+<script>
+    function confirmDeleteSearch(searchId) {
+        if (confirm('¿Eliminar este bloque del historial?')) {
+            fetch(`/delete_search/${searchId}`, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const block = document.getElementById(`search-block-${searchId}`);
+                        if (block) {
+                            block.style.opacity = '0';
+                            block.style.transform = 'scale(0.9)';
+                            setTimeout(() => {
+                                block.remove();
+                                // If no blocks left, maybe hide the container?
+                                const container = document.querySelector('.search-history-home div[style*="grid"]');
+                                if (container && container.children.length === 0) {
+                                    document.querySelector('.search-history-home').remove();
+                                }
+                            }, 300);
+                        }
+                    } else {
+                        alert('Error al eliminar: ' + (data.error || 'Desconocido'));
+                    }
+                })
+                .catch(err => {
+                    console.error('Error:', err);
+                    alert('Error de conexión');
+                });
+        }
+    }
+</script>
+{% endif %}
+
+<div id="noticias-container">
+    {% include '_noticias_list.html' %}
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const form = document.getElementById('filter-form');
+        const continenteSelect = document.getElementById('continente_id');
+        const paisSelect = document.getElementById('pais_id');
+        const categoriaSelect = document.getElementById('categoria_id');
+        const fechaInput = document.getElementById('fecha');
+        const qInput = document.getElementById('q');
+
+        const pageInput = document.getElementById('page');
+        const origInput = document.getElementById('orig');
+        const langInput = document.getElementById('lang');
+
+        window.setPage = function (p) {
+            if (pageInput) pageInput.value = p;
+        };
+
+        function setPage1() { pageInput.value = 1; }
+
+        function filtrarPaises() {
+            const continenteId = continenteSelect.value;
+            for (let i = 1; i < paisSelect.options.length; i++) {
+                const option = paisSelect.options[i];
+                const paisContinenteId = option.getAttribute('data-continente-id');
+                option.style.display = (!continenteId || paisContinenteId === continenteId) ? '' : 'none';
+            }
+            const opcionSeleccionada = paisSelect.options[paisSelect.selectedIndex];
+            if (opcionSeleccionada && opcionSeleccionada.style.display === 'none') {
+                paisSelect.value = '';
+            }
+        }
+
+        async function cargarNoticiasFromURL(url) {
+            const container = document.getElementById('noticias-container');
+            // Ensure minimum height to prevent collapse and scroll jump
+            container.style.minHeight = container.offsetHeight + 'px';
+            container.style.opacity = '0.5';
+
+            try {
+                const response = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                const html = await response.text();
+                container.innerHTML = html;
+            } catch (error) {
+                console.error('Error al filtrar noticias:', error);
+                container.innerHTML = '<p style="color:var(--error-color); text-align:center;">Error al cargar las noticias.</p>';
+            } finally {
+                container.style.opacity = '1';
+                // Optional: remove minHeight if you want it to shrink back, but keeping it is often safer until next interaction
+                // container.style.minHeight = ''; 
+            }
+        }
+
+        window.cargarNoticias = async function (keepPage) {
+            if (!keepPage) setPage1();
+
+            const formData = new FormData(form);
+            const params = new URLSearchParams(formData);
+            const newUrl = `${form.action}?${params.toString()}`;
+
+            await cargarNoticiasFromURL(newUrl);
+            window.history.pushState({ path: newUrl }, '', newUrl);
+        };
+
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            cargarNoticias(false);
+        });
+
+        const toggleOrig = document.getElementById('toggle-orig');
+        const toggleTr = document.getElementById('toggle-tr');
+
+        if (toggleOrig) {
+            toggleOrig.addEventListener('click', function (e) {
+                e.preventDefault();
+                origInput.value = '1';
+                cargarNoticias(false);
+            });
+        }
+        if (toggleTr) {
+            toggleTr.addEventListener('click', function (e) {
+                e.preventDefault();
+                origInput.value = '';
+                if (!langInput.value) langInput.value = 'es';
+                cargarNoticias(false);
+            });
+        }
+
+        continenteSelect.addEventListener('change', function () {
+            filtrarPaises();
+            cargarNoticias(false);
+        });
+        paisSelect.addEventListener('change', function () {
+            cargarNoticias(false);
+        });
+        categoriaSelect.addEventListener('change', function () {
+            cargarNoticias(false);
+        });
+        fechaInput.addEventListener('change', function () {
+            cargarNoticias(false);
+        });
+
+        let qTimer = null;
+        qInput.addEventListener('input', function () {
+            if (qTimer) clearTimeout(qTimer);
+            qTimer = setTimeout(() => {
+                cargarNoticias(false);
+            }, 450);
+        });
+
+        const semanticToggle = document.getElementById('semantic-toggle');
+        const semanticInput = document.getElementById('semantic');
+        if (semanticToggle) {
+            semanticToggle.addEventListener('change', function () {
+                semanticInput.value = this.checked ? '1' : '';
+                cargarNoticias(false);
+            });
+        }
+
+        filtrarPaises();
+
+        window.addEventListener('popstate', function (e) {
+            const url = (e.state && e.state.path) ? e.state.path : window.location.href;
+            cargarNoticiasFromURL(url);
+        });
+    });
+</script>
+{% endblock %}

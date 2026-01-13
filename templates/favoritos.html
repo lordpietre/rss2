@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Mis Favoritos{% endblock %}
+
+{% block content %}
+<div class="favoritos-page">
+    <h2><i class="fas fa-star"></i> Mis Favoritos</h2>
+
+    {% if noticias %}
+    <p class="favoritos-count">{{ noticias|length }} noticia{{ 's' if noticias|length > 1 else '' }} guardada{{ 's' if
+        noticias|length > 1 else '' }}</p>
+
+    <ul class="noticias-list">
+        {% for n in noticias %}
+        <li class="noticia-item">
+            {% if n.imagen_url %}
+            <div class="noticia-imagen">
+                <img src="{{ n.imagen_url }}" loading="lazy" onerror="this.parentElement.style.display='none'">
+            </div>
+            {% endif %}
+
+            <div class="noticia-texto">
+                <h3 class="m0">
+                    <a href="{{ url_for('noticia.noticia', id=n.id) }}">
+                        {{ n.titulo_trad or n.titulo }}
+                    </a>
+                </h3>
+
+                <div class="noticia-meta">
+                    {% if n.fecha %}
+                    <i class="far fa-calendar-alt"></i>
+                    {{ n.fecha.strftime('%d-%m-%Y %H:%M') if n.fecha else '' }}
+                    {% endif %}
+                    {% if n.fuente_nombre %} | {{ n.fuente_nombre }}{% endif %}
+                    {% if n.pais %} | {{ n.pais|country_flag }} {{ n.pais }}{% endif %}
+                </div>
+
+                <p class="noticia-resumen">{{ (n.resumen_trad or n.resumen or '')[:200] }}...</p>
+
+                <button class="btn-remove-fav" onclick="removeFavorite('{{ n.id }}', this)" title="Quitar de favoritos">
+                    <i class="fas fa-trash"></i> Quitar
+                </button>
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <div class="empty-state">
+        <i class="far fa-star"></i>
+        <p>No tienes noticias guardadas.</p>
+        <a href="{{ url_for('home.home') }}" class="btn btn-dark">Ver noticias</a>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .favoritos-page h2 {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .favoritos-count {
+        color: var(--text-muted, #666);
+        margin-bottom: 1.5rem;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 3rem;
+        color: var(--text-muted, #666);
+    }
+
+    .empty-state i {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+
+    .btn-remove-fav {
+        margin-top: 0.5rem;
+        padding: 0.4rem 0.8rem;
+        background: transparent;
+        border: 1px solid #dc3545;
+        color: #dc3545;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.8rem;
+        transition: all 0.2s;
+    }
+
+    .btn-remove-fav:hover {
+        background: #dc3545;
+        color: #fff;
+    }
+</style>
+
+<script>
+    async function removeFavorite(noticiaId, btn) {
+        const response = await fetch(`/favoritos/toggle/${noticiaId}`, { method: 'POST' });
+        if (response.ok) {
+            btn.closest('.noticia-item').remove();
+            // Update count
+            const remaining = document.querySelectorAll('.noticia-item').length;
+            if (remaining === 0) {
+                location.reload();
+            } else {
+                document.querySelector('.favoritos-count').textContent =
+                    `${remaining} noticia${remaining > 1 ? 's' : ''} guardada${remaining > 1 ? 's' : ''}`;
+            }
+        }
+    }
+</script>
+{% endblock %}
