@@ -7,23 +7,7 @@ cd "$(dirname "$0")"
 
 echo "=== RSS2 Docker Services ==="
 
-# Verificar si el modelo CTranslate2 existe
-CT2_MODEL="./models/nllb-ct2"
-if [ ! -d "$CT2_MODEL" ]; then
-    echo ""
-    echo "⚠️  Modelo CTranslate2 no encontrado en $CT2_MODEL"
-    echo "   Convirtiendo modelo (esto puede tardar 5-10 minutos)..."
-    echo ""
-    
-    # Verificar si ctranslate2 está instalado
-    if ! python3 -c "import ctranslate2" 2>/dev/null; then
-        echo "Instalando ctranslate2..."
-        pip install ctranslate2
-    fi
-    
-    # Convertir el modelo
-    ./convert_model.sh
-fi
+# Verificación de modelo eliminada (script de conversión no disponible)
 
 echo ""
 echo "Iniciando servicios Docker..."
