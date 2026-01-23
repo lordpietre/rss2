@@ -4,12 +4,14 @@ from psycopg2 import extras
 from models.categorias import get_categorias
 from models.paises import get_paises
 from utils.feed_discovery import discover_feeds, validate_feed, get_feed_metadata
+from cache import cached
 
 # Blueprint correcto
 feeds_bp = Blueprint("feeds", __name__, url_prefix="/feeds")
 
 
 @feeds_bp.route("/")
+@cached(ttl_seconds=300, prefix="feeds")  # 5 minutos para listados
 def list_feeds():
     """Listado con filtros"""
     page = max(int(request.args.get("page", 1)), 1)

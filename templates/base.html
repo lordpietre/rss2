@@ -4,15 +4,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}Agregador de Noticias RSS{% endblock %}</title>
+  <title>{% block title %}El Observador - Noticias{% endblock %}</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
-    href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Old+Standard+TT:wght@400;700&family=Playfair+Display:wght@400;700;900&family=Merriweather:wght@300;400;700&family=Lato:wght@300;400;700&display=swap"
     rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=10">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=11">
   <!-- TomSelect CSS -->
   <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
 
@@ -80,7 +80,7 @@
     <!-- Mobile/Global Nav Elements -->
     <div class="mobile-header">
       <div class="logo-mobile">
-        <a href="/">THE DAILY FEED</a>
+        <a href="/">EL OBSERVADOR</a>
       </div>
       <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="Abrir menú">
         <i class="fas fa-bars"></i>
@@ -93,7 +93,7 @@
     <header class="desktop-header">
       <div class="header-top-row">
         <div class="header-title-wrapper">
-          <h1><a href="/" style="text-decoration: none; color: inherit;">THE DAILY FEED</a></h1>
+          <h1><a href="/" style="text-decoration: none; color: inherit;">EL OBSERVADOR</a></h1>
         </div>
 
         <div class="header-user-menu">
@@ -341,7 +341,7 @@
 
         if (data.has_news) {
           lastCheck = data.timestamp;
-          new Notification("The Daily Feed", {
+          new Notification("El Observador", {
             body: data.message,
             icon: "/static/favicon.ico" // Assuming generic icon
           });
@@ -381,7 +381,7 @@
           Notification.requestPermission().then(permission => {
             if (permission === "granted") {
               btn.style.display = 'none';
-              new Notification("The Daily Feed", { body: "¡Notificaciones activadas!" });
+              new Notification("El Observador", { body: "¡Notificaciones activadas!" });
             }
           });
         };

@@ -6,7 +6,7 @@ import os
 import time
 from typing import List, Dict, Any, Optional
 from qdrant_client import QdrantClient
-from sentence_transformers import SentenceTransformer
+# from sentence_transformers import SentenceTransformer (Moved to function)
 
 # Configuración
 QDRANT_HOST = os.environ.get("QDRANT_HOST", "localhost")
@@ -16,7 +16,7 @@ EMB_MODEL = os.environ.get("EMB_MODEL", "sentence-transformers/paraphrase-multil
 
 # Singleton para clientes globales
 _qdrant_client: Optional[QdrantClient] = None
-_embedding_model: Optional[SentenceTransformer] = None
+_embedding_model: Optional[Any] = None
 
 
 def get_qdrant_client() -> QdrantClient:
@@ -40,12 +40,13 @@ def get_qdrant_client() -> QdrantClient:
     return _qdrant_client
 
 
-def get_embedding_model() -> SentenceTransformer:
+def get_embedding_model() -> Any:
     """
     Obtiene el modelo de embeddings (singleton).
     """
     global _embedding_model
     if _embedding_model is None:
+        from sentence_transformers import SentenceTransformer
         _embedding_model = SentenceTransformer(EMB_MODEL, device='cpu')
     return _embedding_model
 

@@ -30,6 +30,7 @@ Estos workers procesan asíncronamente la información utilizando modelos locale
 | **`embeddings`** | **Vectorización** | `Sentence-Transformers`. Convierte texto en vectores matemáticos para búsqueda semántica. |
 | **`ner`** | **Entidades** | Modelos SpaCy/Bert. Extrae Personas, Organizaciones y Lugares. |
 | **`topics`** | **Clasificación** | Clasifica noticias en temas (Política, Economía, Tecnología, etc.). |
+| **`llm-categorizer`** | **Categorización Inteligente** | `ExLlamaV2 + Mistral-7B`. Categoriza noticias usando LLM local. Procesa 10 noticias por lote. |
 | **`cluster`** | **Agrupación** | Agrupa noticias sobre el mismo evento de diferentes fuentes. |
 | **`related`** | **Relaciones** | Calcula y enlaza noticias relacionadas temporal y contextualmente. |
 
@@ -86,6 +87,37 @@ Utiliza el script de arranque que verifica dependencias y levanta el stack:
 ### 4. Acceder a la Aplicación
 *   **Web Principal**: [http://localhost:8001](http://localhost:8001)
 *   **Monitorización**: [http://localhost:3001](http://localhost:3001) (Usuario: `admin`, Password: ver archivo `.env`)
+
+---
+
+## 🔒 Seguridad y Credenciales (¡IMPORTANTE!)
+
+El sistema viene protegido por defecto. **No existen contraseñas "hardcodeadas"**; todas se generan dinámicamente o se leen del entorno.
+
+### 🔑 Generación de Claves
+Al ejecutar `./generate_secure_credentials.sh`, el sistema crea un archivo `.env` que contiene:
+1.  **`GRAFANA_PASSWORD`**: Contraseña para el usuario `admin` en Grafana.
+2.  **`POSTGRES_PASSWORD`**: Contraseña maestra para la base de datos `rss`.
+3.  **`REDIS_PASSWORD`**: Clave de autenticación para Redis.
+4.  **`SECRET_KEY`**: Llave criptográfica para sesiones y tokens de seguridad.
+
+**⚠️ Atención:** Si no ejecutas el script, el sistema intentará usar valores por defecto inseguros (ej. `change_this_password`) definidos en `.env.example`. **No uses esto en producción.**
+
+### 🛡️ Niveles de Acceso
+1.  **Red Pública (Internet) -> Puerto 8001**:
+    *   Solo acceso a **Nginx** (Frontend).
+    *   Protegido por las reglas de firewall de tu servidor.
+2.  **Red Local (Localhost) -> Puerto 3001**:
+    *   Acceso a **Grafana**.
+    *   **Login**: Usuario `admin` / Password: Ver `GRAFANA_PASSWORD` en tu archivo `.env`.
+3.  **Red Interna (Docker Backend)**:
+    *   Base de datos, Redis y Qdrant **NO** están expuestos fuera de Docker.
+    *   **Acceso a DB**: Solo posible vía `docker exec` (ver abajo).
+
+### 📋 Auditoría
+El repositorio incluye herramientas para verificar la seguridad:
+*   `./verify_security.sh`: Ejecuta un escaneo de puertos y configuraciones.
+*   `SECURITY_GUIDE.md`: Manual avanzado de administración segura.
 
 ---
 

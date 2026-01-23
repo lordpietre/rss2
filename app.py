@@ -8,12 +8,10 @@ from routers.feeds import feeds_bp
 from routers.urls import urls_bp
 from routers.noticia import noticia_bp
 from routers.backup import backup_bp
-# from routers.eventos import eventos_bp
 from routers.config import config_bp
 from routers.favoritos import favoritos_bp
 from routers.search import search_bp
 from routers.rss import rss_bp
-from routers.resumen import resumen_bp
 from routers.stats import stats_bp
 from routers.pdf import pdf_bp
 from routers.notifications import notifications_bp
@@ -35,12 +33,10 @@ def create_app() -> Flask:
     app.register_blueprint(urls_bp)
     app.register_blueprint(noticia_bp)
     app.register_blueprint(backup_bp)
-    # app.register_blueprint(eventos_bp) # Removed
     app.register_blueprint(config_bp)
     app.register_blueprint(favoritos_bp)
     app.register_blueprint(search_bp)
     app.register_blueprint(rss_bp)
-    # app.register_blueprint(resumen_bp) # Removed
     app.register_blueprint(stats_bp)
     app.register_blueprint(pdf_bp)
     app.register_blueprint(notifications_bp)

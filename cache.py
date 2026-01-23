@@ -6,37 +6,48 @@ import redis
 import json
 import logging
 import hashlib
+import time
 from functools import wraps
 from config import REDIS_HOST, REDIS_PORT, REDIS_PASSWORD, REDIS_TTL_DEFAULT
 
 logger = logging.getLogger(__name__)
 
 _redis_client = None
-
+_redis_last_fail = 0
 
 def get_redis():
-    """Get Redis client singleton."""
-    global _redis_client
-    if _redis_client is None:
-        try:
-            redis_config = {
-                'host': REDIS_HOST,
-                'port': REDIS_PORT,
-                'decode_responses': True,
-                'socket_connect_timeout': 2,
-                'socket_timeout': 2
-            }
-            
-            # Agregar autenticación si está configurada
-            if REDIS_PASSWORD:
-                redis_config['password'] = REDIS_PASSWORD
-            
-            _redis_client = redis.Redis(**redis_config)
-            _redis_client.ping()
-        except redis.ConnectionError as e:
-            logger.warning(f"Redis connection failed: {e}. Caching disabled.")
-            _redis_client = None
-    return _redis_client
+    """Get Redis client singleton with failure backoff."""
+    global _redis_client, _redis_last_fail
+    
+    if _redis_client is not None:
+        return _redis_client
+        
+    # Prevent retrying too often if it's failing (60s backoff)
+    now = time.time()
+    if now - _redis_last_fail < 60:
+        return None
+        
+    try:
+        redis_config = {
+            'host': REDIS_HOST,
+            'port': REDIS_PORT,
+            'decode_responses': True,
+            'socket_connect_timeout': 1, # Faster timeout
+            'socket_timeout': 1
+        }
+        
+        if REDIS_PASSWORD:
+            redis_config['password'] = REDIS_PASSWORD
+        
+        _redis_client = redis.Redis(**redis_config)
+        _redis_client.ping()
+        _redis_last_fail = 0
+        return _redis_client
+    except Exception as e:
+        logger.warning(f"Redis connection failed: {e}. Caching disabled for 60s.")
+        _redis_client = None
+        _redis_last_fail = now
+        return None
 
 
 def cached(ttl_seconds=None, prefix="cache"):

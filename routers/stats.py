@@ -511,6 +511,7 @@ def get_cpu_info():
         return None
 
 @stats_bp.route("/api/system/info")
+@cached(ttl_seconds=40, prefix="system_info")
 def system_info_api():
     """Endpoint for real-time system monitoring."""
     return jsonify({

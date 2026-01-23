@@ -1,8 +1,11 @@
 .git
 pgdata
 pgdata-replica
+pgdata-replica.old.*
+pgdata.failed_restore
 redis-data
 hf_cache
+qdrant_storage
 
 venv
 __pycache__

@@ -73,7 +73,7 @@ MAX_NEW_TOKENS_TITLE = _env_int("MAX_NEW_TOKENS_TITLE", 96)
 MAX_NEW_TOKENS_BODY = _env_int("MAX_NEW_TOKENS_BODY", 512)
 
 NUM_BEAMS_TITLE = _env_int("NUM_BEAMS_TITLE", 2)
-NUM_BEAMS_BODY = _env_int("NUM_BEAMS_BODY", 1)
+NUM_BEAMS_BODY = _env_int("NUM_BEAMS_BODY", 2)
 
 # HuggingFace model name (used for tokenizer)
 UNIVERSAL_MODEL = _env_str("UNIVERSAL_MODEL", "facebook/nllb-200-distilled-600M")
@@ -304,6 +304,8 @@ def _translate_texts(src, tgt, texts, beams, max_new_tokens):
         target_prefix=target_prefix,
         beam_size=beams,
         max_decoding_length=max_new,
+        repetition_penalty=1.1,
+        no_repeat_ngram_size=4,
     )
     dt = time.time() - start
 

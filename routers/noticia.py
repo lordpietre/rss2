@@ -112,5 +112,14 @@ def noticia():
                 )
                 relacionadas = cur.fetchall()
 
-    return render_template("noticia.html", dato=dato, tags=tags, relacionadas=relacionadas)
+    # Preparar datos para el template clásico
+    context = {
+        'dato': dato,
+        'etiquetas': ', '.join([tag['valor'] for tag in tags]) if tags else '',
+        'related_news': relacionadas,
+        'categorias': [],  # Podríamos añadir categorías populares si quisiéramos
+        'idioma_orig': dato['lang_from'] if dato else None
+    }
+    
+    return render_template("noticia_classic.html", **context)
 

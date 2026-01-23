@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Últimas Noticias RSS{% endblock %}
+{% block title %}El Observador - Últimas Noticias{% endblock %}
 
 {% block content %}
 <div class="card" style="padding: 1.5rem;">
@@ -18,11 +18,11 @@
         <div class="filter-main-row" style="display: flex; gap: 10px; width: 100%;">
             <div class="filter-search-box" style="flex: 1;">
                 <input type="search" name="q" id="q" placeholder="Buscar noticias..." value="{{ q or '' }}"
-                    style="width: 100%; padding: 0.8rem 1rem; font-size: 1.1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                    style="width: 100%; padding: 0.8rem 1rem; font-size: 1.1rem; border-radius: 0; border: 1px solid var(--ink-black);">
             </div>
 
             <div class="filter-actions" style="display: flex; gap: 5px;">
-                <button type="submit" class="btn" style="padding: 0.8rem 1.2rem; border-radius: 8px;" title="Buscar">
+                <button type="submit" class="btn" style="padding: 0.8rem 1.2rem; border-radius: 0;" title="Buscar">
                     <i class="fas fa-search"></i>
                 </button>
                 <a href="{{ url_for('home.home') }}" class="btn btn-secondary"
@@ -163,10 +163,17 @@
 </div>
 
 <style>
+    :root {
+        --accent-color: var(--accent-red);
+        --text-color: var(--newspaper-gray);
+        --bg-color: var(--paper-cream);
+        --card-bg: var(--paper-white);
+    }
+
     .timeline-container {
         position: relative;
         padding-left: 30px;
-        border-left: 2px solid rgba(108, 99, 255, 0.3);
+        border-left: 2px solid var(--accent-red);
         /* Var accent-color opacity */
         margin-left: 10px;
     }
@@ -182,7 +189,7 @@
         top: 20px;
         width: 12px;
         height: 12px;
-        background: var(--accent-color, #6c63ff);
+        background: var(--accent-red);
         border-radius: 50%;
         border: 2px solid var(--bg-color, #f4f6f8);
         box-shadow: 0 0 0 4px rgba(108, 99, 255, 0.2);

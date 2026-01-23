@@ -1,8 +1,7 @@
 from psycopg2 import extras
 from typing import List, Dict, Optional, Tuple, Any
 import os
-import torch
-from sentence_transformers import SentenceTransformer
+# from sentence_transformers import SentenceTransformer (Moved to functions to avoid heavy start-up)
 
 
 def _extraer_tags_por_traduccion(cur, traduccion_ids: List[int]) -> Dict[int, List[tuple]]:
@@ -74,33 +73,21 @@ def buscar_noticias(
         where.append("p.continente_id = %s")
         params.append(int(continente_id))
 
-    # Búsqueda
+    # Búsqueda optimizada usando FTS (Full Text Search)
     if q:
-        search_like = f"%{q}%"
         if use_tr:
             where.append(
                 """
                 (
-                    n.tsv @@ websearch_to_tsquery('spanish', %s)
-                    OR t.titulo_trad ILIKE %s
-                    OR t.resumen_trad ILIKE %s
-                    OR n.titulo ILIKE %s
-                    OR n.resumen ILIKE %s
+                    n.search_vector_es @@ websearch_to_tsquery('spanish', %s)
+                    OR t.search_vector_es @@ websearch_to_tsquery('spanish', %s)
                 )
                 """
             )
-            params.extend([q, search_like, search_like, search_like, search_like])
+            params.extend([q, q])
         else:
-            where.append(
-                """
-                (
-                    n.tsv @@ websearch_to_tsquery('spanish', %s)
-                    OR n.titulo ILIKE %s
-                    OR n.resumen ILIKE %s
-                )
-                """
-            )
-            params.extend([q, search_like, search_like])
+            where.append("n.search_vector_es @@ websearch_to_tsquery('spanish', %s)")
+            params.append(q)
 
     where_sql = " AND ".join(where)
 
@@ -192,6 +179,7 @@ def buscar_noticias(
 _model_cache = {}
 
 def _get_emb_model():
+    from sentence_transformers import SentenceTransformer
     model_name = os.environ.get("EMB_MODEL", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
     if model_name not in _model_cache:
         device = "cuda" if torch.cuda.is_available() else "cpu"

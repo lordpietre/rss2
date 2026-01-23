@@ -5,13 +5,13 @@
 {% block content %}
 <div class="monitor-layout">
     <!-- PANEL IZQUIERDO: FILTROS -->
-    <aside class="monitor-sidebar card">
+    <aside class="monitor-sidebar newspaper-sidebar card">
         <div class="sidebar-header">
-            <h3><i class="fas fa-filter"></i> Filtros</h3>
+            <h3><i class="fas fa-filter"></i> FILTROS</h3>
         </div>
 
         <div class="filter-section">
-            <label class="filter-label"><i class="fas fa-globe"></i> País</label>
+            <label class="filter-label"><i class="fas fa-globe"></i> PAÍS</label>
             <div class="custom-dropdown big-dropdown" id="countryDropdown">
                 <input type="text" id="countrySearch" class="form-control big-search" placeholder="Buscar país..."
                     value="Global" readonly>
@@ -20,50 +20,47 @@
         </div>
 
         <div class="filter-section">
-            <label class="filter-label"><i class="far fa-calendar-alt"></i> Fecha</label>
+            <label class="filter-label"><i class="far fa-calendar-alt"></i> FECHA</label>
             <input type="date" id="datePicker" class="form-control big-date" placeholder="Seleccionar fecha">
         </div>
 
         <div class="filter-actions content-center">
-            <button id="clearFilters" class="btn btn-secondary full-btn">
-                <i class="fas fa-times-circle"></i> Limpiar Filtros
+            <button id="clearFilters" class="btn btn-newspaper full-btn">
+                <i class="fas fa-times-circle"></i> LIMPIAR FILTROS
             </button>
         </div>
 
         <div class="active-filters-summary">
-            <span class="badge" id="timeRangeBadge">Global | Últimos 30 días</span>
+            <span class="badge badge-newspaper" id="timeRangeBadge">Global | Últimos 30 días</span>
         </div>
     </aside>
 
     <!-- PANEL DERECHO: CONTENIDO Y TABS -->
     <main class="monitor-main">
         <!-- TABS DE NAVEGACIÓN -->
-        <div class="monitor-tabs">
+        <div class="monitor-tabs newspaper-tabs">
             <button class="monitor-tab active" onclick="switchTab('personas')">
-                <i class="fas fa-user-tie"></i> Personas
+                <i class="fas fa-user-tie"></i> PERSONAS
             </button>
             <button class="monitor-tab" onclick="switchTab('organizaciones')">
-                <i class="fas fa-building"></i> Organizaciones
+                <i class="fas fa-building"></i> ORGANIZACIONES
             </button>
             <button class="monitor-tab" onclick="switchTab('lugares')">
-                <i class="fas fa-globe-americas"></i> Lugares
+                <i class="fas fa-globe-americas"></i> LUGARES
             </button>
         </div>
 
         <!-- CONTENIDO TABS -->
         <div class="tab-content-container">
 
-
             <!-- TAB: PERSONAS -->
             <div id="tab-personas" class="tab-pane active fade-in">
-                <div class="card stats-card full-height">
-                    <!-- Eliminado header redundante, ya está en el tab -->
+                <div class="card entities-card full-height">
                     <div class="entities-container">
-                        <!-- Lista a la izquierda -->
                         <div class="list-box scroll-y">
                             <div class="list-header-row">
-                                <span>Entidad</span>
-                                <span>Menciones</span>
+                                <span>ENTIDAD</span>
+                                <span>MENCIONES</span>
                             </div>
                             <ol class="entity-list" id="peopleList"></ol>
                         </div>
@@ -73,12 +70,12 @@
 
             <!-- TAB: ORGANIZACIONES -->
             <div id="tab-organizaciones" class="tab-pane fade-in">
-                <div class="card stats-card full-height">
+                <div class="card entities-card full-height">
                     <div class="entities-container">
                         <div class="list-box scroll-y">
                             <div class="list-header-row">
-                                <span>Organización</span>
-                                <span>Menciones</span>
+                                <span>ORGANIZACIÓN</span>
+                                <span>MENCIONES</span>
                             </div>
                             <ol class="entity-list" id="orgsList"></ol>
                         </div>
@@ -88,12 +85,12 @@
 
             <!-- TAB: LUGARES -->
             <div id="tab-lugares" class="tab-pane fade-in">
-                <div class="card stats-card full-height">
+                <div class="card entities-card full-height">
                     <div class="entities-container">
                         <div class="list-box scroll-y">
                             <div class="list-header-row">
-                                <span>Lugar</span>
-                                <span>Menciones</span>
+                                <span>LUGAR</span>
+                                <span>MENCIONES</span>
                             </div>
                             <ol class="entity-list" id="placesList"></ol>
                         </div>
@@ -105,41 +102,112 @@
     </main>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- Div para tooltips globales -->
+<div id="fixed-tooltip" class="entity-tooltip"></div>
+
 <script>
     // --- TABS LOGIC ---
     function switchTab(tabName) {
-        // Hide all tabs
         document.querySelectorAll('.tab-pane').forEach(el => {
             el.classList.remove('active');
-            el.style.display = 'none'; // Force hide
+            el.style.display = 'none';
         });
         document.querySelectorAll('.monitor-tab').forEach(el => el.classList.remove('active'));
 
-        // Show selected
         const selected = document.getElementById('tab-' + tabName);
         if (selected) {
             selected.classList.add('active');
-            selected.style.display = 'block'; // Force show
+            selected.style.display = 'block';
         }
 
-        // Update button
         const btns = document.querySelectorAll('.monitor-tab');
         btns.forEach(btn => {
-            if (btn.innerHTML.toLowerCase().includes(tabName)) {
+            if (btn.textContent.toLowerCase().includes(tabName)) {
                 btn.classList.add('active');
             }
         });
     }
-
-    // --- ORIGINAL LOGIC ADAPTED ---
-    // Charts removed per user request
 
     function updateAll(country, date) {
         loadPeople(country, date);
         loadOrgs(country);
         loadPlaces(country);
     }
+
+    function createEntityLi(name, count, imgUrl, summary) {
+        const li = document.createElement('li');
+        const wikiUrl = `https://es.wikipedia.org/wiki/${encodeURIComponent(name.replace(/ /g, '_'))}`;
+
+        let imgHtml = (imgUrl && imgUrl !== "NO_IMAGE")
+            ? `<img src="${imgUrl}" class="entity-avatar" alt="${name}">`
+            : `<div class="entity-avatar-placeholder">${name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}</div>`;
+
+        li.innerHTML = `
+            <div class="entity-item-wrapper">
+                ${imgHtml}
+                <div class="entity-info">
+                   <a href="${wikiUrl}" target="_blank" class="entity-name-link" 
+                      onmouseover="showTooltip(event, '${name}', '${summary ? summary.replace(/'/g, "\\'") : ''}', '${imgUrl || ''}')" 
+                      onmouseout="hideTooltip()">
+                      ${name}
+                   </a>
+                </div>
+            </div>
+            <span class="entity-count-badge">${count}</span>
+        `;
+        return li;
+    }
+
+    function showTooltip(event, name, summary, imgUrl) {
+        const tooltip = document.getElementById('fixed-tooltip');
+        if (!summary) return;
+
+        let imgTag = (imgUrl && imgUrl !== "NO_IMAGE")
+            ? `<img src="${imgUrl}" style="width:100%; height:150px; object-fit:cover; border-radius:4px; margin-bottom:10px; border: 1px solid var(--border-gray);">`
+            : '';
+
+        tooltip.innerHTML = `
+            <div class="tooltip-content">
+                ${imgTag}
+                <h4 style="font-family: var(--headline-font); margin: 0 0 10px 0; color: var(--ink-black); border-bottom: 2px solid var(--accent-red); padding-bottom: 5px;">${name}</h4>
+                <p style="font-family: var(--body-font); font-size: 0.9rem; line-height: 1.4; color: var(--newspaper-gray); margin: 0;">${summary}</p>
+                <div style="margin-top: 10px; font-size: 0.75rem; text-align: right; color: var(--accent-red); font-weight: bold; text-transform: uppercase;">
+                    <i class="fab fa-wikipedia-w"></i> Wikpedia
+                </div>
+            </div>
+        `;
+
+        tooltip.style.visibility = 'visible';
+        tooltip.style.opacity = '1';
+        updateTooltipPos(event);
+    }
+
+    function hideTooltip() {
+        const tooltip = document.getElementById('fixed-tooltip');
+        tooltip.style.visibility = 'hidden';
+        tooltip.style.opacity = '0';
+    }
+
+    function updateTooltipPos(e) {
+        const tooltip = document.getElementById('fixed-tooltip');
+        let x = e.clientX + 20;
+        let y = e.clientY - 40;
+
+        // Prevent overflow
+        if (x + 320 > window.innerWidth) x = e.clientX - 340;
+        if (y + 400 > window.innerHeight) y = window.innerHeight - 410;
+        if (y < 10) y = 10;
+
+        tooltip.style.left = x + 'px';
+        tooltip.style.top = y + 'px';
+    }
+
+    document.addEventListener('mousemove', (e) => {
+        const tooltip = document.getElementById('fixed-tooltip');
+        if (tooltip.style.visibility === 'visible') {
+            updateTooltipPos(e);
+        }
+    });
 
     function loadPeople(country, date) {
         let url = '/stats/api/entities/people';
@@ -148,550 +216,333 @@
         if (date) params.push(`date=${encodeURIComponent(date)}`);
         if (params.length > 0) url += '?' + params.join('&');
 
-        const badge = document.getElementById('timeRangeBadge');
-        if (badge) {
-            const countryText = (country && country !== 'global') ? country.toUpperCase() : 'GLOBAL';
-            const dateText = date ? date : 'Últimos 30 días';
-            badge.textContent = `${countryText} | ${dateText}`;
-        }
-
         const list = document.getElementById('peopleList');
-        if (list) list.innerHTML = '<div class="loading-spinner">Cargando...</div>';
+        if (list) list.innerHTML = '<div class="loading-newspaper">CARGANDO ARCHIVOS...</div>';
 
         fetch(url)
-            .then(response => {
-                if (!response.ok) throw new Error('Error en la carga');
-                return response.json();
-            })
+            .then(res => res.json())
             .then(data => {
                 if (list) list.innerHTML = '';
-
                 if (!data.labels || data.labels.length === 0) {
-                    if (list) list.innerHTML = '<div class="no-data"><i class="fas fa-info-circle"></i> No hay datos</div>';
+                    list.innerHTML = '<div class="no-data">SIN REGISTROS</div>';
                     return;
                 }
-
-                // Render List
-                if (list) {
-                    data.labels.forEach((name, index) => {
-                        const li = document.createElement('li');
-                        const imgUrl = data.images && data.images[index] ? data.images[index] : null;
-                        const summary = data.summaries && data.summaries[index] ? data.summaries[index] : null;
-
-                        let imgHtml = (imgUrl && imgUrl !== "NO_IMAGE")
-                            ? `<img src="${imgUrl}" class="entity-avatar" alt="${name}">`
-                            : `<div class="entity-avatar-placeholder">${name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}</div>`;
-
-                        let tooltipHtml = summary ? `<div class="entity-tooltip"><strong>${name}</strong><hr>${summary}</div>` : '';
-
-                        li.innerHTML = `
-                            <div class="entity-item-wrapper" style="display: flex; align-items: center; gap: 12px; flex: 1;">
-                                ${imgHtml}
-                                <span class="entity-name">${name}</span>
-                                ${tooltipHtml}
-                            </div>
-                            <span class="entity-count-badge">${data.data[index]}</span>
-                        `;
-                        list.appendChild(li);
-                    });
-                }
+                data.labels.forEach((name, i) => {
+                    list.appendChild(createEntityLi(name, data.data[i], data.images[i], data.summaries[i]));
+                });
             })
             .catch(err => {
-                console.error(err);
-                if (list) list.innerHTML = '<div class="error-msg">Error loaded data</div>';
+                if (list) list.innerHTML = '<div class="error-msg">ERROR DE CONEXIÓN</div>';
             });
     }
 
     function loadOrgs(country) {
         let url = '/stats/api/entities/orgs';
         if (country && country !== 'global') url += `?country=${encodeURIComponent(country)}`;
-
         const list = document.getElementById('orgsList');
-        if (list) list.innerHTML = '<li>Cargando...</li>';
-
+        if (list) list.innerHTML = '<div class="loading-newspaper">CARGANDO...</div>';
         fetch(url)
-            .then(response => response.json())
+            .then(res => res.json())
             .then(data => {
                 if (list) {
                     list.innerHTML = '';
-                    if (!data.labels || data.labels.length === 0) {
-                        list.innerHTML = '<li class="no-data">No hay datos</li>';
-                        return;
-                    }
-
-                    data.labels.forEach((name, index) => {
-                        const li = document.createElement('li');
-                        let imgUrl = data.images && data.images[index];
-                        const summary = data.summaries && data.summaries[index];
-
-                        let imgHtml = (imgUrl && imgUrl !== "NO_IMAGE")
-                            ? `<img src="${imgUrl}" class="entity-avatar" alt="${name}">`
-                            : `<div class="entity-avatar-placeholder">${name.substring(0, 2).toUpperCase()}</div>`;
-
-                        let tooltipHtml = summary ? `<div class="entity-tooltip"><strong>${name}</strong><hr>${summary}</div>` : '';
-
-                        li.innerHTML = `
-                                <div class="entity-item-wrapper" style="display: flex; align-items: center; width: 100%; gap: 12px;">
-                                    ${imgHtml}
-                                    <span class="entity-name">${name}</span>
-                                    ${tooltipHtml}
-                                </div>
-                                <span class="entity-count-badge">${data.data[index]}</span>
-                            `;
-                        list.appendChild(li);
+                    if (!data.labels || data.labels.length === 0) return;
+                    data.labels.forEach((name, i) => {
+                        list.appendChild(createEntityLi(name, data.data[i], data.images[i], data.summaries[i]));
                     });
                 }
-            })
-            .catch(err => { });
+            });
     }
 
     function loadPlaces(country) {
         let url = '/stats/api/entities/places';
         if (country && country !== 'global') url += `?country=${encodeURIComponent(country)}`;
-
         const list = document.getElementById('placesList');
-        if (list) list.innerHTML = '<li>Cargando...</li>';
-
-        fetch(url)
-            .then(response => response.json())
-            .then(data => {
-                if (list) {
-                    list.innerHTML = '';
-                    if (!data.labels || data.labels.length === 0) {
-                        list.innerHTML = '<li class="no-data">No hay datos</li>';
-                        return;
-                    }
-
-                    data.labels.forEach((name, index) => {
-                        const li = document.createElement('li');
-                        let imgUrl = data.images && data.images[index];
-                        const summary = data.summaries && data.summaries[index];
-
-                        let imgHtml = (imgUrl && imgUrl !== "NO_IMAGE")
-                            ? `<img src="${imgUrl}" class="entity-avatar" alt="${name}">`
-                            : `<div class="entity-avatar-placeholder">${name.substring(0, 2).toUpperCase()}</div>`;
-
-                        let tooltipHtml = summary ? `<div class="entity-tooltip"><strong>${name}</strong><hr>${summary}</div>` : '';
-
-                        li.innerHTML = `
-                                <div class="entity-item-wrapper" style="display: flex; align-items: center; width: 100%; gap: 12px;">
-                                    ${imgHtml}
-                                    <span class="entity-name">${name}</span>
-                                    ${tooltipHtml}
-                                </div>
-                                <span class="entity-count-badge">${data.data[index]}</span>
-                            `;
-                        list.appendChild(li);
-                    });
-                }
-            })
-            .catch(err => { });
+        if (list) list.innerHTML = '<div class="loading-newspaper">CARGANDO...</div>';
+        fetch(url).then(res => res.json()).then(data => {
+            if (list) {
+                list.innerHTML = '';
+                if (!data.labels || data.labels.length === 0) return;
+                data.labels.forEach((name, i) => {
+                    list.appendChild(createEntityLi(name, data.data[i], data.images[i], data.summaries[i]));
+                });
+            }
+        });
     }
 
-    // --- FILTERS & DROPDOWN LOGIC ---
+    // --- FILTERS LOGIC ---
     document.getElementById('clearFilters').addEventListener('click', function () {
-        const cs = document.getElementById('countrySearch');
-        if (cs) {
-            cs.value = 'Global';
-            cs.setAttribute('readonly', 'readonly');
-        }
+        document.getElementById('countrySearch').value = 'Global';
         document.getElementById('datePicker').value = '';
-        renderResults(''); // Reset db
+        renderResults('');
         updateAll('global', null);
     });
 
     document.getElementById('datePicker').addEventListener('change', function (e) {
-        const currentCountry = document.getElementById('countrySearch').value;
-        const country = currentCountry === 'Global' ? 'global' : currentCountry;
-        updateAll(country, e.target.value);
+        const c = document.getElementById('countrySearch').value;
+        updateAll(c === 'Global' ? 'global' : c, e.target.value);
     });
 
-    function selectCountry(displayText, value) {
-        countrySearch.value = displayText;
-        // dropdownResults is now always visible or handled via CSS, lets just update query
-        const currentDate = document.getElementById('datePicker').value;
-        updateAll(value, currentDate || null);
+    function selectCountry(disp, val) {
+        document.getElementById('countrySearch').value = disp;
+        updateAll(val, document.getElementById('datePicker').value || null);
     }
 
-    // Updated Country Logic
     let allCountries = [];
-    const countrySearch = document.getElementById('countrySearch');
-    const dropdownResults = document.getElementById('dropdownResults');
-
-    fetch('/stats/api/countries/list')
-        .then(res => res.json())
-        .then(data => {
-            allCountries = data;
-            renderResults(''); // Render initial full list
-        })
-        .catch(err => console.error('Error loading countries:', err));
-
-    function renderResults(filterText) {
-        const filter = filterText || '';
-        dropdownResults.innerHTML = '';
-
-        if (!filter || 'global'.includes(filter.toLowerCase())) {
-            const globalItem = document.createElement('div');
-            globalItem.className = 'dropdown-item';
-            globalItem.innerHTML = '🌍 <strong>Global</strong>';
-            globalItem.onclick = () => selectCountry('Global', 'global');
-            dropdownResults.appendChild(globalItem);
-        }
-
-        const filtered = allCountries.filter(c =>
-            !filter || c.name.toLowerCase().includes(filter.toLowerCase())
-        );
-
-        filtered.forEach(c => {
-            const item = document.createElement('div');
-            item.className = 'dropdown-item';
-            item.innerHTML = `<span class="flag">${c.flag}</span> <span class="name">${c.name}</span>`;
-            item.onclick = () => selectCountry(c.name, c.name);
-            dropdownResults.appendChild(item);
-        });
-    }
-
-    countrySearch.addEventListener('input', (e) => {
-        countrySearch.removeAttribute('readonly');
-        renderResults(e.target.value);
-    });
-
-    countrySearch.addEventListener('click', () => {
-        countrySearch.removeAttribute('readonly');
-        countrySearch.value = '';
-        countrySearch.focus();
+    fetch('/stats/api/countries/list').then(res => res.json()).then(data => {
+        allCountries = data;
         renderResults('');
     });
 
-    // Initial
-    switchTab('personas'); // Default tab
-    updateAll('global', null);
-
-    // Mouse Tooltips
-    document.addEventListener('mousemove', function (e) {
-        const tooltips = document.querySelectorAll('.entity-tooltip');
-        if (tooltips.length === 0) return;
-        tooltips.forEach(tooltip => {
-            const style = window.getComputedStyle(tooltip);
-            if (tooltip.style.visibility === 'visible' || style.visibility === 'visible') {
-                let x = e.clientX + 20;
-                let y = e.clientY - 40;
-                if (x + 400 > window.innerWidth) x = window.innerWidth - 420;
-                if (y + 300 > window.innerHeight) y = window.innerHeight - 310;
-                tooltip.style.left = x + 'px';
-                tooltip.style.top = y + 'px';
-            }
+    function renderResults(filter) {
+        const dr = document.getElementById('dropdownResults');
+        dr.innerHTML = '';
+        if (!filter || 'global'.includes(filter.toLowerCase())) {
+            const g = document.createElement('div');
+            g.className = 'dropdown-item';
+            g.innerHTML = '🌍 <strong>GLOBAL</strong>';
+            g.onclick = () => selectCountry('Global', 'global');
+            dr.appendChild(g);
+        }
+        allCountries.filter(c => !filter || c.name.toLowerCase().includes(filter.toLowerCase())).forEach(c => {
+            const i = document.createElement('div');
+            i.className = 'dropdown-item';
+            i.innerHTML = `<span class="flag">${c.flag}</span> <span class="name">${c.name.toUpperCase()}</span>`;
+            i.onclick = () => selectCountry(c.name, c.name);
+            dr.appendChild(i);
         });
-    });
+    }
+
+    document.getElementById('countrySearch').addEventListener('input', e => renderResults(e.target.value));
+    document.getElementById('countrySearch').addEventListener('click', e => { e.target.value = ''; renderResults(''); });
+
+    // Initial
+    switchTab('personas');
+    updateAll('global', null);
 </script>
 
 <style>
-    /* LAYOUT MACRO */
     .monitor-layout {
         display: flex;
-        gap: 20px;
-        align-items: flex-start;
-        padding-bottom: 40px;
-        min-height: 85vh;
+        gap: 30px;
+        padding-top: 20px;
+        background: var(--paper-cream);
+        font-family: var(--sans-font);
     }
 
     .monitor-sidebar {
         width: 320px;
         flex-shrink: 0;
-        background: var(--bg-card);
+        background: var(--paper-white);
+        border: 1px solid var(--ink-black);
+        border-radius: 0;
+        /* Square edges for newspaper */
         padding: 20px;
-        border-radius: 12px;
+        box-shadow: 5px 5px 0px var(--border-gray);
         position: sticky;
         top: 20px;
-        height: auto;
-        max-height: 90vh;
-        display: flex;
-        flex-direction: column;
-        border: 1px solid var(--border-color);
     }
 
-    /* FIX: Moved out of nesting */
-    .entity-item-wrapper img {
-        max-width: none;
-        /* Reset global limits */
+    .sidebar-header h3 {
+        font-family: var(--headline-font);
+        border-bottom: 3px double var(--ink-black);
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+        text-align: center;
+        letter-spacing: 1px;
     }
 
-    .entity-avatar {
-        width: 50px !important;
-        height: 50px !important;
-        min-width: 50px !important;
-        max-width: 50px !important;
-        flex-shrink: 0 !important;
-        border-radius: 50%;
-        object-fit: cover;
-        border: 2px solid var(--border-color);
+    .filter-label {
+        font-family: var(--headline-font);
+        font-weight: 900;
+        font-size: 0.8rem;
+        color: var(--ink-black);
+        margin-bottom: 8px;
         display: block;
-        margin-right: 15px;
+    }
+
+    .big-search,
+    .big-date {
+        border-radius: 0;
+        border: 1px solid var(--ink-black);
+        font-family: var(--sans-font);
+        padding: 10px;
+    }
+
+    .btn-newspaper {
+        background: var(--ink-black);
+        color: var(--paper-white);
+        border: none;
+        border-radius: 0;
+        font-weight: bold;
+        padding: 12px;
+        text-transform: uppercase;
+        font-size: 0.8rem;
+        letter-spacing: 1px;
+        transition: all 0.2s;
+    }
+
+    .btn-newspaper:hover {
+        background: var(--accent-red);
+        color: white;
+    }
+
+    .badge-newspaper {
+        background: var(--paper-cream);
+        color: var(--ink-black);
+        border: 1px solid var(--ink-black);
+        border-radius: 0;
+        padding: 5px 10px;
+        font-family: var(--headline-font);
+        font-weight: bold;
+    }
+
+    /* TABS */
+    .newspaper-tabs {
+        border-bottom: 4px double var(--ink-black);
+        margin-bottom: 20px;
+    }
+
+    .monitor-tab {
+        font-family: var(--headline-font);
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        border: none;
+        background: transparent;
+        padding: 15px 25px;
+        border-radius: 0;
+        transition: all 0.2s;
+    }
+
+    .monitor-tab.active {
+        background: var(--ink-black);
+        color: var(--paper-white) !important;
+    }
+
+    .entities-card {
+        background: var(--paper-white);
+        border: 1px solid var(--border-gray);
+        border-radius: 0;
+        box-shadow: none;
+    }
+
+    .list-header-row {
+        background: var(--light-gray);
+        font-family: var(--headline-font);
+        text-transform: uppercase;
+        font-size: 0.8rem;
+        letter-spacing: 1px;
+        padding: 12px 20px;
+    }
+
+    .entity-list li {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px 20px;
+        border-bottom: 1px solid var(--light-gray);
+        transition: background 0.2s;
+    }
+
+    .entity-list li:hover {
+        background: var(--paper-cream);
     }
 
     .entity-item-wrapper {
         display: flex;
         align-items: center;
-        width: 100%;
-        overflow: hidden;
-    }
-
-    .monitor-main {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
         gap: 15px;
-        min-width: 0;
-        /* Prevent flex overflow */
     }
 
-    /* SIDEBAR STYLES */
-    .sidebar-header h3 {
-        color: var(--text-primary);
-        margin-top: 0;
-        border-bottom: 2px solid var(--border-color);
-        padding-bottom: 15px;
-        margin-bottom: 20px;
-        font-size: 1.4em;
+    .entity-avatar {
+        width: 45px;
+        height: 45px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 1px solid var(--ink-black);
     }
 
-    .filter-section {
-        margin-bottom: 25px;
-    }
-
-    .filter-label {
-        display: block;
-        margin-bottom: 10px;
-        color: var(--text-secondary);
-        font-weight: 600;
-        font-size: 0.9em;
-    }
-
-    .big-search {
-        font-size: 1.1em;
-        padding: 12px;
-        border: 2px solid var(--border-color);
-        background: var(--bg-input);
-    }
-
-    .big-date {
-        font-size: 1em;
-        padding: 10px;
-    }
-
-    .custom-dropdown.big-dropdown {
-        width: 100%;
-        position: relative;
-    }
-
-    .dropdown-results.static-results {
-        position: relative;
-        /* In flow, not floating */
-        border: 1px solid var(--border-color);
-        background: var(--bg-body);
-        max-height: 400px;
-        /* TALLER */
-        overflow-y: auto;
-        margin-top: 5px;
-        display: block;
-        /* Always visible or toggleable */
-        border-radius: 8px;
-    }
-
-    .dropdown-item {
-        padding: 12px 15px;
-        border-bottom: 1px solid var(--border-color);
-        font-size: 1.05em;
-    }
-
-    .dropdown-item:last-child {
-        border-bottom: none;
-    }
-
-    .filter-actions {
-        margin-top: auto;
-        padding-top: 20px;
-    }
-
-    .full-btn {
-        width: 100%;
-        justify-content: center;
-        padding: 12px;
-    }
-
-    .active-filters-summary {
-        margin-top: 20px;
-        text-align: center;
-    }
-
-    /* TABS STYLES */
-    .monitor-tabs {
-        display: flex;
-        gap: 10px;
-        border-bottom: 2px solid var(--border-color);
-        padding-bottom: 0px;
-    }
-
-    .monitor-tab {
-        background: transparent;
-        border: none;
-        color: var(--text-secondary);
-        font-size: 1.1em;
-        padding: 12px 25px;
-        cursor: pointer;
-        font-weight: 600;
-        position: relative;
-        transition: all 0.2s;
-        border-radius: 8px 8px 0 0;
-    }
-
-    .monitor-tab:hover {
-        color: var(--text-primary);
-        background: var(--bg-hover);
-    }
-
-    .monitor-tab.active {
-        color: var(--accent-color);
-        background: var(--bg-card);
-        border-bottom: 3px solid var(--accent-color);
-    }
-
-    /* CONTENT AREAS */
-    .tab-pane {
-        display: none;
-    }
-
-    .tab-pane.active {
-        display: block;
-        animation: fadeIn 0.3s ease;
-    }
-
-    @keyframes fadeIn {
-        from {
-            opacity: 0;
-            transform: translateY(5px);
-        }
-
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-
-    .full-height {
-        min-height: 700px;
-        padding: 0;
-        overflow: hidden;
-    }
-
-    .entities-container {
-        display: block;
-        height: 700px;
-        width: 100%;
-    }
-
-    .list-box {
-        width: 100%;
-        height: 100%;
-        border-right: none;
-        overflow-y: auto;
-        padding: 0;
-        background: var(--bg-card);
-    }
-
-    .scroll-y {
-        overflow-y: auto;
-    }
-
-    .chart-box {
-        flex: 1;
-        padding: 20px;
+    .entity-avatar-placeholder {
+        width: 45px;
+        height: 45px;
+        background: var(--light-gray);
+        border: 1px solid var(--border-gray);
+        border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
-        background: var(--bg-body);
-        /* Slightly darker for contrast */
+        font-weight: bold;
+        color: var(--text-gray);
+        font-size: 0.8rem;
     }
 
-    .list-header-row {
-        position: sticky;
-        top: 0;
-        background: var(--bg-header);
-        padding: 10px 15px;
-        display: flex;
-        justify-content: space-between;
+    .entity-name-link {
+        font-family: var(--headline-font);
         font-weight: 700;
-        border-bottom: 2px solid var(--border-color);
-        z-index: 10;
+        font-size: 1.1rem;
+        color: var(--ink-black);
+        text-decoration: none;
     }
 
-    .entity-list {
-        display: flex;
-        flex-direction: column;
-        /* Force single column list */
-        row-gap: 0;
-    }
-
-    .entity-list li {
-        padding: 12px 15px;
-        margin: 0;
-        border-bottom: 1px solid var(--border-color);
-        transition: background 0.1s;
-    }
-
-    .entity-list li:hover {
-        background: var(--bg-hover);
+    .entity-name-link:hover {
+        color: var(--accent-red);
+        text-decoration: underline;
     }
 
     .entity-count-badge {
-        background: var(--accent-color);
-        color: #fff;
-        padding: 4px 8px;
-        border-radius: 12px;
-        font-size: 0.85em;
-        font-weight: 700;
+        font-family: var(--sans-font);
+        background: var(--paper-cream);
+        color: var(--accent-red);
+        border: 1px solid var(--accent-red);
+        padding: 4px 10px;
+        font-weight: 900;
+        font-size: 0.9rem;
     }
 
-    /* UTILITIES */
+    /* TOOLTIP */
     .entity-tooltip {
         position: fixed;
         visibility: hidden;
-        z-index: 9999;
-        background: var(--paper-color);
-        border: 1px solid var(--accent-color);
-        padding: 15px;
-        border-radius: 8px;
-        width: 300px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        opacity: 0;
+        z-index: 10000;
+        background: var(--paper-white);
+        border: 1px solid var(--ink-black);
+        padding: 20px;
+        width: 320px;
+        box-shadow: 10px 10px 0px rgba(0, 0, 0, 0.2);
+        transition: opacity 0.3s;
+        pointer-events: none;
     }
 
-    /* RESPONSIVE */
-    @media (max-width: 1100px) {
-        .monitor-layout {
-            flex-direction: column;
-        }
+    .loading-newspaper {
+        padding: 40px;
+        text-align: center;
+        font-family: var(--headline-font);
+        font-weight: 900;
+        color: var(--border-gray);
+        letter-spacing: 3px;
+    }
 
-        .monitor-sidebar {
-            width: 100%;
-            position: static;
-            max-height: none;
-        }
+    /* DROPDOWN CUSTOM */
+    .dropdown-results.static-results {
+        background: var(--paper-white);
+        border: 1px solid var(--ink-black);
+        max-height: 300px;
+        overflow-y: auto;
+    }
 
-        .entities-container.row-layout {
-            flex-direction: column;
-            height: auto;
-        }
+    .dropdown-item {
+        padding: 8px 15px;
+        font-size: 0.85rem;
+        font-weight: bold;
+        cursor: pointer;
+        border-bottom: 1px solid var(--light-gray);
+    }
 
-        .list-box {
-            flex: none;
-            border-right: none;
-            height: 500px;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .chart-box {
-            height: 400px;
-        }
+    .dropdown-item:hover {
+        background: var(--paper-cream);
+        color: var(--accent-red);
     }
 </style>
 {% endblock %}

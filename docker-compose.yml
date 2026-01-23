@@ -237,37 +237,6 @@ services:
           cpus: '1'
           memory: 1G
 
-  # rss-web-go deshabilitado por duplicar funcionalidad
-  # Si es necesario, habilitar pero SIN exposición de puertos
-  # rss-web-go:
-  #   build:
-  #     context: ./rss-web-go
-  #     dockerfile: Dockerfile
-  #   container_name: rss2_web_go
-  #   # SEGURIDAD: Sin exposición de puertos - solo acceso interno
-  #   # ports:
-  #   #   - "8002:8001"
-  #   environment:
-  #     - DB_HOST=db
-  #     - DB_PORT=5432
-  #     - DB_NAME=${DB_NAME:-rss}
-  #     - DB_USER=${DB_USER:-rss}
-  #     - DB_PASS=${DB_PASS}
-  #     - REDIS_HOST=redis
-  #     - REDIS_PORT=6379
-  #     - REDIS_PASSWORD=${REDIS_PASSWORD}
-  #     - PORT=8001
-  #     - TZ=Europe/Madrid
-  #   volumes:
-  #     - ./static:/root/static:ro
-  #     - ./templates:/root/templates:ro
-  #   networks:
-  #     - backend
-  #   depends_on:
-  #     db:
-  #       condition: service_healthy
-  #   restart: unless-stopped
-
   rss2_web:
     build: .
     container_name: rss2_web
@@ -328,6 +297,10 @@ services:
           memory: 8G
         reservations:
           memory: 4G
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
 
   nginx:
     image: nginx:alpine
@@ -620,6 +593,31 @@ services:
           cpus: '1'
           memory: 1G
 
+  llm-categorizer:
+    build: .
+    container_name: rss2_llm_categorizer
+    command: bash -lc "python -m workers.simple_categorizer_worker"
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-rss}
+      DB_USER: ${DB_USER:-rss}
+      DB_PASS: ${DB_PASS}
+      CATEGORIZER_BATCH_SIZE: 10
+      CATEGORIZER_SLEEP_IDLE: 5
+      TZ: Europe/Madrid
+    networks:
+      - backend
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+
   qdrant:
     image: qdrant/qdrant:latest
     container_name: rss2_qdrant
@@ -788,3 +786,4 @@ networks:
 volumes:
   prometheus_data:
   grafana_data:
+  torch_extensions:

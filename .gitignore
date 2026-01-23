@@ -51,6 +51,8 @@ data/
 
 # Database backups
 *.sql
+!init-db/*.sql
+!migrations/*.sql
 backup_*.sql
 
 # Redis backups
@@ -62,3 +64,17 @@ qdrant_backup_*.tar.gz
 
 # Docker compose with real credentials (if you create variations)
 docker-compose.override.yml
+
+# Large Language Models
+models/llm/
+
+# User Uploads
+static/uploads/
+
+# Celery/Workers
+celerybeat-schedule
+celerybeat.pid
+
+# System/IDE
+.DS_Store
+Thumbs.db

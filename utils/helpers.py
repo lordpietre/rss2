@@ -13,8 +13,14 @@ def safe_html(texto: Optional[str]) -> str:
         return ""
     
     # Sanitize content to prevent layout breakage (e.g. unclosed divs)
-    allowed_tags = ['b', 'i', 'strong', 'em', 'p', 'br', 'span', 'a']
-    allowed_attrs = {'a': ['href', 'target', 'rel']}
+    allowed_tags = [
+        'b', 'i', 'strong', 'em', 'p', 'br', 'span', 'a', 'img',
+        'h1', 'h2', 'h3', 'h4', 'ul', 'ol', 'li', 'blockquote'
+    ]
+    allowed_attrs = {
+        'a': ['href', 'target', 'rel', 'title'],
+        'img': ['src', 'alt', 'title', 'width', 'height', 'style']
+    }
     
     cleaned = bleach.clean(texto, tags=allowed_tags, attributes=allowed_attrs, strip=True)
     return Markup(cleaned)
