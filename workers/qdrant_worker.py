@@ -109,7 +109,7 @@ def get_pending_news(limit: int = BATCH_SIZE) -> List[Dict[str, Any]]:
                 SELECT 
                     t.id as traduccion_id,
                     t.noticia_id,
-                    t.lang_to as lang,
+                    TRIM(t.lang_to) as lang,
                     t.titulo_trad as titulo,
                     t.resumen_trad as resumen,
                     n.url,

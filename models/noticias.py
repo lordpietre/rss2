@@ -1,7 +1,7 @@
-from psycopg2 import extras
-from typing import List, Dict, Optional, Tuple, Any
 import os
-# from sentence_transformers import SentenceTransformer (Moved to functions to avoid heavy start-up)
+from typing import List, Dict, Optional, Tuple, Any
+from psycopg2 import extras
+from utils.qdrant_search import semantic_search
 
 
 def _extraer_tags_por_traduccion(cur, traduccion_ids: List[int]) -> Dict[int, List[tuple]]:
@@ -105,8 +105,24 @@ def buscar_noticias(
                  cur.execute("SELECT reltuples::bigint FROM pg_class WHERE relname = 'noticias'")
                  row = cur.fetchone()
                  total_results = row[0] if row else 0
+            elif q and not (categoria_id or pais_id or continente_id or fecha):
+                # Conteo optimizado para búsqueda simple (UNION de hits en noticias y traducciones)
+                cur.execute(
+                    """
+                    SELECT COUNT(DISTINCT id) FROM (
+                        SELECT id FROM noticias 
+                        WHERE search_vector_es @@ websearch_to_tsquery('spanish', %s)
+                        UNION ALL
+                        SELECT noticia_id as id FROM traducciones 
+                        WHERE search_vector_es @@ websearch_to_tsquery('spanish', %s) 
+                          AND lang_to = %s AND status = 'done'
+                    ) as all_hits
+                    """,
+                    (q, q, lang),
+                )
+                total_results = cur.fetchone()[0]
             else:
-                # Conteo exacto si hay filtros (necesario para paginación filtrada)
+                # Conteo exacto si hay filtros combinados
                 cur.execute(
                     f"""
                     SELECT COUNT(n.id)
@@ -175,16 +191,7 @@ def buscar_noticias(
     return noticias, total_results, total_pages, tags_por_tr
 
 
-# Cache del modelo para no cargarlo en cada petición
-_model_cache = {}
-
-def _get_emb_model():
-    from sentence_transformers import SentenceTransformer
-    model_name = os.environ.get("EMB_MODEL", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
-    if model_name not in _model_cache:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        _model_cache[model_name] = SentenceTransformer(model_name, device=device)
-    return _model_cache[model_name], model_name
+# Embedding model loading moved to utils.qdrant_search
 
 def buscar_noticias_semantica(
     conn,
@@ -194,77 +201,89 @@ def buscar_noticias_semantica(
     categoria_id: Optional[str] = None,
     continente_id: Optional[str] = None,
     pais_id: Optional[str] = None,
-    fecha: Optional[str] = None,
+    fecha: Optional[Any] = None,
     lang: str = "es",
 ) -> Tuple[List[Dict], int, int, Dict]:
     """
-    Búsqueda semántica usando embeddings y similitud coseno (vía producto punto si están normalizados).
+    Búsqueda semántica optimizada usando Qdrant.
+    Cae de vuelta a búsqueda tradicional si falla.
     """
     if not q.strip():
         return buscar_noticias(conn, page, per_page, "", categoria_id, continente_id, pais_id, fecha, lang)
 
-    offset = (page - 1) * per_page
-    model, model_name = _get_emb_model()
-    
-    # Generar embedding de la consulta
-    q_emb = model.encode([q], normalize_embeddings=True)[0].tolist()
-
-    where = ["t.status = 'done'", "t.lang_to = %s"]
-    params = [lang]
-
-    if fecha:
-        where.append("n.fecha::date = %s")
-        params.append(fecha)
+    # Preparar filtros para Qdrant
+    q_filters = {"lang": lang}
     if categoria_id:
-        where.append("n.categoria_id = %s")
-        params.append(int(categoria_id))
+        q_filters["categoria_id"] = int(categoria_id)
     if pais_id:
-        where.append("n.pais_id = %s")
-        params.append(int(pais_id))
-    elif continente_id:
-        where.append("p.continente_id = %s")
-        params.append(int(continente_id))
+        q_filters["pais_id"] = int(pais_id)
+    # Nota: No filtramos por fecha o continente en Qdrant por ahora para simplicidad,
+    # ya que requeriría lógica más compleja de filtrado en Qdrant (rango o joins manuales).
+    
+    # Realizar búsqueda en Qdrant
+    # Obtenemos más resultados de los necesarios para permitir re-filtrado o mejor ranking
+    # Pero no demasiados para mantener la velocidad
+    limit_qdrant = min(page * per_page * 2, 500)
+    
+    try:
+        results_q = semantic_search(
+            query=q,
+            limit=limit_qdrant,
+            score_threshold=0.35,
+            filters=q_filters
+        )
+    except Exception as e:
+        print(f"⚠️ Error en búsqueda Qdrant, usando fallback: {e}")
+        return buscar_noticias(conn, page, per_page, q, categoria_id, continente_id, pais_id, fecha, lang)
 
-    where_sql = " AND ".join(where)
+    if not results_q:
+        # Fallback a búsqueda tradicional si no hay resultados semánticos
+        return buscar_noticias(conn, page, per_page, q, categoria_id, continente_id, pais_id, fecha, lang)
 
+    # El total real en Qdrant para esta búsqueda es difícil de saber sin una query de conteo separada,
+    # estimamos o usamos el tamaño de la lista retornada (limitada por nuestro umbral).
+    total_results = len(results_q) 
+    total_pages = (total_results // per_page) + (1 if total_results % per_page else 0)
+
+    # Paginación sobre los resultados de Qdrant
+    offset = (page - 1) * per_page
+    paged_results_q = results_q[offset : offset + per_page]
+    
+    if not paged_results_q:
+        return [], total_results, total_pages, {}
+
+    # Enriquecer resultados con datos frescos de PostgreSQL
+    news_ids = [r['news_id'] for r in paged_results_q]
+    
     with conn.cursor(cursor_factory=extras.DictCursor) as cur:
-        # Consulta de búsqueda vectorial (usamos un array_agg o similar para el producto punto si no hay pgvector)
-        # Nota: Aquí asumo que usamos producto punto entre arrays de double precision
-        query_sql = f"""
-            WITH similarity AS (
-                SELECT 
-                    te.traduccion_id,
-                    (
-                        SELECT SUM(a*b)
-                        FROM unnest(te.embedding, %s::double precision[]) AS t(a,b)
-                    ) AS score
-                FROM traduccion_embeddings te
-                WHERE te.model = %s
-            )
-            SELECT 
+        cur.execute(
+            """
+            SELECT
                 n.id, n.titulo, n.resumen, n.url, n.fecha, n.imagen_url, n.fuente_nombre,
                 c.nombre AS categoria, p.nombre AS pais,
                 t.id AS traduccion_id, t.titulo_trad AS titulo_traducido, t.resumen_trad AS resumen_traducido,
-                TRUE AS tiene_traduccion, s.score
-            FROM similarity s
-            JOIN traducciones t ON t.id = s.traduccion_id
-            JOIN noticias n ON n.id = t.noticia_id
+                TRUE AS tiene_traduccion
+            FROM noticias n
             LEFT JOIN categorias c ON c.id = n.categoria_id
             LEFT JOIN paises p ON p.id = n.pais_id
-            WHERE {where_sql}
-            ORDER BY n.fecha DESC NULLS LAST, s.score DESC
-            LIMIT %s OFFSET %s
-        """
+            LEFT JOIN traducciones t ON t.noticia_id = n.id AND t.lang_to = %s AND t.status = 'done'
+            WHERE n.id = ANY(%s)
+            """,
+            (lang, news_ids),
+        )
+        db_rows = {row['id']: row for row in cur.fetchall()}
         
-        # Para el conteo total en semántica podemos simplificar o usar el mismo WHERE
-        cur.execute(f"SELECT COUNT(*) FROM traducciones t JOIN noticias n ON n.id = t.noticia_id LEFT JOIN paises p ON p.id = n.pais_id WHERE {where_sql}", params)
-        total_results = cur.fetchone()[0]
-        total_pages = (total_results // per_page) + (1 if total_results % per_page else 0)
-
-        cur.execute(query_sql, [q_emb, model_name] + params + [per_page, offset])
-        noticias = cur.fetchall()
-
-        tr_ids = [n["traduccion_id"] for n in noticias]
+        # Mantener el orden de relevancia de Qdrant
+        noticias_enriquecidas = []
+        for r_q in paged_results_q:
+            nid = r_q['news_id']
+            if nid in db_rows:
+                row = dict(db_rows[nid])
+                row['score'] = r_q['score'] # Añadir score de relevancia
+                noticias_enriquecidas.append(row)
+        
+        # Tags
+        tr_ids = [n["traduccion_id"] for n in noticias_enriquecidas if n.get("traduccion_id")]
         tags_por_tr = _extraer_tags_por_traduccion(cur, tr_ids)
 
-    return noticias, total_results, total_pages, tags_por_tr
+    return noticias_enriquecidas, total_results, total_pages, tags_por_tr

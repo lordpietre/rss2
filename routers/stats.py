@@ -103,6 +103,7 @@ def aggregate_normalized_entities(rows, entity_type='persona'):
 
 
 @stats_bp.route("/")
+@cached(ttl_seconds=600, prefix="stats_index")
 def index():
     """Stats dashboard page."""
     

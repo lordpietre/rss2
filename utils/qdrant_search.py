@@ -13,6 +13,7 @@ QDRANT_HOST = os.environ.get("QDRANT_HOST", "localhost")
 QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
 QDRANT_COLLECTION = os.environ.get("QDRANT_COLLECTION_NAME", "news_vectors")
 EMB_MODEL = os.environ.get("EMB_MODEL", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
+EMB_DEVICE = os.environ.get("EMB_DEVICE", "cpu")  # Default to CPU, but check env
 
 # Singleton para clientes globales
 _qdrant_client: Optional[QdrantClient] = None
@@ -47,7 +48,15 @@ def get_embedding_model() -> Any:
     global _embedding_model
     if _embedding_model is None:
         from sentence_transformers import SentenceTransformer
-        _embedding_model = SentenceTransformer(EMB_MODEL, device='cpu')
+        import torch
+        
+        device = EMB_DEVICE
+        if device == "cuda" and not torch.cuda.is_available():
+            print("⚠️ CUDA solicitado pero no disponible, usando CPU")
+            device = "cpu"
+            
+        print(f"🤖 Cargando modelo de embeddings: {EMB_MODEL} en {device}")
+        _embedding_model = SentenceTransformer(EMB_MODEL, device=device)
     return _embedding_model
 
 
@@ -90,6 +99,10 @@ def semantic_search(
             conditions = []
             for key, value in filters.items():
                 if value is not None:
+                    if key == "lang" and isinstance(value, str) and len(value) < 5:
+                        # Character(5) in Postgres pads with spaces
+                        value = value.ljust(5)
+                    
                     conditions.append(
                         FieldCondition(key=key, match=MatchValue(value=value))
                     )

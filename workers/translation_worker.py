@@ -304,7 +304,7 @@ def _translate_texts(src, tgt, texts, beams, max_new_tokens):
         target_prefix=target_prefix,
         beam_size=beams,
         max_decoding_length=max_new,
-        repetition_penalty=1.1,
+        repetition_penalty=1.2,
         no_repeat_ngram_size=4,
     )
     dt = time.time() - start

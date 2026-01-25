@@ -93,17 +93,21 @@ def noticia():
                 cur.execute(
                     """
                     SELECT
+                        n2.id,
                         n2.url,
-                        n2.titulo,
+                        n2.titulo AS titulo_original,
                         n2.fecha,
                         n2.imagen_url,
                         n2.fuente_nombre,
                         rn.score,
                         t2.titulo_trad,
-                        t2.id AS related_tr_id
+                        t2.id AS traduccion_id,
+                        c.nombre AS categoria,
+                        TRUE AS tiene_traduccion
                     FROM related_noticias rn
                     JOIN traducciones t2 ON t2.id = rn.related_traduccion_id
                     JOIN noticias n2 ON n2.id = t2.noticia_id
+                    LEFT JOIN categorias c ON c.id = n2.categoria_id
                     WHERE rn.traduccion_id = %s
                     ORDER BY rn.score DESC
                     LIMIT 8;

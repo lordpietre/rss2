@@ -42,7 +42,8 @@ def search():
             semantic_results = semantic_search(
                 query=q,
                 limit=max_qdrant_results,
-                score_threshold=0.3  # Umbral más bajo para capturar más resultados
+                score_threshold=0.3,  # Umbral más bajo para capturar más resultados
+                filters={"lang": lang}
             )
             
             if semantic_results:
