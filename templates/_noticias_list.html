@@ -11,9 +11,9 @@
       {% if n.imagen_url %}
       <img src="{{ n.imagen_url }}" alt="{{ n.titulo }}" loading="lazy"
         onerror="this.style.display='none'; this.parentElement.querySelector('.no-image-placeholder').style.display='flex';">
-      <div class="no-image-placeholder" style="display:none;"></div>
+      <div class="no-image-placeholder" style="display:none;"><i class="far fa-newspaper"></i></div>
       {% else %}
-      <div class="no-image-placeholder"></div>
+      <div class="no-image-placeholder"><i class="far fa-newspaper"></i></div>
       {% endif %}
     </a>
   </div>

@@ -108,6 +108,45 @@ def normalize_lang(code: Optional[str], default=None):
 def _norm(s: str) -> str:
     return re.sub(r"\W+", "", (s or "").lower()).strip()
 
+def _is_repetitive_output(text: str, threshold: float = 0.25) -> bool:
+    """Detect if translation output is repetitive/low quality.
+    
+    Args:
+        text: The translated text to check
+        threshold: Minimum unique word ratio (default 0.25 = 25% unique words)
+    
+    Returns:
+        True if text appears to be repetitive/low quality
+    """
+    if not text or len(text) < 50:
+        return False
+    
+    # Check for obvious repetitive patterns
+    repetitive_patterns = [
+        r'(\b\w+\b)( \1){3,}',  # Same word repeated 4+ times
+        r'(\b\w+ \w+\b)( \1){2,}',  # Same 2-word phrase repeated 3+ times
+        r'de la la ',
+        r'la línea de la línea',
+        r'de Internet de Internet',
+    ]
+    
+    for pattern in repetitive_patterns:
+        if re.search(pattern, text, re.IGNORECASE):
+            LOG.warning(f"Detected repetitive pattern: {pattern}")
+            return True
+    
+    # Check word diversity
+    words = text.lower().split()
+    if len(words) < 10:
+        return False
+    
+    unique_ratio = len(set(words)) / len(words)
+    if unique_ratio < threshold:
+        LOG.warning(f"Low word diversity: {unique_ratio:.2%} (threshold: {threshold:.2%})")
+        return True
+    
+    return False
+
 # =========================
 # DB
 # =========================
@@ -304,8 +343,8 @@ def _translate_texts(src, tgt, texts, beams, max_new_tokens):
         target_prefix=target_prefix,
         beam_size=beams,
         max_decoding_length=max_new,
-        repetition_penalty=1.2,
-        no_repeat_ngram_size=4,
+        repetition_penalty=2.5,  # Increased from 1.2 to prevent loops
+        no_repeat_ngram_size=3,  # Prevent 3-gram repetition
     )
     dt = time.time() - start
 
@@ -439,6 +478,12 @@ def process_batch(conn, rows):
                     ttr = ttr.replace("<unk>", "").replace("  ", " ").strip()
                 if btr:
                     btr = btr.replace("<unk>", "").replace("  ", " ").strip()
+
+                # VALIDATION: Check for repetitive output
+                if _is_repetitive_output(ttr) or _is_repetitive_output(btr):
+                    LOG.warning(f"Rejecting repetitive translation for tr_id={i['tr_id']}")
+                    errors.append(("Repetitive output detected", i["tr_id"]))
+                    continue
 
                 done.append((ttr, btr, lang_from, i["tr_id"]))
 

@@ -409,9 +409,10 @@ header.desktop-header {
 
 #noticias-container {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
     gap: 25px;
     margin-top: 30px;
+    min-height: 200px;
 }
 
 @media (max-width: 768px) {

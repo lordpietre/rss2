@@ -1,157 +1,135 @@
-# RSS2 - Plataforma de Inteligencia de Noticias con IA
+# RSS2 - Plataforma de Inteligencia de Noticias con IA 🚀
 
-RSS2 es una plataforma avanzada de agregación, traducción, análisis y vectorización de noticias diseñada para procesar grandes volúmenes de información en tiempo real. Combina una arquitectura de **microservicios híbrida (Go + Python)** con modelos de **Inteligencia Artificial** locales para transformar flujos RSS crudos en inteligencia accionable, permitiendo búsqueda semántica y análisis de tendencias.
+RSS2 es una plataforma avanzada de agregación, traducción, análisis y vectorización de noticias diseñada para transformar flujos masivos de información en inteligencia accionable. Utiliza una arquitectura de **microservicios híbrida (Go + Python)** con modelos de **Inteligencia Artificial** de vanguardia para ofrecer búsqueda semántica, clasificación inteligente y automatización de contenidos.
+
+---
+
+## ✨ Características Principales
+
+*   🤖 **Categorización Inteligente (LLM)**: Clasificación de noticias mediante **Mistral-7B** local (ExLlamaV2/GPTQ), procesando lotes de alta velocidad.
+*   🔍 **Búsqueda Semántica**: Motor vectorial **Qdrant** para encontrar noticias por contexto y significado, no solo por palabras clave.
+*   🌍 **Traducción Neuronal de Alta Calidad**: Integración con **NLLB-200** para traducir noticias de múltiples idiomas al español con validación post-proceso para evitar repeticiones.
+*   📊 **Inteligencia de Entidades**: Extracción automática y normalización de Personas, Organizaciones y Lugares para análisis de tendencias.
+*   📺 **Automatización de Video**: Generación automática de noticias en formato video y gestión de "parrillas" de programación.
+*   📄 **Exportación Inteligente**: Generación de informes en **PDF** con diseño profesional y limpieza de ruido de red.
+*   🔔 **Notificaciones en Tiempo Real**: API de monitoreo para detectar eventos importantes al instante.
+*   ⭐ **Gestión de Favoritos**: Sistema robusto para guardar y organizar noticias, compatible con usuarios y sesiones temporales.
 
 ---
 
 ## 🏗️ Arquitectura de Servicios (Docker)
 
-El sistema está orquestado mediante Docker Compose y se divide en 3 redes aisladas (`frontend`, `backend`, `monitoring`) para garantizar la seguridad y el rendimiento.
+El sistema está orquestado mediante Docker Compose, garantizando aislamiento y escalabilidad.
 
-### 🌐 Core & Acceso (Red Frontend)
-| Servicio | Tecnología | Puerto Ext. | Descripción |
-|----------|------------|-------------|-------------|
-| **`nginx`** | Nginx Alpine | **8001** | **Gateway Público**. Proxy inverso que sirve la aplicación y archivos estáticos. |
-| **`rss2_web`** | Python (Flask+Gunicorn) | - | Servidor de aplicación principal. Gestiona la API, interfaz web y lógica de negocio. |
-
-### 📥 Ingesta y Descubrimiento (Red Backend)
+### 🌐 Core & Acceso (Frontend)
 | Servicio | Tecnología | Descripción |
 |----------|------------|-------------|
-| **`rss-ingestor-go`** | **Go** | Crawler de ultra-alto rendimiento. Monitoriza y descarga cientos de feeds RSS por minuto. |
-| **`url-worker`** | Python | Scraper profundo. Descarga el contenido completo (HTML limpio via `newspaper3k`) de cada noticia. |
-| **`url-discovery-worker`**| Python | Agente autónomo que descubre y sugiere nuevos feeds RSS basándose en el tráfico actual. |
+| **`nginx`** | Nginx Alpine | Gateway y Proxy Inverso (Puerto **8001**). |
+| **`rss2_web`** | Flask + Gunicorn | API principal e Interfaz Web de usuario. |
 
-### � Procesamiento de IA (Red Backend)
-Estos workers procesan asíncronamente la información utilizando modelos locales (GPU/CPU).
+### 📥 Ingesta y Descubrimiento (Backend)
+| Servicio | Tecnología | Descripción |
+|----------|------------|-------------|
+| **`rss-ingestor-go`** | **Go** | Crawler de ultra-alto rendimiento (Cientos de feeds/min). |
+| **`url-worker`** | Python | Scraper profundo con limpieza de HTML via `newspaper3k`. |
+| **`url-discovery`** | Python | Agente autónomo para el descubrimiento de nuevos feeds. |
 
-| Servicio | Función | Modelo / Tecnología |
-|----------|---------|---------------------|
-| **`translator`** (x3) | **Traducción Neural** | `NLLB-200`. Traduce noticias de cualquier idioma al Español. Escalado horizontalmente (3 réplicas). |
-| **`embeddings`** | **Vectorización** | `Sentence-Transformers`. Convierte texto en vectores matemáticos para búsqueda semántica. |
-| **`ner`** | **Entidades** | Modelos SpaCy/Bert. Extrae Personas, Organizaciones y Lugares. |
-| **`topics`** | **Clasificación** | Clasifica noticias en temas (Política, Economía, Tecnología, etc.). |
-| **`llm-categorizer`** | **Categorización Inteligente** | `ExLlamaV2 + Mistral-7B`. Categoriza noticias usando LLM local. Procesa 10 noticias por lote. |
-| **`cluster`** | **Agrupación** | Agrupa noticias sobre el mismo evento de diferentes fuentes. |
-| **`related`** | **Relaciones** | Calcula y enlaza noticias relacionadas temporal y contextualmente. |
+### 🧠 Procesamiento de IA (Background Workers)
+| Servicio | Modelo / Función | Descripción |
+|----------|-------------------|-------------|
+| **`llm-categorizer`** | **Mistral-7B** | Categorización contextual avanzada (15 categorías). |
+| **`translator`** (x3) | **NLLB-200** | Traducción neural masiva escalada horizontalmente. |
+| **`embeddings`** | **S-Transformers** | Conversión de texto a vectores para búsqueda semántica. |
+| **`ner`** | **Spacy/BERT** | Extracción de entidades (Personas, Lugares, Orgs). |
+| **`cluster` & `related`**| Algoritmos Propios | Agrupación de eventos y detección de noticias relacionadas. |
 
-### 💾 Almacenamiento y Búsqueda (Red Backend)
+### 💾 Almacenamiento y Datos
 | Servicio | Rol | Descripción |
 |----------|-----|-------------|
-| **`db`** | Base de Datos Relacional | **PostgreSQL 18**. Almacenamiento principal de noticias, usuarios y configuración. |
-| **`qdrant`** | Base de Datos Vectorial | **Qdrant**. Motor de búsqueda semántica de alta velocidad. |
-| **`qdrant-worker`**| Sincronización | Worker dedicado a mantener sincronizados PostgreSQL y Qdrant. |
-| **`redis`** | Caché y Colas | **Redis 7**. Gestiona las colas de tareas para los workers y caché de sesión. |
-
-### ⚙️ Orquestación y Mantenimiento
-| Servicio | Descripción |
-|----------|-------------|
-| **`rss-tasks`** | Scheduler (Cron) que ejecuta tareas periódicas de limpieza, mantenimiento y optimización de índices. |
-
-### 📊 Observabilidad (Red Monitoring)
-Acceso exclusivo vía localhost o túnel SSH.
-
-| Servicio | Puerto Local | Descripción |
-|----------|--------------|-------------|
-| **`grafana`** | **3001** | Dashboard visual para monitorizar CPU/RAM, colas de Redis y estado de ingesta. |
-| **`prometheus`**| - | Recolección de métricas de todos los contenedores. |
-| **`cadvisor`** | - | Monitor de recursos del kernel de Linux para Docker. |
+| **`db`** | **PostgreSQL 18** | Almacenamiento relacional principal y metadatos. |
+| **`qdrant`** | **Vector DB** | Motor de búsqueda por similitud de alta velocidad. |
+| **`redis`** | **Redis 7** | Gestión de colas de tareas (Celery-style) y caché. |
 
 ---
 
 ## 🚀 Guía de Inicio Rápido
 
-### Requisitos Previos
-*   Docker y Docker Compose V2.
-*   Drivers de NVIDIA (Opcional, pero recomendado para inferencia rápida de IA).
-
-### 1. Instalación
+### 1. Preparación
 ```bash
 git clone <repo>
 cd rss2
+./generate_secure_credentials.sh  # Genera .env seguro y contraseñas robustas
 ```
 
-### 2. Configuración de Seguridad
-Genera contraseñas robustas automáticamente para todos los servicios:
+### 2. Configuración de Modelos (IA)
+Para activar la categorización inteligente y traducción, descarga los modelos:
 ```bash
-./generate_secure_credentials.sh
+./scripts/download_llm_model.sh  # Recomendado: Mistral-7B GPTQ
+python3 scripts/download_models.py # Modelos NLLB y Embeddings
 ```
-*Esto creará un archivo `.env` configurado y seguro.*
 
-### 3. Iniciar la Plataforma
-Utiliza el script de arranque que verifica dependencias y levanta el stack:
+### 3. Arranque del Sistema
 ```bash
-./start_docker.sh
+./start_docker.sh  # Script de inicio con verificación de dependencias
 ```
-*Alternativamente: `docker compose up -d`*
-
-### 4. Acceder a la Aplicación
-*   **Web Principal**: [http://localhost:8001](http://localhost:8001)
-*   **Monitorización**: [http://localhost:3001](http://localhost:3001) (Usuario: `admin`, Password: ver archivo `.env`)
 
 ---
 
-## 🔒 Seguridad y Credenciales (¡IMPORTANTE!)
+## 📖 Documentación Especializada
 
-El sistema viene protegido por defecto. **No existen contraseñas "hardcodeadas"**; todas se generan dinámicamente o se leen del entorno.
+Consulte nuestras guías detalladas para configuraciones específicas:
 
-### 🔑 Generación de Claves
-Al ejecutar `./generate_secure_credentials.sh`, el sistema crea un archivo `.env` que contiene:
-1.  **`GRAFANA_PASSWORD`**: Contraseña para el usuario `admin` en Grafana.
-2.  **`POSTGRES_PASSWORD`**: Contraseña maestra para la base de datos `rss`.
-3.  **`REDIS_PASSWORD`**: Clave de autenticación para Redis.
-4.  **`SECRET_KEY`**: Llave criptográfica para sesiones y tokens de seguridad.
-
-**⚠️ Atención:** Si no ejecutas el script, el sistema intentará usar valores por defecto inseguros (ej. `change_this_password`) definidos en `.env.example`. **No uses esto en producción.**
-
-### 🛡️ Niveles de Acceso
-1.  **Red Pública (Internet) -> Puerto 8001**:
-    *   Solo acceso a **Nginx** (Frontend).
-    *   Protegido por las reglas de firewall de tu servidor.
-2.  **Red Local (Localhost) -> Puerto 3001**:
-    *   Acceso a **Grafana**.
-    *   **Login**: Usuario `admin` / Password: Ver `GRAFANA_PASSWORD` en tu archivo `.env`.
-3.  **Red Interna (Docker Backend)**:
-    *   Base de datos, Redis y Qdrant **NO** están expuestos fuera de Docker.
-    *   **Acceso a DB**: Solo posible vía `docker exec` (ver abajo).
-
-### 📋 Auditoría
-El repositorio incluye herramientas para verificar la seguridad:
-*   `./verify_security.sh`: Ejecuta un escaneo de puertos y configuraciones.
-*   `SECURITY_GUIDE.md`: Manual avanzado de administración segura.
+*   📘 **[QUICKSTART_LLM.md](QUICKSTART_LLM.md)**: Guía rápida para el categorizador Mistral-7B.
+*   🚀 **[DEPLOY.md](DEPLOY.md)**: Guía detallada de despliegue en nuevos servidores.
+*   📊 **[TRANSLATION_FIX_SUMMARY.md](TRANSLATION_FIX_SUMMARY.md)**: Resumen de mejoras en calidad de traducción.
+*   🛡️ **[SECURITY_GUIDE.md](SECURITY_GUIDE.md)**: Manual avanzado de seguridad y endurecimiento.
+*   🏗️ **[QDRANT_SETUP.md](QDRANT_SETUP.md)**: Configuración y migración de la base de datos vectorial.
+*   📑 **[FUNCIONES_DE_ARCHIVOS.md](FUNCIONES_DE_ARCHIVOS.md)**: Inventario detallado de la lógica del proyecto.
 
 ---
 
-## �️ Operaciones Comunes
+## 💻 Requisitos de Hardware
 
-### Ver logs en tiempo real
+Para un rendimiento óptimo, se recomienda:
+*   **GPU**: NVIDIA (mínimo 12GB VRAM para Mistral-7B y traducción simultánea).
+*   **Drivers**: NVIDIA Container Toolkit instalado.
+*   **AllTalk TTS**: Instancia activa (puerto 7851) para la generación de audio en videos.
+
+---
+
+## 🔧 Operaciones y Mantenimiento
+
+### Verificación de Calidad de Traducción
+El sistema incluye herramientas para asegurar la calidad de los datos:
 ```bash
-# Ver todo el sistema
-docker compose logs -f
+# Monitorear calidad en tiempo real
+docker exec rss2_web python3 scripts/monitor_translation_quality.py --watch
 
-# Ver un servicio específico (ej. traductor o web)
-docker compose logs -f translator
-docker compose logs -f rss2_web
+# Limpiar automáticamente traducciones defectuosas
+docker exec rss2_web python3 scripts/clean_repetitive_translations.py
 ```
 
-### Generación de Videos (Nuevo)
-El sistema incluye un script para convertir noticias en videos narrados automáticamente:
+### Gestión de Contenidos
 ```bash
-# Ejecutar generador manual
-python3 scripts/generar_videos_noticias.py
+# Generar videos de noticias destacadas
+docker exec rss2_web python3 scripts/generar_videos_noticias.py
+
+# Iniciar migración a Qdrant (Vectores)
+docker exec rss2_web python3 scripts/migrate_to_qdrant.py
 ```
 
-### Copias de Seguridad (Backup)
+### Diagnóstico de Ingesta (Feeds)
 ```bash
-# Backup de PostgreSQL
-docker exec rss2_db pg_dump -U rss rss > backup_full_$(date +%Y%m%d).sql
-
-# Backup de Qdrant (Vectores)
-tar -czf vector_backup.tar.gz qdrant_storage/
+docker exec rss2_web python3 scripts/diagnose_rss.py --url <FEED_URL>
 ```
 
-### Reinicio Completo (con reconstrucción)
-Si modificas código o configuración:
-```bash
-docker compose down
-docker compose up -d --build
-```
+---
+
+## 📊 Observabilidad
+Acceso a métricas de rendimiento (Solo vía Localhost/Tunel):
+*   **Grafana**: [http://localhost:3001](http://localhost:3001) (Admin/Pass en `.env`)
+*   **Proxy Nginx**: [http://localhost:8001](http://localhost:8001)
+
+---
+
+**RSS2** - *Transformando noticias en inteligencia con IA Local.*
