@@ -3,7 +3,8 @@ import time
 import logging
 import re
 import string
-from typing import List, Tuple
+import json
+from typing import List, Tuple, Set, Dict
 from collections import Counter
 
 import psycopg2
@@ -45,6 +46,49 @@ ENT_LABELS = {
     "LOC": "lugar",
     "MISC": "tema",
 }
+
+# ==========================================================
+# Configuración global de entidades (Synonyms / Blacklist)
+# ==========================================================
+ENTITY_CONFIG = {"blacklist": [], "synonyms": {}}
+REVERSE_SYNONYMS = {}
+
+def load_entity_config():
+    global ENTITY_CONFIG, REVERSE_SYNONYMS
+    path = "entity_config.json"
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                ENTITY_CONFIG = json.load(f)
+            
+            # Construir mapa inverso para búsqueda rápida de sinónimos
+            REVERSE_SYNONYMS = {}
+            for canonical, aliases in ENTITY_CONFIG.get("synonyms", {}).items():
+                for alias in aliases:
+                    REVERSE_SYNONYMS[alias.lower()] = canonical
+                REVERSE_SYNONYMS[canonical.lower()] = canonical
+            
+            log.info(f"Loaded entity_config.json: {len(ENTITY_CONFIG.get('blacklist', []))} blacklisted, {len(ENTITY_CONFIG.get('synonyms', {}))} synonym groups")
+        except Exception as e:
+            log.error(f"Error loading entity_config.json: {e}")
+
+def get_canonical_name(text: str) -> str:
+    if not text:
+        return text
+    lower = text.lower()
+    return REVERSE_SYNONYMS.get(lower, text)
+
+def is_blacklisted(text: str) -> bool:
+    if not text:
+        return True
+    lower = text.lower()
+    # Check full match
+    if lower in [item.lower() for item in ENTITY_CONFIG.get("blacklist", [])]:
+        return True
+    # Check if it's just a number
+    if re.fullmatch(r"[0-9\s\.,\-:/]+", lower):
+        return True
+    return False
 
 # ==========================================================
 # Limpieza avanzada
@@ -125,7 +169,11 @@ def clean_tag_text(text: str) -> str | None:
     if not text:
         return None
 
-    text = BeautifulSoup(text, "html.parser").get_text()
+    try:
+        text = BeautifulSoup(text, "html.parser").get_text()
+    except Exception:
+        pass
+
     for pat in HTML_TRASH_PATTERNS:
         text = re.sub(pat, "", text)
 
@@ -133,71 +181,25 @@ def clean_tag_text(text: str) -> str | None:
     text = text.strip(string.punctuation + " ")
 
     if len(text) < 3:
-        log.debug(f"Clean reject (too short): {text}")
         return None
     if re.search(r"[<>/\\]", text):
-        log.debug(f"Clean reject (bad chars): {text}")
+        return None
+
+    if is_blacklisted(text):
         return None
 
     lower = text.lower()
     if lower.startswith("href="):
-        log.debug(f"Clean reject (href): {text}")
         return None
     if _looks_like_attr_or_path(lower):
-        log.debug(f"Clean reject (attr/path): {text}")
         return None
     if lower in GENERIC_BAD_TAGS:
-        log.debug(f"Clean reject (generic bad): {text}")
         return None
 
-    replacements = {
-        "ee.uu.": "Estados Unidos",
-        "los estados unidos": "Estados Unidos",
-        "eeuu": "Estados Unidos",
-        "eu": "Unión Europea",
-        "ue": "Unión Europea",
-        "kosova": "Kosovo",
-        # Specific User Requests
-        "trump": "Donald Trump",
-        "mr. trump": "Donald Trump",
-        "mr trump": "Donald Trump",
-        "doland trump": "Donald Trump",
-        "el presidente trump": "Donald Trump",
-        "president trump": "Donald Trump",
-        "ex-president trump": "Donald Trump",
-        "expresidente trump": "Donald Trump",
-        "putin": "Vladimir Putin",
-        "vladimir putin": "Vladimir Putin",
-        "v. putin": "Vladimir Putin",
-        "presidente putin": "Vladimir Putin",
-        # New requests
-        "sanchez": "Pedro Sánchez",
-        "pedro sanchez": "Pedro Sánchez",
-        "p. sanchez": "Pedro Sánchez",
-        "mr. sanchez": "Pedro Sánchez",
-        "sánchez": "Pedro Sánchez", # explicit match just in case
-        "pedro sánchez": "Pedro Sánchez",
-        "maduro": "Nicolás Maduro",
-        "nicolas maduro": "Nicolás Maduro",
-        "mr. maduro": "Nicolás Maduro",
-        "lula": "Lula da Silva",
-        "lula da silva": "Lula da Silva",
-        "luiz inácio lula da silva": "Lula da Silva",
-    }
-    if lower in replacements:
-        return replacements[lower]
-
-    # Blacklist (explicit removals requested)
-    blacklist = {
-        "getty images", "netflix", "fiscalia", "segun", "estoy", # People blacklist
-        "and more", "app", "estamos", "ultra", # Orgs blacklist
-        "hacienda", "fiscalía" 
-    }
-    if lower in blacklist:
-        log.debug(f"Clean reject (blacklist): {text}")
-        return None
-
-    return text
+    # Normalización vía entity_config
+    canonical = get_canonical_name(text)
+    
+    return canonical
 
 
 # ==========================================================
@@ -207,7 +209,11 @@ def clean_topic_text(text: str) -> str | None:
     if not text:
         return None
 
-    text = BeautifulSoup(text, "html.parser").get_text()
+    try:
+        text = BeautifulSoup(text, "html.parser").get_text()
+    except Exception:
+        pass
+
     for pat in HTML_TRASH_PATTERNS:
         text = re.sub(pat, "", text)
 
@@ -215,6 +221,9 @@ def clean_topic_text(text: str) -> str | None:
     text = text.strip(string.punctuation + " ")
 
     if len(text) < TOPIC_MIN_CHARS:
+        return None
+
+    if is_blacklisted(text):
         return None
 
     lower = text.lower()
@@ -245,8 +254,6 @@ def clean_topic_text(text: str) -> str | None:
         return None
     if all(t in STOPWORDS for t in tokens):
         return None
-    if re.fullmatch(r"[0-9\s\.,\-:/]+", norm):
-        return None
 
     return norm
 
@@ -262,8 +269,6 @@ def extract_entities_and_topics(nlp, text: str) -> Tuple[List[Tuple[str, str]], 
         return ents, topics
 
     doc = nlp(text)
-    # log.debug(f"Processing text ({len(text)} chars): {text[:30]}...")
-    # log.debug(f"Entities found: {len(doc.ents)}")
 
     # --- ENTIDADES ---
     for ent in doc.ents:
@@ -273,35 +278,8 @@ def extract_entities_and_topics(nlp, text: str) -> Tuple[List[Tuple[str, str]], 
 
         cleaned = clean_tag_text(ent.text)
         if not cleaned:
-            # log.debug(f"Rejected entity: {ent.text} ({ent.label_})")
             continue
             
-        if tipo == "persona":
-            lower_cleaned = cleaned.lower()
-            # Aggressive normalization rules for VIPs
-            # Use token checks or substring checks carefully
-            if "trump" in lower_cleaned.split(): 
-                # Token 'trump' exists? e.g. "donald trump", "trump", "mr. trump"
-                # Exclude family members
-                family = ["ivanka", "melania", "eric", "tiffany", "barron", "lara", "mary", "fred"]
-                if not any(f in lower_cleaned for f in family):
-                    cleaned = "Donald Trump"
-            
-            elif "sanchez" in lower_cleaned or "sánchez" in lower_cleaned:
-                # Be careful of other Sanchez? But user context implies Pedro.
-                if "pedro" in lower_cleaned or "presidente" in lower_cleaned or lower_cleaned in ["sanchez", "sánchez"]:
-                    cleaned = "Pedro Sánchez"
-            
-            elif "maduro" in lower_cleaned:
-                cleaned = "Nicolás Maduro"
-            
-            elif "lula" in lower_cleaned:
-                cleaned = "Lula da Silva"
-            
-            elif "putin" in lower_cleaned:
-                cleaned = "Vladimir Putin"
-
-        # log.debug(f"Accepted entity: {cleaned} ({tipo})")
         ents.append((cleaned, tipo))
 
     # --- TOPICS ---
@@ -311,10 +289,10 @@ def extract_entities_and_topics(nlp, text: str) -> Tuple[List[Tuple[str, str]], 
         if cleaned:
             topic_counter[cleaned] += 1
 
-    ent_values = {v for (v, _) in ents}
+    ent_values = {v.lower() for (v, _) in ents}
 
     for val, _count in topic_counter.most_common(TOPIC_MAX_PER_DOC):
-        if val in ent_values:
+        if val.lower() in ent_values:
             continue
         topics.append((val, "tema"))
 
@@ -328,85 +306,98 @@ def main():
     global STOPWORDS
 
     # Cargar spaCy
-    log.info("Cargando modelo spaCy es_core_news_md...")
-    nlp = spacy.load("es_core_news_md", disable=["lemmatizer", "textcat"])
+    log.info("Cargando modelo spaCy es_core_news_lg...")
+    nlp = spacy.load("es_core_news_lg", disable=["lemmatizer", "textcat"])
     STOPWORDS = set(nlp.Defaults.stop_words)
     log.info("Modelo spaCy cargado correctamente.")
 
+    # Cargar configuración de entidades
+    load_entity_config()
+
     while True:
         try:
-            with get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
-                cur.execute(
-                    """
-                    SELECT t.id, t.titulo_trad, t.resumen_trad
-                    FROM traducciones t
-                    WHERE t.status = 'done'
-                      AND t.lang_to = %s
-                      AND NOT EXISTS (
-                          SELECT 1 FROM tags_noticia tn WHERE tn.traduccion_id = t.id
-                      )
-                    ORDER BY t.id DESC
-                    LIMIT %s;
-                    """,
-                    (NER_LANG, BATCH),
-                )
+            with get_conn() as conn:
+                with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+                    cur.execute(
+                        """
+                        SELECT t.id, t.titulo_trad, t.resumen_trad, t.noticia_id
+                        FROM traducciones t
+                        WHERE t.status = 'done'
+                          AND t.lang_to = %s
+                          AND NOT EXISTS (
+                              SELECT 1 FROM tags_noticia tn WHERE tn.traduccion_id = t.id
+                          )
+                        ORDER BY t.id DESC
+                        LIMIT %s;
+                        """,
+                        (NER_LANG, BATCH),
+                    )
 
+                    rows = cur.fetchall()
 
-                rows = cur.fetchall()
-
-                if not rows:
-                    time.sleep(5)
-                    continue
-
-                log.info(f"Procesando {len(rows)} traducciones para NER/temas...")
-
-                inserted_links = 0
-
-                for r in rows:
-                    text = f"{r['titulo_trad'] or ''}\n{r['resumen_trad'] or ''}".strip()
-                    if not text:
+                    if not rows:
+                        time.sleep(10)
                         continue
 
-                    ents, topics = extract_entities_and_topics(nlp, text)
-                    tags = ents + topics
-                    if not tags:
-                        continue
+                    log.info(f"Procesando {len(rows)} traducciones para NER/temas...")
 
-                    for valor, tipo in tags:
-                        try:
-                            cur.execute(
-                                """
-                                INSERT INTO tags (valor, tipo)
-                                VALUES (%s, %s)
-                                ON CONFLICT (valor, tipo)
-                                DO UPDATE SET valor = EXCLUDED.valor
-                                RETURNING id;
-                                """,
-                                (valor, tipo),
-                            )
-                            tag_id = cur.fetchone()[0]
+                    inserted_links = 0
 
-                            cur.execute(
-                                """
-                                INSERT INTO tags_noticia (traduccion_id, tag_id)
-                                VALUES (%s, %s)
-                                ON CONFLICT DO NOTHING;
-                                """,
-                                (r["id"], tag_id),
-                            )
+                    for r in rows:
+                        noticia_id = r["noticia_id"]
+                        traduccion_id = r["id"]
+                        
+                        text = f"{r['titulo_trad'] or ''}\n{r['resumen_trad'] or ''}".strip()
+                        if not text:
+                            # Para evitar re-procesar, insertamos un tag especial '_none_'
+                            tags = [("_none_", "sistema")]
+                        else:
+                            ents, topics = extract_entities_and_topics(nlp, text)
+                            tags = ents + topics
+                            if not tags:
+                                tags = [("_none_", "sistema")]
 
-                            if cur.rowcount > 0:
-                                inserted_links += 1
+                        for valor, tipo in tags:
+                            try:
+                                # Usar commit parcial por noticia para evitar abortar todo el batch
+                                cur.execute(
+                                    """
+                                    INSERT INTO tags (valor, tipo)
+                                    VALUES (%s, %s)
+                                    ON CONFLICT (valor, tipo)
+                                    DO UPDATE SET valor = EXCLUDED.valor
+                                    RETURNING id;
+                                    """,
+                                    (valor, tipo),
+                                )
+                                tag_id = cur.fetchone()[0]
 
-                        except Exception:
-                            log.exception("Error insertando tag/relación")
+                                cur.execute(
+                                    """
+                                    INSERT INTO tags_noticia (traduccion_id, noticia_id, tag_id)
+                                    VALUES (%s, %s, %s)
+                                    ON CONFLICT DO NOTHING;
+                                    """,
+                                    (traduccion_id, noticia_id, tag_id),
+                                )
 
-                conn.commit()
-                log.info(f"Lote NER OK. Nuevas relaciones tag_noticia: {inserted_links}")
+                                if cur.rowcount > 0:
+                                    inserted_links += 1
+                            except Exception as e:
+                                log.error(f"Error insertando tag '{valor}': {e}")
+                                conn.rollback()
+                                # Volvemos a empezar el loop de tags para esta noticia no es buena idea,
+                                # pero el rollback abortó la transacción del cursor.
+                                # En psycopg2, tras rollback hay que seguir o cerrar.
+                                pass
+                        
+                        conn.commit()
 
-        except Exception:
-            log.exception("Error general en NER loop")
-            time.sleep(5)
+                    log.info(f"Lote NER OK. Nuevas relaciones tag_noticia: {inserted_links}")
+
+        except Exception as e:
+            log.exception(f"Error general en NER loop: {e}")
+            time.sleep(10)
 
 
 if __name__ == "__main__":

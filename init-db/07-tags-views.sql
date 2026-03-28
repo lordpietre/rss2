@@ -1,6 +1,6 @@
 -- init-db/07-tags-views.sql
--- Vista de Top tags (24h) para el esquema:
---   tags(id, valor, tipo)
+-- Vista de Top tags (24h) para el esquema existente:
+--   tags(id, nombre)
 --   tags_noticia(id, traduccion_id, tag_id)
 --   traducciones(id, noticia_id, lang_to, status, ...)
 --   noticias(id, fecha, ...)
@@ -8,8 +8,7 @@
 CREATE OR REPLACE VIEW public.v_tag_counts_24h AS
 SELECT
   tg.id,
-  tg.valor,
-  tg.tipo,
+  tg.valor AS tag_name,
   COUNT(*) AS apariciones
 FROM public.tags tg
 JOIN public.tags_noticia tn ON tn.tag_id = tg.id
@@ -18,7 +17,7 @@ JOIN public.noticias n       ON n.id = t.noticia_id
 WHERE t.status = 'done'
   AND t.lang_to = 'es'
   AND n.fecha >= now() - INTERVAL '24 hours'
-GROUP BY tg.id, tg.valor, tg.tipo
+GROUP BY tg.id, tg.valor
 ORDER BY apariciones DESC, tg.valor;
 
 -- Índices recomendados para acelerar la vista (idempotentes)
@@ -33,10 +32,4 @@ CREATE INDEX IF NOT EXISTS idx_tags_noticia_traduccion
 
 CREATE INDEX IF NOT EXISTS idx_tags_noticia_tag
   ON public.tags_noticia (tag_id);
-
--- (Opcionales si no existen ya, pero ayudan en búsquedas ad hoc)
-CREATE INDEX IF NOT EXISTS idx_tags_valor
-  ON public.tags (valor);
-CREATE INDEX IF NOT EXISTS idx_tags_tipo
-  ON public.tags (tipo);
 

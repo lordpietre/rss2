@@ -1,0 +1,31 @@
+FROM golang:alpine AS builder
+
+ENV GOTOOLCHAIN=auto
+
+RUN apk add --no-cache git
+
+WORKDIR /app
+
+COPY backend/go.mod backend/go.sum ./
+RUN go mod download
+
+COPY backend/ ./
+
+RUN go mod tidy
+
+RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/wiki_worker ./cmd/wiki_worker
+
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates tzdata
+
+COPY --from=builder /bin/wiki_worker /bin/wiki_worker
+
+ENV DB_HOST=db \
+    DB_PORT=5432 \
+    DB_NAME=rss \
+    DB_USER=rss \
+    DB_PASS=rss \
+    WIKI_SLEEP=10
+
+ENTRYPOINT ["/bin/wiki_worker"]

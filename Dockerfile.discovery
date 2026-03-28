@@ -1,0 +1,31 @@
+FROM golang:1.22-alpine AS builder
+
+ENV GOTOOLCHAIN=auto
+
+RUN apk add --no-cache git
+
+WORKDIR /app
+
+COPY backend/go.mod backend/go.sum ./
+RUN go mod download
+
+COPY backend/ ./
+
+RUN CGO_ENABLED=0 GOOS=linux go build -o /bin/discovery ./cmd/discovery
+
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates tzdata
+
+COPY --from=builder /bin/discovery /bin/discovery
+
+ENV DB_HOST=db \
+    DB_PORT=5432 \
+    DB_NAME=rss \
+    DB_USER=rss \
+    DB_PASS=rss \
+    DISCOVERY_INTERVAL=900 \
+    DISCOVERY_BATCH=10 \
+    MAX_FEEDS_PER_URL=5
+
+ENTRYPOINT ["/bin/discovery"]

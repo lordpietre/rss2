@@ -1,135 +1,124 @@
-# RSS2 - Plataforma de Inteligencia de Noticias con IA 🚀
+# RSS2 - AI-Powered News Intelligence Platform
 
-RSS2 es una plataforma avanzada de agregación, traducción, análisis y vectorización de noticias diseñada para transformar flujos masivos de información en inteligencia accionable. Utiliza una arquitectura de **microservicios híbrida (Go + Python)** con modelos de **Inteligencia Artificial** de vanguardia para ofrecer búsqueda semántica, clasificación inteligente y automatización de contenidos.
+RSS2 es una plataforma avanzada de agregación, traducción, análisis y vectorización de noticias, diseñada para transformar flujos masivos de información en inteligencia accionable. Utiliza una arquitectura híbrida de microservicios (Go + Python) integrada con modelos de inteligencia artificial de última generación para ofrecer búsqueda semántica, clasificación inteligente y automatización de contenidos.
 
 ---
 
-## ✨ Características Principales
+## 🚀 Capacidades Principales
 
-*   🤖 **Categorización Inteligente (LLM)**: Clasificación de noticias mediante **Mistral-7B** local (ExLlamaV2/GPTQ), procesando lotes de alta velocidad.
-*   🔍 **Búsqueda Semántica**: Motor vectorial **Qdrant** para encontrar noticias por contexto y significado, no solo por palabras clave.
-*   🌍 **Traducción Neuronal de Alta Calidad**: Integración con **NLLB-200** para traducir noticias de múltiples idiomas al español con validación post-proceso para evitar repeticiones.
-*   📊 **Inteligencia de Entidades**: Extracción automática y normalización de Personas, Organizaciones y Lugares para análisis de tendencias.
-*   📺 **Automatización de Video**: Generación automática de noticias en formato video y gestión de "parrillas" de programación.
-*   📄 **Exportación Inteligente**: Generación de informes en **PDF** con diseño profesional y limpieza de ruido de red.
-*   🔔 **Notificaciones en Tiempo Real**: API de monitoreo para detectar eventos importantes al instante.
-*   ⭐ **Gestión de Favoritos**: Sistema robusto para guardar y organizar noticias, compatible con usuarios y sesiones temporales.
+*   **Enriquecimiento con Wikipedia**: Sistema automatizado que detecta personas y organizaciones, descarga sus biografías e imágenes oficiales de Wikipedia para mostrarlas en tooltips interactivos con avatares circulares.
+*   **Categorización Inteligente (LLM)**: Clasificación de noticias mediante una instancia local de Mistral-7B / Llama-3 (vía Ollama), procesando contenido en tiempo real.
+*   **Búsqueda Semántica**: Motor vectorial Qdrant para descubrir noticias por contexto y significado, yendo más allá de las palabras clave tradicionales.
+*   **Traducción Neuronal de Alta Calidad**: Integración de NLLB-200 (vía CTranslate2) para traducir noticias de múltiples idiomas al español con precisión profesional.
+*   **Inteligencia de Entidades (NER)**: Extracción y normalización automática de Personas, Organizaciones y Lugares para análisis de tendencias y mapeo de relaciones.
+*   **Búsqueda de Noticias Relacionadas**: Algoritmos de similitud que agrupan noticias sobre el mismo tema automáticamente.
 
 ---
 
 ## 🏗️ Arquitectura de Servicios (Docker)
 
-El sistema está orquestado mediante Docker Compose, garantizando aislamiento y escalabilidad.
+El sistema se orquestra mediante Docker Compose y se divide en capas especializadas:
 
-### 🌐 Core & Acceso (Frontend)
+### Capa de Acceso y API
 | Servicio | Tecnología | Descripción |
-|----------|------------|-------------|
+|---------|------------|-------------|
 | **`nginx`** | Nginx Alpine | Gateway y Proxy Inverso (Puerto **8001**). |
-| **`rss2_web`** | Flask + Gunicorn | API principal e Interfaz Web de usuario. |
+| **`rss2_frontend`** | React + Vite | Interfaz web de usuario moderna y responsiva. |
+| **`backend-go`** | Go + Gin | API REST principal y gestión de lógica de negocio. |
 
-### 📥 Ingesta y Descubrimiento (Backend)
+### Ingesta y Descubrimiento (Go)
 | Servicio | Tecnología | Descripción |
-|----------|------------|-------------|
-| **`rss-ingestor-go`** | **Go** | Crawler de ultra-alto rendimiento (Cientos de feeds/min). |
-| **`url-worker`** | Python | Scraper profundo con limpieza de HTML via `newspaper3k`. |
-| **`url-discovery`** | Python | Agente autónomo para el descubrimiento de nuevos feeds. |
+|---------|------------|-------------|
+| **`rss-ingestor-go`** | Go | Crawler de alto rendimiento para feeds RSS. |
+| **`scraper`** | Go | Scraper profundo con sanitización de HTML y extracción de texto. |
+| **`discovery`** | Go | Agente autónomo para descubrir nuevos feeds a partir de URLs. |
 
-### 🧠 Procesamiento de IA (Background Workers)
-| Servicio | Modelo / Función | Descripción |
-|----------|-------------------|-------------|
-| **`llm-categorizer`** | **Mistral-7B** | Categorización contextual avanzada (15 categorías). |
-| **`translator`** (x3) | **NLLB-200** | Traducción neural masiva escalada horizontalmente. |
-| **`embeddings`** | **S-Transformers** | Conversión de texto a vectores para búsqueda semántica. |
-| **`ner`** | **Spacy/BERT** | Extracción de entidades (Personas, Lugares, Orgs). |
-| **`cluster` & `related`**| Algoritmos Propios | Agrupación de eventos y detección de noticias relacionadas. |
+### Procesamiento de Datos e IA (Go & Python)
+| Servicio | Tecnología | Descripción |
+|---------|------------|-------------|
+| **`translator`** | NLLB-200 (CPU) | Traducción neuronal optimizada con CTranslate2. |
+| **`translator-gpu`**| NLLB-200 (GPU) | Traducción acelerada por hardware (CUDA). |
+| **`wiki-worker`** | Go | **[NUEVO]** Integración con Wikipedia y gestión de imágenes locales. |
+| **`embeddings`** | S-Transformers | Generación de vectores para búsqueda semántica. |
+| **`ner`** | Spacy / BERT | Reconocimiento de entidades nombradas (NER). |
+| **`llm-categorizer`**| Ollama / Mistral | Clasificación avanzada mediante modelos de lenguaje. |
+| **`topics`** | Go | Matcher automático de países y temas predefinidos. |
+| **`related`** | Go | Motor de detección de noticias relacionadas. |
 
-### 💾 Almacenamiento y Datos
-| Servicio | Rol | Descripción |
-|----------|-----|-------------|
-| **`db`** | **PostgreSQL 18** | Almacenamiento relacional principal y metadatos. |
-| **`qdrant`** | **Vector DB** | Motor de búsqueda por similitud de alta velocidad. |
-| **`redis`** | **Redis 7** | Gestión de colas de tareas (Celery-style) y caché. |
+### Capa de Almacenamiento
+| Servicio | Tecnología | Descripción |
+|---------|------------|-------------|
+| **`db`** | PostgreSQL 18 | Base de datos relacional principal. |
+| **`qdrant`** | Qdrant | Base de datos vectorial para búsqueda por similitud. |
+| **`redis`** | Redis 7 | Colas de mensajes y caché de alto desempeño. |
 
 ---
 
-## 🚀 Guía de Inicio Rápido
+## ⚙️ Guía de Configuración
 
-### 1. Preparación
+### 1. Requisitos de Hardware
+*   **Modo Básico (CPU)**: 4+ Cores CPU, 8GB RAM.
+*   **Modo Avanzado (IA)**: NVIDIA GPU con 8GB+ VRAM (mínimo recomendado para LLM y Traducción GPU).
+
+### 2. Instalación Rápida
 ```bash
-git clone <repo>
+git clone <repo_url>
 cd rss2
-./generate_secure_credentials.sh  # Genera .env seguro y contraseñas robustas
+cp .env.example .env
+# Edita .env con tus credenciales
+docker compose up -d
 ```
 
-### 2. Configuración de Modelos (IA)
-Para activar la categorización inteligente y traducción, descarga los modelos:
-```bash
-./scripts/download_llm_model.sh  # Recomendado: Mistral-7B GPTQ
-python3 scripts/download_models.py # Modelos NLLB y Embeddings
-```
+### 3. Escalado de Workers (¡Importante!)
+Para aumentar la velocidad de procesamiento (especialmente la traducción), puedes escalar los workers:
 
-### 3. Arranque del Sistema
 ```bash
-./start_docker.sh  # Script de inicio con verificación de dependencias
+# Ejecutar 4 traductores en paralelo
+docker compose up -d --scale translator=4
+
+# Si usas GPU y tienes capacidad
+docker compose up -d --scale translator-gpu=2
 ```
 
 ---
 
-## 📖 Documentación Especializada
+## 🛡️ Administración y Mantenimiento
 
-Consulte nuestras guías detalladas para configuraciones específicas:
+### Copias de Seguridad (Backups)
+Desde el panel de Administración (`/admin/settings`), puedes realizar:
+*   **Backup Completo**: Volcado SQL de toda la base de datos.
+*   **Backup de Noticias (ZIP)**: **[NUEVO]** Genera un archivo comprimido que incluye las tablas de noticias, traducciones y todas sus etiquetas. Ideal para migraciones de contenido.
 
-*   📘 **[QUICKSTART_LLM.md](QUICKSTART_LLM.md)**: Guía rápida para el categorizador Mistral-7B.
-*   🚀 **[DEPLOY.md](DEPLOY.md)**: Guía detallada de despliegue en nuevos servidores.
-*   📊 **[TRANSLATION_FIX_SUMMARY.md](TRANSLATION_FIX_SUMMARY.md)**: Resumen de mejoras en calidad de traducción.
-*   🛡️ **[SECURITY_GUIDE.md](SECURITY_GUIDE.md)**: Manual avanzado de seguridad y endurecimiento.
-*   🏗️ **[QDRANT_SETUP.md](QDRANT_SETUP.md)**: Configuración y migración de la base de datos vectorial.
-*   📑 **[FUNCIONES_DE_ARCHIVOS.md](FUNCIONES_DE_ARCHIVOS.md)**: Inventario detallado de la lógica del proyecto.
-
----
-
-## 💻 Requisitos de Hardware
-
-Para un rendimiento óptimo, se recomienda:
-*   **GPU**: NVIDIA (mínimo 12GB VRAM para Mistral-7B y traducción simultánea).
-*   **Drivers**: NVIDIA Container Toolkit instalado.
-*   **AllTalk TTS**: Instancia activa (puerto 7851) para la generación de audio en videos.
+### Variables de Entorno Clave (`.env`)
+| Variable | Descripción |
+|----------|-------------|
+| `WIKI_SLEEP` | Tiempo de espera entre peticiones a Wikipedia (evita bloqueos). |
+| `SCHEDULER_BATCH`| Cantidad de noticias a enviar a traducir por ciclo. |
+| `TARGET_LANGS` | Idiomas destino (ej: `es`). |
+| `OLLAMA_HOST` | Dirección del servidor Ollama para categorización. |
 
 ---
 
-## 🔧 Operaciones y Mantenimiento
+## 📖 Documentación de la API (Campos Wikipedia)
 
-### Verificación de Calidad de Traducción
-El sistema incluye herramientas para asegurar la calidad de los datos:
-```bash
-# Monitorear calidad en tiempo real
-docker exec rss2_web python3 scripts/monitor_translation_quality.py --watch
+Las respuestas de noticias ahora incluyen el objeto `entities` enriquecido:
 
-# Limpiar automáticamente traducciones defectuosas
-docker exec rss2_web python3 scripts/clean_repetitive_translations.py
-```
-
-### Gestión de Contenidos
-```bash
-# Generar videos de noticias destacadas
-docker exec rss2_web python3 scripts/generar_videos_noticias.py
-
-# Iniciar migración a Qdrant (Vectores)
-docker exec rss2_web python3 scripts/migrate_to_qdrant.py
-```
-
-### Diagnóstico de Ingesta (Feeds)
-```bash
-docker exec rss2_web python3 scripts/diagnose_rss.py --url <FEED_URL>
+```json
+{
+  "id": 67449,
+  "titulo": "...",
+  "entities": [
+    {
+      "valor": "Apple",
+      "tipo": "organizacion",
+      "wiki_summary": "Apple Inc. es una empresa estadounidense...",
+      "wiki_url": "https://es.wikipedia.org/wiki/Apple",
+      "image_path": "/api/wiki-images/wiki_5723.png"
+    }
+  ]
+}
 ```
 
 ---
 
-## 📊 Observabilidad
-Acceso a métricas de rendimiento (Solo vía Localhost/Tunel):
-*   **Grafana**: [http://localhost:3001](http://localhost:3001) (Admin/Pass en `.env`)
-*   **Proxy Nginx**: [http://localhost:8001](http://localhost:8001)
-
----
-
-**RSS2** - *Transformando noticias en inteligencia con IA Local.*
+**RSS2** - *Transformando noticias en inteligencia con IA localizada.*

@@ -12,47 +12,16 @@ services:
       LC_ALL: C.UTF-8
       TZ: Europe/Madrid
       PGDATA: /var/lib/postgresql/data/18/main
-    command:
-      [
-        "postgres",
-        "-c",
-        "max_connections=200",
-        "-c",
-        "shared_buffers=4GB",
-        "-c",
-        "effective_cache_size=12GB",
-        "-c",
-        "work_mem=16MB",
-        "-c",
-        "maintenance_work_mem=512MB",
-        "-c",
-        "autovacuum_max_workers=3",
-        "-c",
-        "autovacuum_vacuum_scale_factor=0.02",
-        "-c",
-        "autovacuum_vacuum_cost_limit=1000",
-        # Parallel Query Optimization (Adjusted)
-        "-c",
-        "max_worker_processes=8",
-        "-c",
-        "max_parallel_workers=6",
-        "-c",
-        "max_parallel_workers_per_gather=2",
-        # Streaming Replication
-        "-c",
-        "wal_level=replica",
-        "-c",
-        "max_wal_senders=5",
-        "-c",
-        "wal_keep_size=1GB",
-        "-c",
-        "hot_standby=on"
-      ]
     volumes:
-      - ./pgdata:/var/lib/postgresql/data
-      - ./init-db:/docker-entrypoint-initdb.d:ro
+      - ./data/pgdata:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d:rw
+      - ./docker-entrypoint-db.sh:/docker-entrypoint-db.sh:ro
+    entrypoint: ["bash", "/docker-entrypoint-db.sh"]
     networks:
-      - backend
+      backend:
+        aliases:
+          - db
+          - rss2_db
     restart: unless-stopped
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U $$POSTGRES_USER -d $$POSTGRES_DB || exit 1" ]
@@ -67,40 +36,6 @@ services:
         reservations:
           memory: 4G
 
-  db-replica:
-    build:
-      context: .
-      dockerfile: Dockerfile.replica
-    container_name: rss2_db_replica
-    shm_size: 2gb
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-rss}
-      POSTGRES_USER: ${POSTGRES_USER:-rss}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      PGDATA: /var/lib/postgresql/data
-      TZ: Europe/Madrid
-    command: [ "postgres", "-c", "max_connections=200", "-c", "shared_buffers=256MB", "-c", "effective_cache_size=2GB", "-c", "hot_standby=on", "-c", "max_worker_processes=16", "-c", "hot_standby_feedback=on", "-c", "max_standby_streaming_delay=300s" ]
-    volumes:
-      - ./pgdata-replica:/var/lib/postgresql/data
-    networks:
-      - backend
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: unless-stopped
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U rss -d rss || exit 1" ]
-      interval: 5s
-      timeout: 5s
-      retries: 30
-      start_period: 30s
-    deploy:
-      resources:
-        limits:
-          memory: 4G
-        reservations:
-          memory: 2G
-
   redis:
     image: redis:7-alpine
     container_name: rss2_redis
@@ -110,11 +45,14 @@ services:
     command: >
       redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD}
     volumes:
-      - ./redis-data:/data
+      - ./data/redis-data:/data
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro
     networks:
-      - backend
+      backend:
+        aliases:
+          - redis
+          - rss2_redis
     restart: unless-stopped
     healthcheck:
       test: [ "CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD}", "ping" ]
@@ -156,73 +94,80 @@ services:
         reservations:
           memory: 512M
 
-  rss-tasks:
-    build: .
-    container_name: rss2_tasks_py
-    command: bash -lc "python -m scheduler"
+  langdetect:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rss2_langdetect_py
+    command: bash -lc "python -m workers.langdetect_worker"
     environment:
       DB_HOST: db
       DB_PORT: 5432
       DB_NAME: ${DB_NAME:-rss}
       DB_USER: ${DB_USER:-rss}
       DB_PASS: ${DB_PASS}
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      LANG_DETECT_SLEEP: 60
+      LANG_DETECT_BATCH: 1000
       TZ: Europe/Madrid
+    volumes:
+      - ./workers:/app/workers
     networks:
       - backend
     depends_on:
       db:
         condition: service_healthy
-      redis:
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
+  # ==================================================================================
+  # SCRAPER WORKER (Go) - Extrae artículos de URLs
+  # ==================================================================================
+  scraper:
+    build:
+      context: .
+      dockerfile: Dockerfile.scraper
+    container_name: rss2_scraper
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-rss}
+      DB_USER: ${DB_USER:-rss}
+      DB_PASS: ${DB_PASS}
+      SCRAPER_SLEEP: 60
+      SCRAPER_BATCH: 10
+      TZ: Europe/Madrid
+    networks:
+      - backend
+    depends_on:
+      db:
         condition: service_healthy
     restart: unless-stopped
     deploy:
       resources:
         limits:
           cpus: '1'
-          memory: 1G
+          memory: 512M
 
-  url-worker:
+  # ==================================================================================
+  # DISCOVERY WORKER (Go) - Descubre RSS feeds
+  # ==================================================================================
+  discovery:
     build:
       context: .
-      dockerfile: Dockerfile.url_worker
-    container_name: rss2_url_worker
-    command: bash -lc "python -m workers.url_worker_daemon"
+      dockerfile: Dockerfile.discovery
+    container_name: rss2_discovery
     environment:
       DB_HOST: db
       DB_PORT: 5432
       DB_NAME: ${DB_NAME:-rss}
       DB_USER: ${DB_USER:-rss}
       DB_PASS: ${DB_PASS}
-      DB_READ_HOST: db
-      DB_WRITE_HOST: db
-      TZ: Europe/Madrid
-    networks:
-      - backend
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
-
-  url-discovery-worker:
-    build: .
-    container_name: rss2_url_discovery
-    command: bash -lc "python -m workers.url_discovery_worker"
-    environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_NAME: ${DB_NAME:-rss}
-      DB_USER: ${DB_USER:-rss}
-      DB_PASS: ${DB_PASS}
-      URL_DISCOVERY_INTERVAL_MIN: 15
-      URL_DISCOVERY_BATCH_SIZE: 10
+      DISCOVERY_INTERVAL: 900
+      DISCOVERY_BATCH: 10
       MAX_FEEDS_PER_URL: 5
       TZ: Europe/Madrid
     networks:
@@ -235,104 +180,109 @@ services:
       resources:
         limits:
           cpus: '1'
-          memory: 1G
+          memory: 512M
 
-  rss2_web:
-    build: .
-    container_name: rss2_web
-    command: bash -lc "gunicorn --config gunicorn_config.py app:app"
-    volumes:
-      # SEGURIDAD: Código en read-only donde sea posible
-      - ./app.py:/app/app.py:ro
-      - ./routers:/app/routers:ro
-      - ./models:/app/models:ro
-      - ./utils:/app/utils:ro
-      - ./templates:/app/templates:ro
-      - ./static:/app/static:ro
-      - ./config.py:/app/config.py:ro
-      - ./db.py:/app/db.py:ro
-      - ./cache.py:/app/cache.py:ro
-      - ./gunicorn_config.py:/app/gunicorn_config.py:ro
-      # Directorios escribibles
-      - ./hf_cache:/app/hf_cache
-      - ./data:/app/data
+  # ==================================================================================
+  # WIKI WORKER (Go) - Wikipedia info and thumbnails
+  # ==================================================================================
+  wiki-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.wiki
+    container_name: rss2_wiki_worker
     environment:
       DB_HOST: db
       DB_PORT: 5432
       DB_NAME: ${DB_NAME:-rss}
       DB_USER: ${DB_USER:-rss}
       DB_PASS: ${DB_PASS}
-      DB_READ_HOST: db
-      DB_WRITE_HOST: db
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
-      QDRANT_HOST: qdrant
-      QDRANT_PORT: 6333
-      QDRANT_COLLECTION_NAME: ${QDRANT_COLLECTION_NAME:-news_vectors}
-      EMB_MODEL: ${EMB_MODEL:-sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2}
-      SECRET_KEY: ${SECRET_KEY}
-      GUNICORN_WORKERS: 8
-      ALLTALK_URL: http://host.docker.internal:7851
+      WIKI_SLEEP: 10
       TZ: Europe/Madrid
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./data/wiki_images:/app/data/wiki_images
     networks:
-      - frontend
       - backend
     depends_on:
       db:
         condition: service_healthy
-      # db-replica:
-      #   condition: service_healthy
-      redis:
-        condition: service_healthy
-      qdrant:
-        condition: service_started
     restart: unless-stopped
     deploy:
       resources:
         limits:
-          cpus: '8'
-          memory: 8G
-        reservations:
-          memory: 4G
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [ gpu ]
+          cpus: '0.5'
+          memory: 256M
 
+  # ==================================================================================
+  # BACKEND GO (API REST)
+  # ==================================================================================
+  backend-go:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: rss2_backend_go
+    environment:
+      TZ: Europe/Madrid
+      DATABASE_URL: postgres://${POSTGRES_USER:-rss}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-rss}?sslmode=disable
+      REDIS_URL: redis://:${REDIS_PASSWORD:-rss_redis_pass_2024}@redis:6379
+      SECRET_KEY: ${SECRET_KEY:-change_this_to_a_long_random_string}
+      SERVER_PORT: "8080"
+    volumes:
+      - ./data/wiki_images:/app/data/wiki_images
+    networks:
+      - backend
+      - frontend
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ==================================================================================
+  # FRONTEND REACT
+  # ==================================================================================
+  rss2_frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: rss2_frontend
+    environment:
+      TZ: Europe/Madrid
+      VITE_API_URL: /api
+    networks:
+      - frontend
+    depends_on:
+      - backend-go
+    restart: unless-stopped
+
+  # ==================================================================================
+  # NGINX (Puerto 8001 - sirve React + proxy API)
+  # ==================================================================================
   nginx:
     image: nginx:alpine
     container_name: rss2_nginx
-    environment:
-      TZ: Europe/Madrid
     ports:
-      # ÚNICO puerto expuesto públicamente
       - "8001:80"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./static:/app/static:ro
-      - /etc/timezone:/etc/timezone:ro
-      - /etc/localtime:/etc/localtime:ro
     networks:
       - frontend
     depends_on:
-      - rss2_web
+      - rss2_frontend
+      - backend-go
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 512M
 
+  # ==================================================================================
+  # TRANSLATOR CPU (CTranslate2) - Scale with: docker compose up -d --scale translator=3
+  # ==================================================================================
   translator:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.translator
     image: rss2-translator:latest
-    container_name: rss2_translator_py
-    command: bash -lc "python -m workers.translation_worker"
+    command: bash -lc "python -m workers.ctranslator_worker"
+    security_opt:
+      - seccomp=unconfined
     environment:
       DB_HOST: db
       DB_PORT: 5432
@@ -340,41 +290,36 @@ services:
       DB_USER: ${DB_USER:-rss}
       DB_PASS: ${DB_PASS}
       TARGET_LANGS: es
-      TRANSLATOR_BATCH: 128
-      ENQUEUE: 300
-      # CTranslate2 configuration
+      TRANSLATOR_BATCH: 32
       CT2_MODEL_PATH: /app/models/nllb-ct2
-      CT2_DEVICE: cuda
-      CT2_COMPUTE_TYPE: int8_float16
+      CT2_DEVICE: cpu
+      CT2_COMPUTE_TYPE: int8
       UNIVERSAL_MODEL: facebook/nllb-200-distilled-600M
       HF_HOME: /app/hf_cache
       TZ: Europe/Madrid
+      TRANSLATOR_ID: ${TRANSLATOR_ID:-}
     volumes:
+      - ./workers:/app/workers
       - ./hf_cache:/app/hf_cache
       - ./models:/app/models
     networks:
       - backend
-    deploy:
-      resources:
-        limits:
-          memory: 8G
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [ gpu ]
+    profiles:
+      - cpu-only
     depends_on:
       db:
         condition: service_healthy
     restart: unless-stopped
 
-  translator2:
+  # ==================================================================================
+  # TRANSLATION SCHEDULER - Creates translation jobs
+  # ==================================================================================
+  translation-scheduler:
     build:
       context: .
-      dockerfile: Dockerfile
-    image: rss2-translator2:latest
-    container_name: rss2_translator_py2
-    command: bash -lc "python -m workers.translation_worker"
+      dockerfile: Dockerfile.scheduler
+    image: rss2-scheduler:latest
+    container_name: rss2_translation_scheduler
     environment:
       DB_HOST: db
       DB_PORT: 5432
@@ -382,40 +327,35 @@ services:
       DB_USER: ${DB_USER:-rss}
       DB_PASS: ${DB_PASS}
       TARGET_LANGS: es
-      TRANSLATOR_BATCH: 128
-      ENQUEUE: 300
-      CT2_MODEL_PATH: /app/models/nllb-ct2
-      CT2_DEVICE: cuda
-      CT2_COMPUTE_TYPE: int8_float16
-      UNIVERSAL_MODEL: facebook/nllb-200-distilled-600M
-      HF_HOME: /app/hf_cache
+      SCHEDULER_BATCH: 1000
+      SCHEDULER_SLEEP: 30
       TZ: Europe/Madrid
     volumes:
-      - ./hf_cache:/app/hf_cache
-      - ./models:/app/models
+      - ./workers:/app/workers
     networks:
       - backend
     deploy:
       resources:
         limits:
-          memory: 8G
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [ gpu ]
+          cpus: '0.5'
+          memory: 256M
     depends_on:
       db:
         condition: service_healthy
     restart: unless-stopped
 
-  translator3:
+  # ==================================================================================
+  # TRANSLATOR GPU (CTranslate2 with CUDA)
+  # ==================================================================================
+  translator-gpu:
     build:
       context: .
-      dockerfile: Dockerfile
-    image: rss2-translator3:latest
-    container_name: rss2_translator_py3
-    command: bash -lc "python -m workers.translation_worker"
+      dockerfile: Dockerfile.translator-gpu
+    image: rss2-translator-gpu:latest
+    container_name: rss2_translator_gpu
+    command: bash -lc "python -m workers.ctranslator_worker"
+    security_opt:
+      - seccomp=unconfined
     environment:
       DB_HOST: db
       DB_PORT: 5432
@@ -423,14 +363,15 @@ services:
       DB_USER: ${DB_USER:-rss}
       DB_PASS: ${DB_PASS}
       TARGET_LANGS: es
-      TRANSLATOR_BATCH: 128
-      ENQUEUE: 300
+      TRANSLATOR_BATCH: 64
       CT2_MODEL_PATH: /app/models/nllb-ct2
       CT2_DEVICE: cuda
-      CT2_COMPUTE_TYPE: int8_float16
+      CT2_COMPUTE_TYPE: float16
       UNIVERSAL_MODEL: facebook/nllb-200-distilled-600M
       HF_HOME: /app/hf_cache
+      TZ: Europe/Madrid
     volumes:
+      - ./workers:/app/workers
       - ./hf_cache:/app/hf_cache
       - ./models:/app/models
     networks:
@@ -438,7 +379,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 8G
+          memory: 4G
         reservations:
           devices:
             - driver: nvidia
@@ -470,6 +411,7 @@ services:
       HF_HOME: /app/hf_cache
       TZ: Europe/Madrid
     volumes:
+      - ./workers:/app/workers
       - ./hf_cache:/app/hf_cache
     networks:
       - backend
@@ -487,19 +429,53 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  related:
+  # ==================================================================================
+  # TOPICS WORKER (Go) - Matching temas y países
+  # ==================================================================================
+  topics:
     build:
       context: .
-      dockerfile: Dockerfile
-    container_name: rss2_related_py
-    command: bash -lc "python -m workers.related_worker"
+      dockerfile: Dockerfile.topics
+    container_name: rss2_topics
     environment:
       DB_HOST: db
       DB_PORT: 5432
       DB_NAME: ${DB_NAME:-rss}
       DB_USER: ${DB_USER:-rss}
       DB_PASS: ${DB_PASS}
-      RELATED_WINDOW_H: 168
+      TOPICS_SLEEP: 10
+      TOPICS_BATCH: 500
+      TZ: Europe/Madrid
+    networks:
+      - backend
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+
+  # ==================================================================================
+  # RELATED WORKER (Go) - Noticias relacionadas
+  # ==================================================================================
+  related:
+    build:
+      context: .
+      dockerfile: Dockerfile.related
+    container_name: rss2_related
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-rss}
+      DB_USER: ${DB_USER:-rss}
+      DB_PASS: ${DB_PASS}
+      RELATED_SLEEP: 10
+      RELATED_BATCH: 200
+      RELATED_TOPK: 10
+      EMB_MODEL: mxbai-embed-large
       TZ: Europe/Madrid
     networks:
       - backend
@@ -513,6 +489,99 @@ services:
           cpus: '1'
           memory: 1G
 
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: rss2_qdrant
+    environment:
+      TZ: Europe/Madrid
+      QDRANT__SERVICE__GRPC_PORT: 6334
+    volumes:
+      - ./data/qdrant_storage:/qdrant/storage
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - backend
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
+          memory: 2G
+
+  # ==================================================================================
+  # QDRANT WORKER (Go) - Vectorización y búsqueda semántica
+  # ==================================================================================
+  qdrant-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.qdrant
+    container_name: rss2_qdrant_worker
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-rss}
+      DB_USER: ${DB_USER:-rss}
+      DB_PASS: ${DB_PASS}
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6333
+      QDRANT_COLLECTION: news_vectors
+      OLLAMA_URL: http://ollama:11434
+      QDRANT_SLEEP: 30
+      QDRANT_BATCH: 100
+      TZ: Europe/Madrid
+    networks:
+      - backend
+    depends_on:
+      db:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+
+  # ==================================================================================
+  # NER WORKER (Python) - Extracción de entidades
+  # ==================================================================================
+  ner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rss2_ner
+    command: bash -lc "python -m workers.ner_worker"
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-rss}
+      DB_USER: ${DB_USER:-rss}
+      DB_PASS: ${DB_PASS}
+      NER_LANG: es
+      NER_BATCH: 64
+      HF_HOME: /app/hf_cache
+      TZ: Europe/Madrid
+    volumes:
+      - ./workers:/app/workers
+      - ./hf_cache:/app/hf_cache
+    networks:
+      - backend
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+
+  # ==================================================================================
+  # CLUSTER WORKER (Python) - Agrupación de noticias
+  # ==================================================================================
   cluster:
     build:
       context: .
@@ -528,34 +597,8 @@ services:
       EVENT_DIST_THRESHOLD: 0.35
       EMB_MODEL: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
       TZ: Europe/Madrid
-    networks:
-      - backend
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
-
-  ner:
-    build: .
-    container_name: rss2_ner
-    command: bash -lc "python -m workers.ner_worker"
-    environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_NAME: ${DB_NAME:-rss}
-      DB_USER: ${DB_USER:-rss}
-      DB_PASS: ${DB_PASS}
-      NER_LANG: es
-      NER_BATCH: 64
-      HF_HOME: /app/hf_cache
-      TZ: Europe/Madrid
     volumes:
-      - ./hf_cache:/app/hf_cache
+      - ./workers:/app/workers
     networks:
       - backend
     depends_on:
@@ -568,33 +611,13 @@ services:
           cpus: '2'
           memory: 2G
 
-  topics:
+  # ==================================================================================
+  # LLM CATEGORIZER (Python) - Categorización con Ollama
+  # ==================================================================================
+  llm-categorizer:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: rss2_topics_worker
-    command: bash -lc "python -m workers.topics_worker"
-    environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_NAME: ${DB_NAME:-rss}
-      DB_USER: ${DB_USER:-rss}
-      DB_PASS: ${DB_PASS}
-      TZ: Europe/Madrid
-    networks:
-      - backend
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 1G
-
-  llm-categorizer:
-    build: .
     container_name: rss2_llm_categorizer
     command: bash -lc "python -m workers.simple_categorizer_worker"
     environment:
@@ -606,6 +629,8 @@ services:
       CATEGORIZER_BATCH_SIZE: 10
       CATEGORIZER_SLEEP_IDLE: 5
       TZ: Europe/Madrid
+    volumes:
+      - ./workers:/app/workers
     networks:
       - backend
     depends_on:
@@ -617,72 +642,6 @@ services:
         limits:
           cpus: '2'
           memory: 1G
-
-  qdrant:
-    image: qdrant/qdrant:latest
-    container_name: rss2_qdrant
-    environment:
-      TZ: Europe/Madrid
-      QDRANT__SERVICE__GRPC_PORT: 6334
-    # SEGURIDAD: Puertos NO expuestos - solo acceso interno
-    # ports:
-    #   - "6333:6333"
-    #   - "6334:6334"
-    volumes:
-      - ./qdrant_storage:/qdrant/storage
-      - /etc/timezone:/etc/timezone:ro
-      - /etc/localtime:/etc/localtime:ro
-    networks:
-      - backend
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '4'
-          memory: 4G
-        reservations:
-          memory: 2G
-
-  qdrant-worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: rss2_qdrant_worker
-    command: bash -lc "python -m workers.qdrant_worker"
-    environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_NAME: ${DB_NAME:-rss}
-      DB_USER: ${DB_USER:-rss}
-      DB_PASS: ${DB_PASS}
-      DB_READ_HOST: db
-      DB_WRITE_HOST: db
-      QDRANT_HOST: qdrant
-      QDRANT_PORT: 6333
-      QDRANT_COLLECTION_NAME: ${QDRANT_COLLECTION_NAME:-news_vectors}
-      EMB_MODEL: ${EMB_MODEL:-sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2}
-      EMB_DEVICE: cpu
-      QDRANT_BATCH_SIZE: ${QDRANT_BATCH_SIZE:-100}
-      QDRANT_SLEEP_IDLE: ${QDRANT_SLEEP_IDLE:-30}
-      HF_HOME: /app/hf_cache
-      TZ: Europe/Madrid
-    volumes:
-      - ./hf_cache:/app/hf_cache
-    networks:
-      - backend
-    depends_on:
-      db:
-        condition: service_healthy
-      # db-replica:
-      #   condition: service_healthy
-      qdrant:
-        condition: service_started
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 4G
 
   # ==================================================================================
   # MONITORING STACK - SECURED

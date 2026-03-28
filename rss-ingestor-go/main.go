@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/PuerkitoBio/goquery"
 	"github.com/lib/pq"
 	"github.com/mmcdole/gofeed"
 )
@@ -142,14 +143,14 @@ func generateID(link string) string {
 	return hex.EncodeToString(hash[:])
 }
 
-// CleanHTML removes generic HTML tags to store plain text summary
 func cleanHTML(input string) string {
-	// Simple harvester, real cleaning might need a library like bluemonday if strict security needed,
-	// but here we just want to strip tags roughly for the 'resumen' field if it's too raw.
-	// For now, we will trust the database or frontend to handle rendering/sanitization,
-	// or perform a simple strip.
-	// NOTE: The python version used BeautifulSoup. In Go, we can use 'bluemonday' or just simple replacements.
-	// To keep dependencies low for this snippet, sending as is, but stripping major noise if needed.
+	if input == "" {
+		return ""
+	}
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(input))
+	if err == nil {
+		return strings.TrimSpace(doc.Text())
+	}
 	return strings.TrimSpace(input)
 }
 
@@ -181,6 +182,20 @@ func extractImage(item *gofeed.Item) string {
 			}
 		}
 	}
+
+	// Try extracting from HTML description or content
+	for _, html := range []string{item.Description, item.Content} {
+		if html == "" {
+			continue
+		}
+		doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
+		if err == nil {
+			if src, exists := doc.Find("img").First().Attr("src"); exists && src != "" {
+				return src
+			}
+		}
+	}
+
 	return ""
 }
 

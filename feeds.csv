@@ -1,0 +1,18 @@
+id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fallos
+19,8am Daily – Dari,روزنامه ۸صبح افغانستان به زبان دری.,https://8am.af/feed,7,Internacional,1,Afganistán,fa,False,30
+20,8am Daily – Pashto,د ۸صبح ورځپاڼې پښتو خپرونه.,https://8am.af/ps/feed,7,Internacional,1,Afganistán,ps,False,30
+1,Afghanistan News.Net – Noticias,Cobertura continua de noticias generales sobre Afganistán y su entorno regional.,https://feeds.afghanistannews.net/rss/6e1d5c8e1f98f17c,7,Internacional,1,Afganistán,en,True,0
+36,Arezo TV – Dari,آرزو تلویزیون – خبر و گزارش به دری.,https://arezo.tv/fa/feed,7,Internacional,1,Afganistán,fa,False,30
+37,Arezo TV – Pashto,د آرزو تلویزیون پښتو خبرونه.,https://arezo.tv/ps/feed,7,Internacional,1,Afganistán,ps,False,30
+4,Ariana News – Dari,خبرها و تحلیل‌ها از افغانستان به زبان دری.,https://ariananews.af/feed,7,Internacional,1,Afganistán,fa,True,0
+28,Avapress – Dari,خبرگزاری صدای افغان (آوا) به زبان دری.,https://avapress.com/fa/rss,7,Internacional,1,Afganistán,fa,False,30
+29,Avapress – Pashto,د افغان غږ خبري آژانس په پښتو ژبه.,https://avapress.com/ps/rss,7,Internacional,1,Afganistán,ps,False,30
+23,Bakhtar News Agency – Dari,آژانس خبری باختر به زبان دری.,https://bakhtarnews.af/fa/feed,7,Internacional,1,Afganistán,fa,False,5
+24,Bakhtar News Agency – Pashto,د باختر خبري اژانس پښتو پاڼه.,https://bakhtarnews.af/ps/feed,7,Internacional,1,Afganistán,ps,False,5
+38,Barya News – Dari,باریانیوز – رسانه خبری افغانستان.,https://barya.news/feed,7,Internacional,1,Afganistán,fa,False,30
+39,Barya News – Pashto,باریانیوز پښتو خپرونې.,https://barya.news/ps/feed,7,Internacional,1,Afganistán,ps,False,30
+47,Chaprast News – Dari,چپرست نیوز – خبرهای افغانستان.,https://chaprast.com/feed,7,Internacional,1,Afganistán,fa,False,30
+30,Ensaf News – Dari,رسانه تحلیلی به زبان دری.,https://www.ensafnews.com/fa/feed,7,Internacional,1,Afganistán,fa,False,30
+27,Hamshahri Afghanistan – Dari,نسخه افغانستان همشهری به زبان دری.,https://hamshahri.af/feed,7,Internacional,1,Afganistán,fa,False,30
+44,Jomhor News – Dari,جمهور نیوز – خبرگزاری مستقل دری.,https://jomhornews.com/fa/rss,7,Internacional,1,Afganistán,fa,False,30
+45,Jomhor News – Pashto,جمهور نیوز پښتو.,https://jomhornews.com/ps/rss,7,Internacional,1,Afganistán,ps,False,30
