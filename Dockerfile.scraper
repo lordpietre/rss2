@@ -27,6 +27,7 @@ ENV DB_HOST=db \
     DB_USER=rss \
     DB_PASS=rss \
     SCRAPER_SLEEP=60 \
-    SCRAPER_BATCH=10
+    SCRAPER_BATCH=10 \
+    SCRAPER_ENRICH_LIMIT=20
 
 ENTRYPOINT ["/bin/scraper"]

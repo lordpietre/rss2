@@ -139,6 +139,7 @@ services:
       DB_PASS: ${DB_PASS}
       SCRAPER_SLEEP: 60
       SCRAPER_BATCH: 10
+      SCRAPER_ENRICH_LIMIT: 20
       TZ: Europe/Madrid
     networks:
       - backend
@@ -262,7 +263,7 @@ services:
     image: nginx:alpine
     container_name: rss2_nginx
     ports:
-      - "8001:80"
+      - "8888:80"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
     networks:
