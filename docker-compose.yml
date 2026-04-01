@@ -78,7 +78,7 @@ services:
       DB_USER: ${DB_USER:-rss}
       DB_PASS: ${DB_PASS}
       RSS_MAX_WORKERS: 100
-      RSS_POKE_INTERVAL_MIN: 15
+      RSS_POKE_INTERVAL_MIN: 60
       TZ: Europe/Madrid
     networks:
       - backend
