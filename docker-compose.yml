@@ -313,6 +313,38 @@ services:
     restart: unless-stopped
 
   # ==================================================================================
+  # REMOTE TRANSLATOR WORKER - Worker remoto que se conecta por WebSocket
+  # ==================================================================================
+  remote-translator:
+    build:
+      context: .
+      dockerfile: Dockerfile.remote-worker
+    container_name: rss2_remote_translator
+    environment:
+      WORKER_NAME: ${WORKER_NAME:-remote-worker-1}
+      WORKER_API_KEY: ${WORKER_API_KEY:-}
+      WORKER_SERVER: ${WORKER_SERVER:-ws://backend-go:8080/ws/worker}
+      CT2_DEVICE: ${CT2_DEVICE:-cpu}
+      CT2_MODEL_PATH: /app/models/nllb-ct2
+      CT2_COMPUTE_TYPE: ${CT2_COMPUTE_TYPE:-int8}
+      UNIVERSAL_MODEL: facebook/nllb-200-distilled-600M
+      HF_HOME: /app/hf_cache
+      TZ: Europe/Madrid
+    volumes:
+      - ./hf_cache:/app/hf_cache
+      - ./models:/app/models
+    networks:
+      - backend
+    profiles:
+      - remote
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+    restart: unless-stopped
+
+  # ==================================================================================
   # TRANSLATION SCHEDULER - Creates translation jobs
   # ==================================================================================
   translation-scheduler:

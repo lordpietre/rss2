@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import { Layout } from './components/layout/Layout'
+import { ProtectedRoute } from './components/ProtectedRoute'
 import { Home } from './pages/Home'
 import { News } from './pages/News'
 import { Feeds } from './pages/Feeds'
@@ -64,10 +65,22 @@ function App() {
         <Route path="favorites" element={<Favorites />} />
         <Route path="account" element={<Account />} />
         <Route path="login" element={<Login />} />
-        <Route path="admin/aliases" element={<AdminAliases />} />
-        <Route path="admin/users" element={<AdminUsers />} />
-        <Route path="admin/settings" element={<AdminSettings />} />
-        <Route path="admin/workers" element={<AdminWorkers />} />
+        <Route 
+          path="admin/aliases" 
+          element={<ProtectedRoute requireAdmin>{<AdminAliases />}</ProtectedRoute>} 
+        />
+        <Route 
+          path="admin/users" 
+          element={<ProtectedRoute requireAdmin>{<AdminUsers />}</ProtectedRoute>} 
+        />
+        <Route 
+          path="admin/settings" 
+          element={<ProtectedRoute requireAdmin>{<AdminSettings />}</ProtectedRoute>} 
+        />
+        <Route 
+          path="admin/workers" 
+          element={<ProtectedRoute requireAdmin>{<AdminWorkers />}</ProtectedRoute>} 
+        />
       </Route>
     </Routes>
   )

@@ -20,23 +20,34 @@ type Config struct {
 	DefaultLang        string
 	NewsPerPage        int
 	RateLimitPerMinute int
+	DockerComposeDir   string
+	WikiImagesPath     string
+	AllowedOrigins     string
 }
 
 func Load() *Config {
+	secretKey := os.Getenv("SECRET_KEY")
+	if secretKey == "" {
+		secretKey = "change-this-secret-key"
+	}
+
 	return &Config{
-		ServerPort:         getEnv("SERVER_PORT", "8080"),
-		DatabaseURL:        getEnv("DATABASE_URL", "postgres://rss:rss@localhost:5432/rss"),
-		RedisURL:           getEnv("REDIS_URL", "redis://localhost:6379"),
-		QdrantHost:         getEnv("QDRANT_HOST", "localhost"),
-		QdrantPort:         getEnvInt("QDRANT_PORT", 6333),
-		SecretKey:          getEnv("SECRET_KEY", "change-this-secret-key"),
-		JWTExpiration:      getEnvDuration("JWT_EXPIRATION", 24*time.Hour),
-		TranslationURL:     getEnv("TRANSLATION_URL", "http://libretranslate:7790"),
-		OllamaURL:          getEnv("OLLAMA_URL", "http://ollama:11434"),
-		SpacyURL:           getEnv("SPACY_URL", "http://spacy:8000"),
-		DefaultLang:        getEnv("DEFAULT_LANG", "es"),
-		NewsPerPage:        getEnvInt("NEWS_PER_PAGE", 30),
-		RateLimitPerMinute: getEnvInt("RATE_LIMIT_PER_MINUTE", 60),
+		ServerPort:            getEnv("SERVER_PORT", "8080"),
+		DatabaseURL:            getEnv("DATABASE_URL", "postgres://rss:rss@localhost:5432/rss"),
+		RedisURL:              getEnv("REDIS_URL", "redis://localhost:6379"),
+		QdrantHost:            getEnv("QDRANT_HOST", "localhost"),
+		QdrantPort:            getEnvInt("QDRANT_PORT", 6333),
+		SecretKey:             secretKey,
+		JWTExpiration:         getEnvDuration("JWT_EXPIRATION", 24*time.Hour),
+		TranslationURL:        getEnv("TRANSLATION_URL", "http://libretranslate:7790"),
+		OllamaURL:             getEnv("OLLAMA_URL", "http://ollama:11434"),
+		SpacyURL:             getEnv("SPACY_URL", "http://spacy:8000"),
+		DefaultLang:          getEnv("DEFAULT_LANG", "es"),
+		NewsPerPage:          getEnvInt("NEWS_PER_PAGE", 30),
+		RateLimitPerMinute:   getEnvInt("RATE_LIMIT_PER_MINUTE", 60),
+		DockerComposeDir:     getEnv("DOCKER_COMPOSE_DIR", "/datos/rss2"),
+		WikiImagesPath:       getEnv("WIKI_IMAGES_PATH", "/app/data/wiki_images"),
+		AllowedOrigins:       getEnv("ALLOWED_ORIGINS", "*"),
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/gin-gonic/gin"
+	"github.com/rss2/backend/internal/auth"
 	"github.com/rss2/backend/internal/cache"
 	"github.com/rss2/backend/internal/config"
 	"github.com/rss2/backend/internal/db"
@@ -74,6 +75,39 @@ func initDB() {
 		INSERT INTO config (key, value) VALUES ('translator_status', 'stopped')
 		ON CONFLICT (key) DO NOTHING
 	`)
+
+	// Crear tabla de remote_workers si no existe
+	_, err = db.GetPool().Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS remote_workers (
+			id SERIAL PRIMARY KEY,
+			name VARCHAR(255) NOT NULL,
+			api_key VARCHAR(64) UNIQUE NOT NULL,
+			capabilities VARCHAR(50) DEFAULT 'cpu',
+			status VARCHAR(20) DEFAULT 'offline',
+			last_seen TIMESTAMP,
+			created_at TIMESTAMP DEFAULT NOW()
+		)
+	`)
+	if err != nil {
+		log.Printf("Warning: Could not create remote_workers table: %v", err)
+	} else {
+		log.Println("Table remote_workers ready")
+	}
+
+	// Añadir columnas a traducciones para workers remotos
+	_, err = db.GetPool().Exec(ctx, `
+		ALTER TABLE traducciones ADD COLUMN IF NOT EXISTS worker_id INTEGER REFERENCES remote_workers(id)
+	`)
+	if err != nil {
+		log.Printf("Warning: Could not add worker_id column: %v", err)
+	}
+
+	_, err = db.GetPool().Exec(ctx, `
+		ALTER TABLE traducciones ADD COLUMN IF NOT EXISTS assigned_at TIMESTAMP
+	`)
+	if err != nil {
+		log.Printf("Warning: Could not add assigned_at column: %v", err)
+	}
 }
 
 func main() {
@@ -109,7 +143,7 @@ func main() {
 	api := r.Group("/api")
 	{
 		// Serve static images downloaded by wiki_worker
-		api.StaticFS("/wiki-images", gin.Dir("/app/data/wiki_images", false))
+		api.StaticFS("/wiki-images", gin.Dir(cfg.WikiImagesPath, false))
 
 		api.POST("/auth/login", handlers.Login)
 		api.POST("/auth/register", handlers.Register)
@@ -161,7 +195,16 @@ func main() {
 			admin.POST("/workers/config", handlers.SetWorkerConfig)
 			admin.POST("/workers/start", handlers.StartWorkers)
 			admin.POST("/workers/stop", handlers.StopWorkers)
+
+			admin.GET("/workers/remote", handlers.ListRemoteWorkers)
+			admin.POST("/workers/remote", handlers.CreateRemoteWorker)
+			admin.GET("/workers/remote/:id", handlers.GetRemoteWorker)
+			admin.DELETE("/workers/remote/:id", handlers.DeleteRemoteWorker)
+			admin.POST("/workers/remote/:id/toggle", handlers.ToggleRemoteWorker)
+			admin.POST("/workers/remote/:id/regenerate-key", handlers.RegenerateAPIKey)
 		}
+
+		r.GET("/ws/worker", handlers.HandleWorkerWS)
 
 		auth := api.Group("/auth")
 		auth.Use(middleware.AuthRequired())
@@ -170,7 +213,7 @@ func main() {
 		}
 	}
 
-	middleware.SetJWTSecret(cfg.SecretKey)
+	auth.SetJWTSecret(cfg.SecretKey)
 
 	port := cfg.ServerPort
 	addr := fmt.Sprintf(":%s", port)
@@ -181,6 +224,8 @@ func main() {
 			log.Fatalf("Failed to start server: %v", err)
 		}
 	}()
+
+	handlers.StartJobAssigner()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)

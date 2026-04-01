@@ -5,22 +5,9 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
+	"github.com/rss2/backend/internal/auth"
+	"github.com/rss2/backend/internal/config"
 )
-
-var jwtSecret []byte
-
-func SetJWTSecret(secret string) {
-	jwtSecret = []byte(secret)
-}
-
-type Claims struct {
-	UserID   int64  `json:"user_id"`
-	Email    string `json:"email"`
-	Username string `json:"username"`
-	IsAdmin  bool   `json:"is_admin"`
-	jwt.RegisteredClaims
-}
 
 func AuthRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -38,12 +25,8 @@ func AuthRequired() gin.HandlerFunc {
 			return
 		}
 
-		claims := &Claims{}
-		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-			return jwtSecret, nil
-		})
-
-		if err != nil || !token.Valid {
+		claims, err := auth.ValidateToken(tokenString)
+		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 			c.Abort()
 			return
@@ -63,7 +46,7 @@ func AdminRequired() gin.HandlerFunc {
 			return
 		}
 
-		claims := userVal.(*Claims)
+		claims := userVal.(*auth.Claims)
 		if !claims.IsAdmin {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Admin access required"})
 			c.Abort()
@@ -75,9 +58,30 @@ func AdminRequired() gin.HandlerFunc {
 }
 
 func CORSMiddleware() gin.HandlerFunc {
+	cfg := config.Load()
+	allowedOrigins := strings.Split(cfg.AllowedOrigins, ",")
+
 	return func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		origin := c.Request.Header.Get("Origin")
+		
+		allowed := false
+		for _, o := range allowedOrigins {
+			o = strings.TrimSpace(o)
+			if o == "*" || o == origin {
+				allowed = true
+				break
+			}
+		}
+
+		if allowed {
+			if cfg.AllowedOrigins == "*" {
+				c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+			} else {
+				c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+				c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+			}
+		}
+
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE, PATCH")
 

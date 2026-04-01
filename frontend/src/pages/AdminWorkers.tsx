@@ -1,12 +1,22 @@
 import { useState, useEffect } from 'react'
 import { api } from '../services/api'
-import { Cpu, Play, Square, Settings, RefreshCw, Loader2, Server } from 'lucide-react'
+import { Cpu, Play, Square, Settings, RefreshCw, Loader2, Server, Wifi, Plus, Trash2, Key } from 'lucide-react'
 
 interface WorkerStatus {
   type: string
   workers: number
   status: string
   running: number
+}
+
+interface RemoteWorker {
+  id: number
+  name: string
+  api_key?: string
+  capabilities: string
+  status: string
+  last_seen?: string
+  created_at: string
 }
 
 export function AdminWorkers() {
@@ -16,23 +26,49 @@ export function AdminWorkers() {
   const [configType, setConfigType] = useState<'cpu' | 'gpu'>('cpu')
   const [configWorkers, setConfigWorkers] = useState(2)
 
-  useEffect(() => {
-    fetchStatus()
-  }, [])
+  const [remoteWorkers, setRemoteWorkers] = useState<RemoteWorker[]>([])
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [newWorkerName, setNewWorkerName] = useState('')
+  const [newWorkerCapabilities, setNewWorkerCapabilities] = useState('cpu')
+  const [newWorkerKey, setNewWorkerKey] = useState<string | null>(null)
 
   const fetchStatus = async () => {
     setLoading(true)
     try {
       const res = await api.get('/admin/workers/status')
+      console.log('Status response:', res.data)
       setStatus(res.data)
       setConfigType(res.data.type)
       setConfigWorkers(res.data.workers)
-    } catch (err) {
-      console.error(err)
+    } catch (err: any) {
+      console.error('Error fetching status:', err)
     } finally {
       setLoading(false)
     }
   }
+
+  const fetchRemoteWorkers = async () => {
+    try {
+      const res = await api.get('/admin/workers/remote')
+      console.log('Remote workers response:', res.data)
+      setRemoteWorkers(res.data)
+    } catch (err: any) {
+      console.error('Error fetching remote workers:', err)
+      // If 401, user is not authenticated - try refreshing
+      if (err.response?.status === 401) {
+        const userData = localStorage.getItem('user')
+        if (userData) {
+          const user = JSON.parse(userData)
+          console.log('Current user from localStorage:', user)
+        }
+      }
+    }
+  }
+
+  useEffect(() => {
+    fetchStatus()
+    fetchRemoteWorkers()
+  }, [])
 
   const handleStart = async () => {
     setActionLoading('start')
@@ -73,6 +109,53 @@ export function AdminWorkers() {
       alert(err.response?.data?.error || 'Error al guardar configuración')
     } finally {
       setActionLoading(null)
+    }
+  }
+
+  const handleAddRemoteWorker = async () => {
+    if (!newWorkerName.trim()) return
+    setActionLoading('add')
+    try {
+      const res = await api.post('/admin/workers/remote', {
+        name: newWorkerName,
+        capabilities: newWorkerCapabilities
+      })
+      setNewWorkerKey(res.data.api_key)
+      setNewWorkerName('')
+      fetchRemoteWorkers()
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Error al crear worker')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleDeleteRemoteWorker = async (id: number) => {
+    if (!confirm('¿Eliminar este worker remoto?')) return
+    try {
+      await api.delete(`/admin/workers/remote/${id}`)
+      fetchRemoteWorkers()
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Error al eliminar worker')
+    }
+  }
+
+  const handleToggleRemoteWorker = async (id: number) => {
+    try {
+      await api.post(`/admin/workers/remote/${id}/toggle`)
+      fetchRemoteWorkers()
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Error al cambiar estado')
+    }
+  }
+
+  const handleRegenerateKey = async (id: number) => {
+    if (!confirm('¿Regenerar API key? La anterior deixará de funcionar.')) return
+    try {
+      const res = await api.post(`/admin/workers/remote/${id}/regenerate-key`)
+      setNewWorkerKey(res.data.api_key)
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Error al regenerar key')
     }
   }
 
@@ -255,6 +338,123 @@ export function AdminWorkers() {
           <li>• Los cambios en la configuración se aplicarán al iniciar los workers</li>
           <li>• Recomendado: 2-4 workers para CPU, 1-2 para GPU</li>
         </ul>
+      </div>
+
+      <div className="mt-6 bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <Wifi className="h-5 w-5" />
+            Workers Remotos
+          </h2>
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="btn-primary flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Añadir Worker
+          </button>
+        </div>
+
+        {showAddForm && (
+          <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <h3 className="font-medium mb-3">Nuevo Worker Remoto</h3>
+            <div className="flex gap-3 mb-3">
+              <input
+                type="text"
+                placeholder="Nombre del worker"
+                value={newWorkerName}
+                onChange={(e) => setNewWorkerName(e.target.value)}
+                className="flex-1 px-3 py-2 border rounded-lg dark:bg-gray-600 dark:border-gray-600"
+              />
+              <select
+                value={newWorkerCapabilities}
+                onChange={(e) => setNewWorkerCapabilities(e.target.value)}
+                className="px-3 py-2 border rounded-lg dark:bg-gray-600 dark:border-gray-600"
+              >
+                <option value="cpu">CPU</option>
+                <option value="gpu">GPU</option>
+              </select>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleAddRemoteWorker}
+                disabled={actionLoading === 'add'}
+                className="btn-primary"
+              >
+                {actionLoading === 'add' ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Crear'}
+              </button>
+              <button
+                onClick={() => { setShowAddForm(false); setNewWorkerKey(null) }}
+                className="btn-secondary"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {newWorkerKey && (
+          <div className="mb-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <Key className="h-4 w-4 text-green-600" />
+              <span className="font-medium text-green-800 dark:text-green-200">API Key creada</span>
+            </div>
+            <code className="block p-2 bg-white dark:bg-gray-800 rounded text-sm break-all font-mono">
+              {newWorkerKey}
+            </code>
+            <p className="text-sm text-green-700 dark:text-green-300 mt-2">
+              Copia esta clave. No se mostrará de nuevo.
+            </p>
+            <button
+              onClick={() => setNewWorkerKey(null)}
+              className="mt-2 text-sm text-green-700 dark:text-green-300 underline"
+            >
+              Ocultar
+            </button>
+          </div>
+        )}
+
+        {remoteWorkers.length === 0 ? (
+          <p className="text-gray-500 text-center py-4">No hay workers remotos configurados</p>
+        ) : (
+          <div className="space-y-3">
+            {remoteWorkers.map((worker) => (
+              <div key={worker.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className={`w-3 h-3 rounded-full ${
+                    worker.status === 'online' ? 'bg-green-500' : 'bg-gray-400'
+                  }`} />
+                  <div>
+                    <span className="font-medium">{worker.name}</span>
+                    <span className="ml-2 text-sm text-gray-500">{worker.capabilities}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleToggleRemoteWorker(worker.id)}
+                    className="px-2 py-1 text-xs rounded border hover:bg-gray-100 dark:hover:bg-gray-600"
+                  >
+                    {worker.status === 'disabled' ? 'Activar' : 'Desactivar'}
+                  </button>
+                  <button
+                    onClick={() => handleRegenerateKey(worker.id)}
+                    className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                    title="Regenerar API Key"
+                  >
+                    <Key className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteRemoteWorker(worker.id)}
+                    className="p-2 text-red-500 hover:text-red-700"
+                    title="Eliminar"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
