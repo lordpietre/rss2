@@ -5,6 +5,7 @@ import json
 import logging
 import re
 import threading
+import hashlib
 from typing import List, Optional
 
 import websocket
@@ -25,7 +26,7 @@ WORKER_SERVER = os.environ.get("WORKER_SERVER", "ws://localhost:8080/ws/worker")
 DEVICE = os.environ.get("CT2_DEVICE", "cpu")
 MODEL_PATH = os.environ.get("CT2_MODEL_PATH", "/app/models/nllb-ct2")
 COMPUTE_TYPE = os.environ.get("CT2_COMPUTE_TYPE", "int8")
-UNIVERSAL_MODEL = os.environ.get("UNIVERSAL_MODEL", "facebook/nllb-200-distilled-600M")
+UNIVERSAL_MODEL = os.environ.get("UNIVERSAL_MODEL", "facebook/nllb-200-1.3B")
 
 LANG_CODE_MAP = {
     "en": "eng_Latn", "es": "spa_Latn", "fr": "fra_Latn", "de": "deu_Latn",
@@ -60,7 +61,8 @@ def ensure_model():
     model_bin = os.path.join(MODEL_PATH, "model.bin")
     
     if not os.path.exists(model_bin):
-        LOG.info(f"CTranslate2 model not found at {MODEL_PATH}, converting...")
+        LOG.info(f"CTranslate2 model not found at {MODEL_PATH}")
+        LOG.info("Downloading from HuggingFace...")
         convert_model()
     
     LOG.info(f"Loading CTranslate2 model from {MODEL_PATH} on {DEVICE}")
@@ -81,6 +83,8 @@ def convert_model():
     os.makedirs(MODEL_PATH, exist_ok=True)
     
     quantization = COMPUTE_TYPE if COMPUTE_TYPE != "auto" else "int8"
+    
+    LOG.info(f"Converting {UNIVERSAL_MODEL} to CTranslate2 format...")
     
     cmd = [
         "ct2-transformers-converter",

@@ -1,23 +1,20 @@
 FROM python:3.11-slim-bookworm
 
-SHELL ["/bin/bash", "-c"]
-
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    patchelf libpq-dev gcc git curl wget bash \
+    patchelf libpq-dev gcc git curl wget \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     TOKENIZERS_PARALLELISM=false \
-    HF_HOME=/root/.cache/huggingface \
-    DEBIAN_FRONTEND=noninteractive
+    HF_HOME=/root/.cache/huggingface
 
 WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip
 
-RUN pip install --no-cache-dir torch==2.1.0 torchvision==0.16.0 --index-url https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir torch==2.1.0 torchvision==0.16.0 --index-url https://download.pytorch.org/whl/cu118
 
 RUN pip install --no-cache-dir \
     ctranslate2==3.24.0 \
@@ -33,18 +30,10 @@ RUN find /usr/local/lib/python3.11/site-packages/ctranslate2* \
     -name "libctranslate2-*.so.*" -o -name "libctranslate2.so*" | \
     xargs -I {} patchelf --clear-execstack {} || true
 
-COPY workers/ ./workers/
-COPY init-db/ ./init-db/
-COPY migrations/ ./migrations/
+COPY workers/remote_translator_worker.py /app/worker.py
 
-ENV DB_HOST=db
-ENV DB_PORT=5432
-ENV DB_NAME=rss
-ENV DB_USER=rss
-ENV DB_PASS=x
+ENV CT2_DEVICE=cuda
+ENV CT2_COMPUTE_TYPE=float16
+ENV UNIVERSAL_MODEL=facebook/nllb-200-1.3B
 
-ENV WORKER_SERVER=ws://localhost:8080/ws/worker
-ENV CT2_DEVICE=cpu
-ENV CT2_COMPUTE_TYPE=int8
-
-CMD ["python", "-m", "workers.remote_translator_worker"]
+CMD ["python", "/app/worker.py"]

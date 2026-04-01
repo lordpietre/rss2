@@ -324,10 +324,10 @@ services:
       WORKER_NAME: ${WORKER_NAME:-remote-worker-1}
       WORKER_API_KEY: ${WORKER_API_KEY:-}
       WORKER_SERVER: ${WORKER_SERVER:-ws://backend-go:8080/ws/worker}
-      CT2_DEVICE: ${CT2_DEVICE:-cpu}
+      CT2_DEVICE: ${CT2_DEVICE:-cuda}
       CT2_MODEL_PATH: /app/models/nllb-ct2
-      CT2_COMPUTE_TYPE: ${CT2_COMPUTE_TYPE:-int8}
-      UNIVERSAL_MODEL: facebook/nllb-200-distilled-600M
+      CT2_COMPUTE_TYPE: ${CT2_COMPUTE_TYPE:-float16}
+      UNIVERSAL_MODEL: facebook/nllb-200-1.3B
       HF_HOME: /app/hf_cache
       TZ: Europe/Madrid
     volumes:
@@ -340,8 +340,12 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1'
-          memory: 2G
+          memory: 6G
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
     restart: unless-stopped
 
   # ==================================================================================

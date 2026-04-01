@@ -295,3 +295,45 @@ func StartJobAssigner() {
 		}
 	}()
 }
+
+func GetModelDownloadURL(c *gin.Context) {
+	apiKey := c.Query("api_key")
+	if apiKey == "" {
+		apiKey = c.GetHeader("X-API-Key")
+	}
+
+	if apiKey == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "API key required"})
+		return
+	}
+
+	ctx := c.Request.Context()
+
+	var workerID int
+	err := db.GetPool().QueryRow(ctx, `
+		SELECT id FROM remote_workers WHERE api_key = $1
+	`, apiKey).Scan(&workerID)
+
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid API key"})
+		return
+	}
+
+	var modelURL, modelPath string
+	db.GetPool().QueryRow(ctx, `
+		SELECT value FROM config WHERE key = 'remote_worker_model_url'
+	`).Scan(&modelURL)
+
+	db.GetPool().QueryRow(ctx, `
+		SELECT value FROM config WHERE key = 'remote_worker_model_path'
+	`).Scan(&modelPath)
+
+	if modelPath == "" {
+		modelPath = "/app/models/nllb-ct2"
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"model_download_url": modelURL,
+		"model_path":         modelPath,
+	})
+}
