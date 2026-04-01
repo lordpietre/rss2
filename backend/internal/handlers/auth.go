@@ -2,17 +2,13 @@ package handlers
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/rss2/backend/internal/config"
+	"github.com/rss2/backend/internal/auth"
 	"github.com/rss2/backend/internal/db"
 	"github.com/rss2/backend/internal/models"
 	"golang.org/x/crypto/bcrypt"
 )
-
-var jwtSecret []byte
 
 func CheckFirstUser(c *gin.Context) {
 	var count int
@@ -22,18 +18,6 @@ func CheckFirstUser(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"is_first_user": count == 0, "total_users": count})
-}
-
-func InitAuth(secret string) {
-	jwtSecret = []byte(secret)
-}
-
-type Claims struct {
-	UserID   int64  `json:"user_id"`
-	Email    string `json:"email"`
-	Username string `json:"username"`
-	IsAdmin  bool   `json:"is_admin"`
-	jwt.RegisteredClaims
 }
 
 func Login(c *gin.Context) {
@@ -60,20 +44,7 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	expirationTime := time.Now().Add(24 * time.Hour)
-	claims := &Claims{
-		UserID:   user.ID,
-		Email:    user.Email,
-		Username: user.Username,
-		IsAdmin:  user.IsAdmin,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(expirationTime),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-		},
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(jwtSecret)
+	tokenString, err := auth.GenerateToken(user.ID, user.Email, user.Username, user.IsAdmin)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to generate token"})
 		return
@@ -127,20 +98,7 @@ func Register(c *gin.Context) {
 		return
 	}
 
-	expirationTime := time.Now().Add(24 * time.Hour)
-	claims := &Claims{
-		UserID:   user.ID,
-		Email:    user.Email,
-		Username: user.Username,
-		IsAdmin:  user.IsAdmin,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(expirationTime),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-		},
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(jwtSecret)
+	tokenString, err := auth.GenerateToken(user.ID, user.Email, user.Username, user.IsAdmin)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to generate token"})
 		return
@@ -160,7 +118,7 @@ func GetCurrentUser(c *gin.Context) {
 		return
 	}
 
-	claims := userVal.(*Claims)
+	claims := userVal.(*auth.Claims)
 
 	var user models.User
 	err := db.GetPool().QueryRow(c.Request.Context(), `
@@ -175,9 +133,4 @@ func GetCurrentUser(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, user)
-}
-
-func init() {
-	cfg := config.Load()
-	InitAuth(cfg.SecretKey)
 }

@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/rss2/backend/internal/config"
 	"github.com/rss2/backend/internal/db"
 	"github.com/rss2/backend/internal/models"
 )
@@ -465,13 +467,14 @@ func StartWorkers(c *gin.Context) {
 	}
 
 	// Detener cualquier translator existente
+	composeDir := config.Load().DockerComposeDir
 	stopCmd := exec.Command("docker", "compose", "stop", "translator", "translator-gpu")
-	stopCmd.Dir = "/datos/rss2"
+	stopCmd.Dir = composeDir
 	stopCmd.Run()
 
 	// Iniciar con el número de workers
 	startCmd := exec.Command("docker", "compose", "up", "-d", "--scale", fmt.Sprintf("%s=%d", serviceName, workers), serviceName)
-	startCmd.Dir = "/datos/rss2"
+	startCmd.Dir = composeDir
 	output, err := startCmd.CombinedOutput()
 
 	if err != nil {
@@ -483,9 +486,15 @@ func StartWorkers(c *gin.Context) {
 	}
 
 	// Actualizar estado en BD
-	db.GetPool().Exec(ctx, "UPDATE config SET value = 'running', updated_at = NOW() WHERE key = 'translator_status'")
-	db.GetPool().Exec(ctx, "UPDATE config SET value = $1, updated_at = NOW() WHERE key = 'translator_type'", translatorType)
-	db.GetPool().Exec(ctx, "UPDATE config SET value = $1, updated_at = NOW() WHERE key = 'translator_workers'", translatorWorkers)
+	if _, err := db.GetPool().Exec(ctx, "UPDATE config SET value = 'running', updated_at = NOW() WHERE key = 'translator_status'"); err != nil {
+		log.Printf("Failed to update translator_status: %v", err)
+	}
+	if _, err := db.GetPool().Exec(ctx, "UPDATE config SET value = $1, updated_at = NOW() WHERE key = 'translator_type'", translatorType); err != nil {
+		log.Printf("Failed to update translator_type: %v", err)
+	}
+	if _, err := db.GetPool().Exec(ctx, "UPDATE config SET value = $1, updated_at = NOW() WHERE key = 'translator_workers'", translatorWorkers); err != nil {
+		log.Printf("Failed to update translator_workers: %v", err)
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Workers started successfully",
@@ -497,8 +506,9 @@ func StartWorkers(c *gin.Context) {
 
 func StopWorkers(c *gin.Context) {
 	// Detener traductores
+	composeDir := config.Load().DockerComposeDir
 	cmd := exec.Command("docker", "compose", "stop", "translator", "translator-gpu")
-	cmd.Dir = "/datos/rss2"
+	cmd.Dir = composeDir
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {
@@ -510,7 +520,9 @@ func StopWorkers(c *gin.Context) {
 	}
 
 	// Actualizar estado en BD
-	db.GetPool().Exec(c.Request.Context(), "UPDATE config SET value = 'stopped', updated_at = NOW() WHERE key = 'translator_status'")
+	if _, err := db.GetPool().Exec(c.Request.Context(), "UPDATE config SET value = 'stopped', updated_at = NOW() WHERE key = 'translator_status'"); err != nil {
+		log.Printf("Failed to update translator_status: %v", err)
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Workers stopped successfully",
