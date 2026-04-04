@@ -20,8 +20,6 @@ import (
 	"github.com/rss2/backend/internal/models"
 )
 
-
-
 func CreateAlias(c *gin.Context) {
 	var req models.EntityAliasRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -82,7 +80,7 @@ func CreateAlias(c *gin.Context) {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reassign news mentions safely", "message": err.Error()})
 				return
 			}
-			
+
 			// Delete any remaining orphaned mentions of the alias that couldn't be merged (duplicates)
 			_, err = tx.Exec(ctx, "DELETE FROM tags_noticia WHERE tag_id = $1", aliasTagId)
 			if err != nil {
@@ -111,8 +109,6 @@ func CreateAlias(c *gin.Context) {
 		"tipo":           req.Tipo,
 	})
 }
-
-
 
 func ExportAliases(c *gin.Context) {
 	rows, err := db.GetPool().Query(c.Request.Context(),
@@ -533,8 +529,8 @@ func StopWorkers(c *gin.Context) {
 // PatchEntityTipo changes the tipo of all tags matching a given valor
 func PatchEntityTipo(c *gin.Context) {
 	var req struct {
-		Valor    string `json:"valor" binding:"required"`
-		NewTipo  string `json:"new_tipo" binding:"required"`
+		Valor   string `json:"valor" binding:"required"`
+		NewTipo string `json:"new_tipo" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request", "message": err.Error()})
@@ -561,7 +557,7 @@ func PatchEntityTipo(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch existing tags", "message": err.Error()})
 		return
 	}
-	
+
 	type OldTag struct {
 		ID   int
 		Tipo string
@@ -643,32 +639,15 @@ func PatchEntityTipo(c *gin.Context) {
 
 // BackupDatabase runs pg_dump and returns the SQL as a downloadable file
 func BackupDatabase(c *gin.Context) {
-	dbHost := os.Getenv("DB_HOST")
-	if dbHost == "" {
-		dbHost = "db"
-	}
-	dbPort := os.Getenv("DB_PORT")
-	if dbPort == "" {
-		dbPort = "5432"
-	}
-	dbName := os.Getenv("DB_NAME")
-	if dbName == "" {
-		dbName = "rss"
-	}
-	dbUser := os.Getenv("DB_USER")
-	if dbUser == "" {
-		dbUser = "rss"
-	}
-	dbPass := os.Getenv("DB_PASS")
-
-	cmd := exec.Command("pg_dump",
-		"-h", dbHost,
-		"-p", dbPort,
-		"-U", dbUser,
-		"-d", dbName,
+	// Ejecutar pg_dump desde dentro del contenedor db para evitar problemas de red
+	// Usamos docker exec para ejecutar el comando dentro del servicio db
+	cmd := exec.Command("docker", "exec", "rss2_db", "pg_dump",
+		"-U", os.Getenv("POSTGRES_USER"),
+		"-d", os.Getenv("POSTGRES_DB"),
 		"--no-password",
+		"--format=plain",
+		"--pghost=5432",
 	)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbPass))
 
 	var out bytes.Buffer
 	var stderr bytes.Buffer
@@ -769,4 +748,3 @@ func BackupNewsZipped(c *gin.Context) {
 	c.Header("Cache-Control", "no-cache")
 	c.Data(http.StatusOK, "application/zip", buf.Bytes())
 }
-

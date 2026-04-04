@@ -1,80 +1,119 @@
+# ==================================================================================
+# Python
+# ==================================================================================
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
+*.py[cod]
+*$py.class
 *.so
-*.egg
-*.egg-info/
-dist/
+.Python
 build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
 venv/
-.env
+env/
+ENV/
+.venv
+
+# ==================================================================================
+# IDEs
+# ==================================================================================
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 .DS_Store
-pgdata/
-pgdata-replica/
-pgdata.failed_restore/
-pgdata-replica.old.*/
-redis-data/
-hf_cache/
-models/nllb-ct2/
-qdrant_storage/
-*.log
-*.db
-*.sqlite
-*.sqlite3
-data/
-*.mp4
-*.mp3
-*.wav
-*.srt
-*.tar.gz
-*.zip
-*.bak
-*.old
-
+Thumbs.db
 
 # ==================================================================================
-# SECURITY FILES - NEVER COMMIT THESE
+# SECURITY - NEVER COMMIT
 # ==================================================================================
-# Environment files with credentials
 .env
-.env.backup*
+.env.backup
+.env.backup2
 .env.generated
 .env.local
 .env.*.local
 
-# Database backups
+# Credentials
+*.pem
+*.key
+*.crt
+credentials.json
+service-account.json
+
+# ==================================================================================
+# RSS2 Data & Models (downloaded at runtime)
+# ==================================================================================
+# ML Models - downloaded/converted by workers
+models/
+models/nllb-ct2/
+models/nllb-ct2-1.3b/
+
+# Wikipedia images - downloaded by wiki_worker
+data/wiki_images/
+data/backups/
+
+# Database storage (PostgreSQL)
+data/pgdata/
+pgdata/
+pgdata-replica/
+pgdata.failed_restore/
+pgdata-replica.old.*/
+
+# Redis data
+data/redis-data/
+redis-data/
+
+# Qdrant vector storage
+data/qdrant_storage/
+qdrant_storage/
+
+# HuggingFace cache (downloaded models)
+hf_cache/
+
+# Monitoring data
+monitoring/data/
+
+# ==================================================================================
+# Backup files
+# ==================================================================================
 *.sql
 !init-db/*.sql
 !migrations/*.sql
 backup_*.sql
-
-# Redis backups
 *.rdb
 redis_backup_*.rdb
-
-# Qdrant backups
 qdrant_backup_*.tar.gz
 
-# Docker compose with real credentials (if you create variations)
+# ==================================================================================
+# Temporary files
+# ==================================================================================
+tmp/
+temp/
+*.tmp
+*.log
+
+# ==================================================================================
+# Docker
+# ==================================================================================
 docker-compose.override.yml
 
-# Large Language Models
-models/llm/
-
-# User Uploads
-static/uploads/
-
-# Celery/Workers
-celerybeat-schedule
-celerybeat.pid
-
-# System/IDE
-.DS_Store
-Thumbs.db
+# ==================================================================================
+# Keep directory structure (optional - uncomment if needed)
+# models/.gitkeep
+# data/.gitkeep

@@ -18,6 +18,33 @@
 
 set -e  # Exit on error
 
+# Argumentos para modo automático
+FORCE="false"
+
+# Verificar argumentos
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --force)
+            FORCE="true"
+            shift
+            ;;
+        -h|--help)
+            echo "Generador de Credenciales Seguras"
+            echo ""
+            echo "Uso: ./generate_secure_credentials.sh [--force]"
+            echo ""
+            echo "Opciones:"
+            echo "  --force   Forzar reemplazo de .env sin preguntar"
+            echo "  --help    Mostrar esta ayuda"
+            exit 0
+            ;;
+        *)
+            echo "Opción desconocida: $1"
+            exit 1
+            ;;
+    esac
+done
+
 # Colores para output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -157,17 +184,22 @@ EOF
 
 echo -e "${GREEN}✅ Archivo generado: $ENV_FILE${NC}\n"
 
-# Preguntar si quiere reemplazar .env
-echo -e "${YELLOW}¿Deseas reemplazar el archivo .env actual con el generado?${NC}"
-echo -e "${YELLOW}(Recomendado: revisa $ENV_FILE primero)${NC}"
-read -p "¿Continuar? (s/N): " -n 1 -r
-echo
-if [[ $REPLY =~ ^[SsYy]$ ]]; then
+# Preguntar si quiere reemplazar .env (si no se usa --force)
+if [ "$FORCE" = "true" ]; then
     mv "$ENV_FILE" .env
-    echo -e "${GREEN}✅ Archivo .env actualizado${NC}"
+    echo -e "${GREEN}✅ Archivo .env actualizado automáticamente${NC}"
 else
-    echo -e "${YELLOW}⚠️  Archivo guardado como: $ENV_FILE${NC}"
-    echo -e "${YELLOW}   Para usarlo: mv $ENV_FILE .env${NC}"
+    echo -e "${YELLOW}¿Deseas reemplazar el archivo .env actual con el generado?${NC}"
+    echo -e "${YELLOW}(Recomendado: revisa $ENV_FILE primero)${NC}"
+    read -p "¿Continuar? (s/N): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[SsYy]$ ]]; then
+        mv "$ENV_FILE" .env
+        echo -e "${GREEN}✅ Archivo .env actualizado${NC}"
+    else
+        echo -e "${YELLOW}⚠️  Archivo guardado como: $ENV_FILE${NC}"
+        echo -e "${YELLOW}   Para usarlo: mv $ENV_FILE .env${NC}"
+    fi
 fi
 
 echo ""

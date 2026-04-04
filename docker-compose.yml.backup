@@ -319,6 +319,8 @@ services:
       - ./models:/app/models
     networks:
       - backend
+    profiles:
+      - cpu-only
     depends_on:
       db:
         condition: service_healthy
@@ -341,11 +343,11 @@ services:
       DB_USER: ${DB_USER:-rss}
       DB_PASS: ${DB_PASS}
       TARGET_LANGS: es
-      TRANSLATOR_BATCH: 256
-      CT2_MODEL_PATH: /app/models/nllb-ct2-1.3b
+      TRANSLATOR_BATCH: 128
+      CT2_MODEL_PATH: /app/models/nllb-ct2
       CT2_DEVICE: cuda
       CT2_COMPUTE_TYPE: float16
-      UNIVERSAL_MODEL: facebook/nllb-200-1.3B
+      UNIVERSAL_MODEL: facebook/nllb-200-distilled-600M
       HF_HOME: /app/hf_cache
       TZ: Europe/Madrid
       TRANSLATOR_ID: ${TRANSLATOR_ID:-}
@@ -359,6 +361,8 @@ services:
       - /usr/local/nvidia:/usr/local/nvidia:ro
     networks:
       - backend
+    profiles:
+      - gpu
     deploy:
       resources:
         reservations:
@@ -394,6 +398,8 @@ services:
       - ./models:/app/models
     networks:
       - backend
+    profiles:
+      - remote
     deploy:
       resources:
         limits:
