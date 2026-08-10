@@ -51,55 +51,45 @@ func SearchNews(c *gin.Context) {
 	offset := (page - 1) * perPage
 
 	// Build dynamic query
-	args := []interface{}{}
-	argNum := 1
+	args := []interface{}{lang}
+	argNum := 2
 	whereClause := "WHERE 1=1"
 
 	if query != "" {
-		whereClause += " AND (n.titulo ILIKE $" + strconv.Itoa(argNum) + " OR n.resumen ILIKE $" + strconv.Itoa(argNum) + " OR n.contenido ILIKE $" + strconv.Itoa(argNum) + ")"
+		whereClause += " AND (n.titulo ILIKE $" + strconv.Itoa(argNum) + " OR n.resumen ILIKE $" + strconv.Itoa(argNum) + ")"
 		args = append(args, "%"+query+"%")
 		argNum++
 	}
 
-	if lang != "" {
-		whereClause += " AND t.lang_to = $" + strconv.Itoa(argNum)
-		args = append(args, lang)
-		argNum++
-	}
-
 	if categoriaID != "" {
-		whereClause += " AND n.categoria_id = $" + strconv.Itoa(argNum)
-		catID, err := strconv.ParseInt(categoriaID, 10, 64)
-		if err == nil {
+		if catID, err := strconv.ParseInt(categoriaID, 10, 64); err == nil {
+			whereClause += " AND n.categoria_id = $" + strconv.Itoa(argNum)
 			args = append(args, catID)
 			argNum++
 		}
 	}
 
 	if paisID != "" {
-		whereClause += " AND n.pais_id = $" + strconv.Itoa(argNum)
-		pID, err := strconv.ParseInt(paisID, 10, 64)
-		if err == nil {
+		if pID, err := strconv.ParseInt(paisID, 10, 64); err == nil {
+			whereClause += " AND n.pais_id = $" + strconv.Itoa(argNum)
 			args = append(args, pID)
 			argNum++
 		}
 	}
 
-	args = append(args, perPage, offset)
-
 	sqlQuery := `
-		SELECT n.id, n.titulo, n.resumen, n.contenido, n.url, n.imagen, 
-		       n.feed_id, n.lang, n.categoria_id, n.pais_id, n.created_at, n.updated_at,
-		       COALESCE(t.titulo_trad, '') as titulo_trad,
-		       COALESCE(t.resumen_trad, '') as resumen_trad,
-		       t.lang_to as lang_trad,
-		       f.nombre as fuente_nombre
+		SELECT n.id, n.titulo, COALESCE(n.resumen, ''), n.url, n.fecha, n.imagen_url,
+		       n.categoria_id, n.pais_id, n.fuente_nombre,
+		       t.titulo_trad,
+		       t.resumen_trad,
+		       t.lang_to as lang_trad
 		FROM noticias n
-		LEFT JOIN traducciones t ON t.noticia_id = n.id AND t.lang_to = $` + strconv.Itoa(argNum) + `
-		LEFT JOIN feeds f ON f.id = n.feed_id
+		LEFT JOIN traducciones t ON t.noticia_id = n.id AND t.lang_to = $1
 		` + whereClause + `
-		ORDER BY n.created_at DESC
-		LIMIT $` + strconv.Itoa(argNum+1) + ` OFFSET $` + strconv.Itoa(argNum+2)
+		ORDER BY n.fecha DESC
+		LIMIT $` + strconv.Itoa(argNum) + ` OFFSET $` + strconv.Itoa(argNum+1)
+
+	args = append(args, perPage, offset)
 
 	rows, err := db.GetPool().Query(ctx, sqlQuery, args...)
 	if err != nil {
@@ -108,33 +98,38 @@ func SearchNews(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var newsList []models.NewsWithTranslations
+	var newsList []NewsResponse
 	for rows.Next() {
-		var n models.NewsWithTranslations
-		var imagen *string
+		var n NewsResponse
+		var imagenURL, fuenteNombre *string
+		var categoriaIDp, paisIDp *int64
 
 		err := rows.Scan(
-			&n.ID, &n.Title, &n.Summary, &n.Content, &n.URL, &imagen,
-			&n.FeedID, &n.Lang, &n.CategoryID, &n.CountryID, &n.CreatedAt, &n.UpdatedAt,
+			&n.ID, &n.Titulo, &n.Resumen, &n.URL, &n.Fecha, &imagenURL,
+			&categoriaIDp, &paisIDp, &fuenteNombre,
 			&n.TitleTranslated, &n.SummaryTranslated, &n.LangTranslated,
 		)
 		if err != nil {
 			continue
 		}
-		if imagen != nil {
-			n.ImageURL = imagen
+		if imagenURL != nil {
+			n.ImagenURL = imagenURL
 		}
+		if fuenteNombre != nil {
+			n.FuenteNombre = *fuenteNombre
+		}
+		n.CategoriaID = categoriaIDp
+		n.PaisID = paisIDp
 		newsList = append(newsList, n)
 	}
 
 	// Get total count
 	countArgs := args[:len(args)-2]
 
-	// Remove LIMIT/OFFSET from args for count
 	var total int
 	err = db.GetPool().QueryRow(ctx, `
 		SELECT COUNT(*) FROM noticias n
-		LEFT JOIN traducciones t ON t.noticia_id = n.id AND t.lang_to = $`+strconv.Itoa(argNum)+`
+		LEFT JOIN traducciones t ON t.noticia_id = n.id AND t.lang_to = $1
 		`+whereClause, countArgs...).Scan(&total)
 	if err != nil {
 		total = len(newsList)
@@ -142,15 +137,13 @@ func SearchNews(c *gin.Context) {
 
 	totalPages := (total + perPage - 1) / perPage
 
-	response := models.NewsListResponse{
-		News:       newsList,
-		Total:      total,
-		Page:       page,
-		PerPage:    perPage,
-		TotalPages: totalPages,
-	}
-
-	c.JSON(http.StatusOK, response)
+	c.JSON(http.StatusOK, gin.H{
+		"news":        newsList,
+		"total":       total,
+		"page":        page,
+		"per_page":    perPage,
+		"total_pages": totalPages,
+	})
 }
 
 func GetStats(c *gin.Context) {

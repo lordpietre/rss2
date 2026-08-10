@@ -132,9 +132,7 @@ export const apiService = {
   importFeeds: async (file: File): Promise<{ imported: number; skipped: number; failed: number; message: string }> => {
     const formData = new FormData()
     formData.append('file', file)
-    const { data } = await api.post('/feeds/import', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    const { data } = await api.post('/feeds/import', formData)
     return data
   },
 
@@ -191,5 +189,12 @@ export const apiService = {
       console.error('Failed to download backup:', error);
       alert('Error al descargar la copia de seguridad. Verifica tu conexión o permisos.');
     }
+  },
+
+  restoreDatabase: async (file: File): Promise<{ message: string; filename: string; output?: string }> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const { data } = await api.post('/admin/restore', formData)
+    return data
   },
 }

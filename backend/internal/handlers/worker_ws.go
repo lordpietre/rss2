@@ -132,7 +132,10 @@ func writeLoop(wsWorker *WSWorker) {
 	for {
 		select {
 		case <-ticker.C:
-			if err := wsWorker.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+			wsWorker.mu.Lock()
+			err := wsWorker.conn.WriteMessage(websocket.PingMessage, nil)
+			wsWorker.mu.Unlock()
+			if err != nil {
 				return
 			}
 		}
@@ -163,7 +166,9 @@ func heartbeatLoop(wsWorker *WSWorker) {
 
 func sendWS(wsWorker *WSWorker, msg models.WSServerMessage) {
 	data, _ := json.Marshal(msg)
+	wsWorker.mu.Lock()
 	wsWorker.conn.WriteMessage(websocket.TextMessage, data)
+	wsWorker.mu.Unlock()
 }
 
 func cleanupWorker(wsWorker *WSWorker, apiKey string) {

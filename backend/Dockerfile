@@ -12,7 +12,7 @@ RUN go mod tidy
 
 RUN CGO_ENABLED=0 GOOS=linux go build -buildvcs=false -o /server ./cmd/server
 
-FROM alpine:3.19
+FROM alpine:3.23
 
 RUN apk add --no-cache ca-certificates tzdata postgresql-client
 

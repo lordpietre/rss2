@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { apiService } from '../services/api'
-import { AlertTriangle, Database, RefreshCw, Download, FileArchive } from 'lucide-react'
+import { AlertTriangle, Database, RefreshCw, Download, FileArchive, Upload } from 'lucide-react'
 
 export function AdminSettings() {
   const [resetting, setResetting] = useState(false)
+  const [restoring, setRestoring] = useState(false)
+  const [restoreFile, setRestoreFile] = useState<File | null>(null)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const handleReset = async () => {
@@ -35,12 +37,47 @@ export function AdminSettings() {
     }
   }
 
+  const handleRestore = async () => {
+    if (!restoreFile) {
+      setMessage({ type: 'error', text: 'Selecciona un archivo de copia de seguridad (.sql o .zip)' })
+      return
+    }
+
+    if (!confirm('¿Restaurar la base de datos?\n\nEsta acción sobrescribirá los datos existentes con el contenido del archivo de copia de seguridad. No se puede deshacer.')) return
+
+    setRestoring(true)
+    setMessage(null)
+
+    try {
+      const result = await apiService.restoreDatabase(restoreFile)
+      setMessage({ type: 'success', text: result.message })
+      setRestoreFile(null)
+    } catch (err: any) {
+      setMessage({
+        type: 'error',
+        text: err?.response?.data?.details || err?.response?.data?.error || 'Error al restaurar la base de datos',
+      })
+    } finally {
+      setRestoring(false)
+    }
+  }
+
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-6 flex items-center gap-2">
         <Database className="h-6 w-6" />
         Configuración del Sistema
       </h1>
+
+      {message && (
+        <div className={`max-w-2xl mb-6 p-3 rounded-md text-sm ${
+          message.type === 'success' 
+            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200'
+            : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200'
+        }`}>
+          {message.text}
+        </div>
+      )}
 
       <div className="max-w-2xl space-y-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
@@ -75,16 +112,6 @@ export function AdminSettings() {
                 </>
               )}
             </button>
-
-            {message && (
-              <div className={`mt-4 p-3 rounded-md text-sm ${
-                message.type === 'success' 
-                  ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200'
-                  : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200'
-              }`}>
-                {message.text}
-              </div>
-            )}
           </div>
         </div>
 
@@ -111,6 +138,47 @@ export function AdminSettings() {
                 <Download className="h-4 w-4" />
                 Descargar Backup .zip
               </button>
+            </div>
+
+            <div className="p-4 border border-gray-100 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900/50">
+              <h3 className="font-medium mb-1 flex items-center gap-2">
+                <Upload className="h-4 w-4 text-blue-600" />
+                Restaurar Base de Datos
+              </h3>
+              <p className="text-sm text-gray-500 mb-4">
+                Sube un archivo de copia de seguridad (.sql o .zip) para restaurar la base de datos. 
+                La restauración sobrescribe los datos existentes. Se recomienda restaurar después de un reset.
+              </p>
+              <div className="flex items-center gap-3 flex-wrap">
+                <input
+                  type="file"
+                  accept=".sql,.zip"
+                  onChange={(e) => setRestoreFile(e.target.files?.[0] ?? null)}
+                  className="block w-full max-w-sm text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:bg-blue-600 file:text-white file:cursor-pointer hover:file:bg-blue-700"
+                />
+                <button
+                  onClick={handleRestore}
+                  disabled={restoring || !restoreFile}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {restoring ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      Restaurando...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4" />
+                      Restaurar Base de Datos
+                    </>
+                  )}
+                </button>
+              </div>
+              {restoreFile && (
+                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                  Archivo seleccionado: {restoreFile.name}
+                </p>
+              )}
             </div>
           </div>
         </div>

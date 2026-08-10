@@ -73,6 +73,8 @@ CT2_MODEL_PATH = _env_str("CT2_MODEL_PATH", "/app/models/nllb-ct2")
 CT2_DEVICE = _env_str("CT2_DEVICE", "cpu")
 CT2_COMPUTE_TYPE = _env_str("CT2_COMPUTE_TYPE", "int8")
 UNIVERSAL_MODEL = _env_str("UNIVERSAL_MODEL", "facebook/nllb-200-distilled-600M")
+CT2_INTRA_THREADS = _env_int("CT2_INTRA_THREADS", 0)
+CT2_INTER_THREADS = _env_int("CT2_INTER_THREADS", 1)
 BODY_CHARS_CHUNK = _env_int("BODY_CHARS_CHUNK", 900)
 
 LANG_CODE_MAP = {
@@ -128,7 +130,7 @@ def ensure_model():
         all_files_ok = True
         for f in required_files:
             fpath = os.path.join(model_path, f)
-            if not os.path.exists(fpath) or os.path.getsize(fpath) < 1000:
+            if not os.path.exists(fpath) or os.path.getsize(fpath) < 100:
                 all_files_ok = False
                 break
 
@@ -157,6 +159,8 @@ def ensure_model():
         model_path,
         device=device,
         compute_type=CT2_COMPUTE_TYPE,
+        inter_threads=CT2_INTER_THREADS,
+        intra_threads=CT2_INTRA_THREADS,
     )
 
     _tokenizer = AutoTokenizer.from_pretrained(UNIVERSAL_MODEL)
@@ -314,11 +318,7 @@ def translate_body_long(src: str, tgt: str, body: str) -> str:
     if len(chunks) == 1:
         return translate_texts(src, tgt, [body])[0]
 
-    translated_chunks = []
-    for ch in chunks:
-        tr = translate_texts(src, tgt, [ch])[0]
-        translated_chunks.append(tr)
-
+    translated_chunks = translate_texts(src, tgt, chunks)
     return " ".join(translated_chunks)
 
 
@@ -406,18 +406,34 @@ def process_batch(conn, rows):
             titles = [i["titulo"] for i in items]
             translated_titles = translate_texts(lang_from, lang_to, titles)
 
-            for item, tt in zip(items, translated_titles):
+            # Collect all body chunks across all items for a single batched call
+            flat_chunks = []
+            flat_keys = []
+            for item in items:
                 body = (item["resumen"] or "").strip()
-                tb = ""
                 if body:
-                    try:
-                        tb = translate_body_long(lang_from, lang_to, body)
-                    except Exception as e:
-                        LOG.error(f"Body translation error for ID {item['tr_id']}: {e}")
-                        tb = item["resumen"]
+                    chunks = split_body_into_chunks(body)
+                    flat_chunks.extend(chunks)
+                    flat_keys.extend([(item["tr_id"], i) for i in range(len(chunks))])
 
-                tt = clean_text((tt or "").strip())
-                tb = clean_text((tb or "").strip())
+            translated_bodies = []
+            if flat_chunks:
+                try:
+                    translated_bodies = translate_texts(lang_from, lang_to, flat_chunks)
+                except Exception as e:
+                    LOG.error(f"Batch body translation error: {e}")
+                    translated_bodies = flat_chunks
+
+            body_parts = defaultdict(list)
+            for (tr_id, _), tr in zip(flat_keys, translated_bodies):
+                if tr is None:
+                    continue
+                body_parts[tr_id].append(tr)
+
+            for idx, item in enumerate(items):
+                tt = clean_text((translated_titles[idx] or "").strip())
+                parts = body_parts.get(item["tr_id"])
+                tb = clean_text(" ".join(parts).strip()) if parts else ""
 
                 if not tt:
                     tt = item["titulo"]

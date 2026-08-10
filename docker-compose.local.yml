@@ -1,0 +1,10 @@
+# Override local: permite acceder a Grafana en http://localhost:3001
+# La red monitoring es internal:true y compose descarta los puertos de servicios
+# que solo están en redes internas. Añadir la red frontend (no internal) permite
+# publicar el puerto 127.0.0.1:3001.
+# Uso: docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
+services:
+  grafana:
+    networks:
+      - monitoring
+      - frontend

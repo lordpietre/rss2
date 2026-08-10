@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -23,7 +24,6 @@ var (
 	logger     *log.Logger
 	dbPool     *pgxpool.Pool
 	qdrantURL  string
-	ollamaURL  string
 	collection = "news_vectors"
 	sleepSec   = 30
 	batchSize  = 100
@@ -39,7 +39,6 @@ func loadConfig() {
 	qdrantHost := getEnv("QDRANT_HOST", "localhost")
 	qdrantPort := getEnvInt("QDRANT_PORT", 6333)
 	qdrantURL = fmt.Sprintf("http://%s:%d", qdrantHost, qdrantPort)
-	ollamaURL = getEnv("OLLAMA_URL", "http://ollama:11434")
 	collection = getEnv("QDRANT_COLLECTION", "news_vectors")
 }
 
@@ -61,7 +60,7 @@ func getEnvInt(key string, defaultValue int) int {
 
 type Translation struct {
 	ID           int64
-	NoticiaID    int64
+	NoticiaID    string
 	Lang         string
 	Titulo       string
 	Resumen      string
@@ -70,6 +69,7 @@ type Translation struct {
 	FuenteNombre string
 	CategoriaID  *int64
 	PaisID       *int64
+	Embedding    []float64
 }
 
 func getPendingTranslations(ctx context.Context) ([]Translation, error) {
@@ -84,9 +84,11 @@ func getPendingTranslations(ctx context.Context) ([]Translation, error) {
 			n.fecha,
 			n.fuente_nombre,
 			n.categoria_id,
-			n.pais_id
+			n.pais_id,
+			te.embedding::text
 		FROM traducciones t
 		INNER JOIN noticias n ON t.noticia_id = n.id
+		INNER JOIN traduccion_embeddings te ON te.traduccion_id = t.id
 		WHERE t.vectorized = FALSE
 		AND t.status = 'done'
 		ORDER BY t.created_at ASC
@@ -100,54 +102,41 @@ func getPendingTranslations(ctx context.Context) ([]Translation, error) {
 	var translations []Translation
 	for rows.Next() {
 		var t Translation
+		var embText string
 		if err := rows.Scan(
 			&t.ID, &t.NoticiaID, &t.Lang, &t.Titulo, &t.Resumen,
 			&t.URL, &t.Fecha, &t.FuenteNombre, &t.CategoriaID, &t.PaisID,
+			&embText,
 		); err != nil {
+			logger.Printf("Error scanning translation row: %v", err)
 			continue
 		}
+		emb, err := parseEmbedding(embText)
+		if err != nil {
+			logger.Printf("Error parsing embedding for translation %d: %v", t.ID, err)
+			continue
+		}
+		t.Embedding = emb
 		translations = append(translations, t)
 	}
 	return translations, nil
 }
 
-type EmbeddingRequest struct {
-	Model string `json:"model"`
-	Input string `json:"input"`
-}
-
-type EmbeddingResponse struct {
-	Embedding []float64 `json:"embedding"`
-}
-
-func generateEmbedding(text string) ([]float64, error) {
-	reqBody := EmbeddingRequest{
-		Model: "mxbai-embed-large",
-		Input: text,
+func parseEmbedding(s string) ([]float64, error) {
+	s = strings.Trim(strings.TrimSpace(s), "{}")
+	if s == "" {
+		return nil, fmt.Errorf("empty embedding")
 	}
-
-	body, err := json.Marshal(reqBody)
-	if err != nil {
-		return nil, err
+	parts := strings.Split(s, ",")
+	emb := make([]float64, len(parts))
+	for i, p := range parts {
+		v, err := strconv.ParseFloat(strings.TrimSpace(p), 64)
+		if err != nil {
+			return nil, err
+		}
+		emb[i] = v
 	}
-
-	client := &http.Client{Timeout: 60 * time.Second}
-	resp, err := client.Post(ollamaURL+"/api/embeddings", "application/json", bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Ollama returned status %d", resp.StatusCode)
-	}
-
-	var result EmbeddingResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
-	}
-
-	return result.Embedding, nil
+	return emb, nil
 }
 
 type QdrantPoint struct {
@@ -160,7 +149,7 @@ type QdrantUpsertRequest struct {
 	Points []QdrantPoint `json:"points"`
 }
 
-func ensureCollection() error {
+func ensureCollection(ctx context.Context) error {
 	req, err := http.NewRequest("GET", qdrantURL+"/collections/"+collection, nil)
 	if err != nil {
 		return err
@@ -177,16 +166,15 @@ func ensureCollection() error {
 		return nil
 	}
 
-	// Get embedding dimension
-	emb, err := generateEmbedding("test")
+	// Get embedding dimension from stored embeddings
+	var dimension int
+	err = dbPool.QueryRow(ctx, `SELECT dim FROM traduccion_embeddings LIMIT 1`).Scan(&dimension)
 	if err != nil {
 		return fmt.Errorf("failed to get embedding dimension: %w", err)
 	}
-	dimension := len(emb)
 
 	// Create collection
 	createReq := map[string]interface{}{
-		"name": collection,
 		"vectors": map[string]interface{}{
 			"size":     dimension,
 			"distance": "Cosine",
@@ -194,25 +182,34 @@ func ensureCollection() error {
 	}
 
 	body, _ := json.Marshal(createReq)
-	resp2, err := http.Post(qdrantURL+"/collections", "application/json", bytes.NewReader(body))
+	createURL := qdrantURL + "/collections/" + collection
+	req2, err := http.NewRequest(http.MethodPut, createURL, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req2.Header.Set("Content-Type", "application/json")
+	resp2, err := http.DefaultClient.Do(req2)
 	if err != nil {
 		return err
 	}
 	defer resp2.Body.Close()
 
+	if resp2.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp2.Body)
+		return fmt.Errorf("Qdrant create collection returned %d: %s", resp2.StatusCode, string(respBody))
+	}
+
 	logger.Printf("Created collection %s with dimension %d", collection, dimension)
 	return nil
 }
 
-func uploadToQdrant(translations []Translation, embeddings [][]float64) error {
+func uploadToQdrant(translations []Translation, pointIDs []string) error {
 	points := make([]QdrantPoint, 0, len(translations))
 
 	for i, t := range translations {
-		if embeddings[i] == nil {
+		if t.Embedding == nil || len(t.Embedding) == 0 {
 			continue
 		}
-
-		pointID := uuid.New().String()
 
 		payload := map[string]interface{}{
 			"news_id":       t.NoticiaID,
@@ -235,8 +232,8 @@ func uploadToQdrant(translations []Translation, embeddings [][]float64) error {
 		}
 
 		points = append(points, QdrantPoint{
-			ID:      pointID,
-			Vector:  embeddings[i],
+			ID:      pointIDs[i],
+			Vector:  t.Embedding,
 			Payload: payload,
 		})
 	}
@@ -252,7 +249,12 @@ func uploadToQdrant(translations []Translation, embeddings [][]float64) error {
 	}
 
 	url := fmt.Sprintf("%s/collections/%s/points", qdrantURL, collection)
-	resp, err := http.Post(url, "application/json", bytes.NewReader(body))
+	req, err := http.NewRequest(http.MethodPut, url, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -317,7 +319,7 @@ func main() {
 
 	ctx := context.Background()
 
-	if err := ensureCollection(); err != nil {
+	if err := ensureCollection(ctx); err != nil {
 		logger.Printf("Warning: Could not ensure collection: %v", err)
 	}
 
@@ -330,8 +332,8 @@ func main() {
 		os.Exit(0)
 	}()
 
-	logger.Printf("Config: qdrant=%s, ollama=%s, collection=%s, sleep=%ds, batch=%d",
-		qdrantURL, ollamaURL, collection, sleepSec, batchSize)
+	logger.Printf("Config: qdrant=%s, collection=%s, sleep=%ds, batch=%d",
+		qdrantURL, collection, sleepSec, batchSize)
 
 	totalProcessed := 0
 
@@ -351,30 +353,19 @@ func main() {
 
 			logger.Printf("Processing %d translations...", len(translations))
 
-			// Generate embeddings
-			embeddings := make([][]float64, len(translations))
-			for i, t := range translations {
-				text := fmt.Sprintf("%s %s", t.Titulo, t.Resumen)
-				emb, err := generateEmbedding(text)
-				if err != nil {
-					logger.Printf("Error generating embedding for %d: %v", t.ID, err)
-					continue
-				}
-				embeddings[i] = emb
-			}
-
-			// Upload to Qdrant
-			if err := uploadToQdrant(translations, embeddings); err != nil {
-				logger.Printf("Error uploading to Qdrant: %v", err)
-				continue
-			}
-
-			// Update DB status
+			// Generate point IDs once (used both in Qdrant and DB)
 			pointIDs := make([]string, len(translations))
 			for i := range translations {
 				pointIDs[i] = uuid.New().String()
 			}
 
+			// Upload to Qdrant
+			if err := uploadToQdrant(translations, pointIDs); err != nil {
+				logger.Printf("Error uploading to Qdrant: %v", err)
+				continue
+			}
+
+			// Update DB status
 			if err := updateTranslationStatus(ctx, translations, pointIDs); err != nil {
 				logger.Printf("Error updating status: %v", err)
 			}

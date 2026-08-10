@@ -6,14 +6,15 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
 	"time"
-
 	"github.com/gin-gonic/gin"
 	"github.com/rss2/backend/internal/config"
 	"github.com/rss2/backend/internal/db"
@@ -637,17 +638,73 @@ func PatchEntityTipo(c *gin.Context) {
 	})
 }
 
+// pgConnInfo holds PostgreSQL connection parameters for pg_dump
+type pgConnInfo struct {
+	host, port, name, user, pass string
+}
+
+// resolvePgConnInfo prefers DATABASE_URL (the variable the API container gets)
+// and falls back to the individual DB_* variables used by the workers.
+func resolvePgConnInfo() pgConnInfo {
+	if dbURL := os.Getenv("DATABASE_URL"); dbURL != "" {
+		if u, err := url.Parse(dbURL); err == nil && u.Hostname() != "" {
+			info := pgConnInfo{
+				host: u.Hostname(),
+				user: u.User.Username(),
+				name: strings.TrimPrefix(u.Path, "/"),
+				port: u.Port(),
+			}
+			if p, ok := u.User.Password(); ok {
+				info.pass = p
+			}
+			if info.port == "" {
+				info.port = "5432"
+			}
+			if info.user == "" {
+				info.user = "postgres"
+			}
+			if info.name == "" {
+				info.name = "postgres"
+			}
+			return info
+		}
+	}
+
+	info := pgConnInfo{
+		host: os.Getenv("DB_HOST"),
+		port: os.Getenv("DB_PORT"),
+		name: os.Getenv("DB_NAME"),
+		user: os.Getenv("DB_USER"),
+		pass: os.Getenv("DB_PASS"),
+	}
+	if info.host == "" {
+		info.host = "db"
+	}
+	if info.port == "" {
+		info.port = "5432"
+	}
+	if info.name == "" {
+		info.name = "rss"
+	}
+	if info.user == "" {
+		info.user = "rss"
+	}
+	return info
+}
+
 // BackupDatabase runs pg_dump and returns the SQL as a downloadable file
 func BackupDatabase(c *gin.Context) {
-	// Ejecutar pg_dump desde dentro del contenedor db para evitar problemas de red
-	// Usamos docker exec para ejecutar el comando dentro del servicio db
-	cmd := exec.Command("docker", "exec", "rss2_db", "pg_dump",
-		"-U", os.Getenv("POSTGRES_USER"),
-		"-d", os.Getenv("POSTGRES_DB"),
+	info := resolvePgConnInfo()
+
+	cmd := exec.Command("pg_dump",
+		"-h", info.host,
+		"-p", info.port,
+		"-U", info.user,
+		"-d", info.name,
 		"--no-password",
 		"--format=plain",
-		"--pghost=5432",
 	)
+	cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", info.pass))
 
 	var out bytes.Buffer
 	var stderr bytes.Buffer
@@ -671,32 +728,16 @@ func BackupDatabase(c *gin.Context) {
 
 // BackupNewsZipped performs a pg_dump of news tables and returns a ZIP file
 func BackupNewsZipped(c *gin.Context) {
-	dbHost := os.Getenv("DB_HOST")
-	if dbHost == "" {
-		dbHost = "db"
-	}
-	dbPort := os.Getenv("DB_PORT")
-	if dbPort == "" {
-		dbPort = "5432"
-	}
-	dbName := os.Getenv("DB_NAME")
-	if dbName == "" {
-		dbName = "rss"
-	}
-	dbUser := os.Getenv("DB_USER")
-	if dbUser == "" {
-		dbUser = "rss"
-	}
-	dbPass := os.Getenv("DB_PASS")
+	info := resolvePgConnInfo()
 
 	// Tables to backup
 	tables := []string{"noticias", "traducciones", "tags", "tags_noticia"}
 
 	args := []string{
-		"-h", dbHost,
-		"-p", dbPort,
-		"-U", dbUser,
-		"-d", dbName,
+		"-h", info.host,
+		"-p", info.port,
+		"-U", info.user,
+		"-d", info.name,
 		"--no-password",
 	}
 
@@ -705,7 +746,7 @@ func BackupNewsZipped(c *gin.Context) {
 	}
 
 	cmd := exec.Command("pg_dump", args...)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", dbPass))
+	cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", info.pass))
 
 	var sqlOut bytes.Buffer
 	var stderr bytes.Buffer
@@ -747,4 +788,108 @@ func BackupNewsZipped(c *gin.Context) {
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
 	c.Header("Cache-Control", "no-cache")
 	c.Data(http.StatusOK, "application/zip", buf.Bytes())
+}
+
+// RestoreDatabase accepts an uploaded .sql or .zip backup and restores it via psql
+func RestoreDatabase(c *gin.Context) {
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "No file uploaded",
+			"message": "Se requiere un archivo .sql o .zip",
+		})
+		return
+	}
+
+	uploaded, err := file.Open()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to open uploaded file"})
+		return
+	}
+	defer uploaded.Close()
+
+	data, err := io.ReadAll(uploaded)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read uploaded file"})
+		return
+	}
+
+	var sqlData []byte
+	lowerName := strings.ToLower(file.Filename)
+	switch {
+	case strings.HasSuffix(lowerName, ".sql"):
+		sqlData = data
+	case strings.HasSuffix(lowerName, ".zip"):
+		zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ZIP file", "message": err.Error()})
+			return
+		}
+		found := false
+		for _, zf := range zr.File {
+			if zf.FileInfo().IsDir() || !strings.HasSuffix(strings.ToLower(zf.Name), ".sql") {
+				continue
+			}
+			rc, err := zf.Open()
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to open SQL inside ZIP", "message": err.Error()})
+				return
+			}
+			sqlData, err = io.ReadAll(rc)
+			rc.Close()
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read SQL inside ZIP", "message": err.Error()})
+				return
+			}
+			found = true
+			break
+		}
+		if !found {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "No SQL file found inside ZIP"})
+			return
+		}
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Unsupported file type",
+			"message": "Solo se permiten archivos .sql o .zip",
+		})
+		return
+	}
+
+	if len(sqlData) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Empty backup file"})
+		return
+	}
+
+	info := resolvePgConnInfo()
+
+	cmd := exec.Command("psql",
+		"-h", info.host,
+		"-p", info.port,
+		"-U", info.user,
+		"-d", info.name,
+		"--no-password",
+		"-v", "ON_ERROR_STOP=1",
+	)
+	cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", info.pass))
+	cmd.Stdin = bytes.NewReader(sqlData)
+
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Restore failed",
+			"details": stderr.String(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":  "Base de datos restaurada correctamente",
+		"filename": file.Filename,
+		"output":   out.String(),
+	})
 }

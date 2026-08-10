@@ -187,6 +187,7 @@ func main() {
 			admin.POST("/entities/retype", handlers.PatchEntityTipo)
 			admin.GET("/backup", handlers.BackupDatabase)
 			admin.GET("/backup/news", handlers.BackupNewsZipped)
+			admin.POST("/restore", handlers.RestoreDatabase)
 			admin.GET("/users", handlers.GetUsers)
 			admin.POST("/users/:id/promote", handlers.PromoteUser)
 			admin.POST("/users/:id/demote", handlers.DemoteUser)

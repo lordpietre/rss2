@@ -1,27 +1,23 @@
 #!/bin/bash
 set -e
 
-# Detectar si la base de datos necesita reinicialización
+# Directorio de datos de PostgreSQL
 PGDATA_DIR="/var/lib/postgresql/data/18/main"
 
-echo "RSS2: Checking database integrity..."
+echo "RSS2: Checking database presence..."
 
-# Si no existe el archivo de versión, es una base de datos nueva
-if [ ! -f "$PGDATA_DIR/PG_VERSION" ]; then
-    echo "RSS2: New database - will be initialized by docker-entrypoint"
+# REGLA: nunca se borra ni se modifica el directorio de datos automáticamente.
+# Solo se informa del estado y se deja que el entrypoint oficial de PostgreSQL
+# inicialice (si no existe) o arranque con los datos existentes.
+if [ -f "$PGDATA_DIR/PG_VERSION" ]; then
+    echo "RSS2: Existing database found at $PGDATA_DIR - starting normally"
 else
-    # Verificar si la base de datos es funcional
-    if ! pg_isready -h localhost -p 5432 -U "${POSTGRES_USER:-rss}" 2>/dev/null; then
-        echo "RSS2: Database appears corrupted - removing old data files for fresh initialization..."
-        # Eliminar solo los archivos de datos, no todo el directorio
-        rm -rf "$PGDATA_DIR"/*
-        echo "RSS2: Data files removed - docker-entrypoint will initialize fresh database"
-    else
-        echo "RSS2: Database is healthy"
-    fi
+    echo "RSS2: No database found at $PGDATA_DIR - docker-entrypoint will initialize it"
 fi
 
-# Ejecutar el entrypoint original con los parámetros de PostgreSQL
+# Ejecutar el entrypoint original con los parámetros de PostgreSQL.
+# Si la base de datos estuviera corrupta, PostgreSQL fallará al arrancar y
+# registrará el error en los logs; NO se elimina ningún dato de forma automática.
 exec docker-entrypoint.sh \
     postgres \
     -c max_connections=200 \

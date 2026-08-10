@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -397,10 +398,45 @@ func ImportFeeds(c *gin.Context) {
 	}
 
 	reader := csv.NewReader(strings.NewReader(string(content)))
-	_, err = reader.Read()
+	records, err := reader.ReadAll()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Invalid CSV format"})
 		return
+	}
+	if len(records) == 0 {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Empty CSV file"})
+		return
+	}
+
+	colIndex := func(header []string, names ...string) int {
+		for i, h := range header {
+			h = strings.ToLower(strings.TrimSpace(h))
+			for _, n := range names {
+				if h == n {
+					return i
+				}
+			}
+		}
+		return -1
+	}
+
+	header := records[0]
+	isHeader := colIndex(header, "url", "link", "feed", "nombre", "name", "titulo") != -1
+
+	var dataRows [][]string
+	iNombre, iDesc, iURL, iCat, iPais, iLang, iActivo, iFallos := -1, -1, -1, -1, -1, -1, -1, -1
+	if isHeader {
+		iNombre = colIndex(header, "nombre", "name", "titulo", "title")
+		iDesc = colIndex(header, "descripcion", "description")
+		iURL = colIndex(header, "url", "link", "feed")
+		iCat = colIndex(header, "categoria_id", "category_id", "categoria", "category")
+		iPais = colIndex(header, "pais_id", "country_id", "pais", "country")
+		iLang = colIndex(header, "idioma", "language", "lang")
+		iActivo = colIndex(header, "activo", "active", "enabled")
+		iFallos = colIndex(header, "fallos", "failures", "fails")
+		dataRows = records[1:]
+	} else {
+		dataRows = records
 	}
 
 	imported := 0
@@ -415,71 +451,115 @@ func ImportFeeds(c *gin.Context) {
 	}
 	defer tx.Rollback(context.Background())
 
-	for {
-		record, err := reader.Read()
-		if err == io.EOF {
-			break
+	field := func(record []string, idx int) string {
+		if idx < 0 || idx >= len(record) {
+			return ""
 		}
-		if err != nil {
-			failed++
-			continue
-		}
+		return strings.TrimSpace(record[idx])
+	}
 
-		if len(record) < 4 {
+	for _, record := range dataRows {
+		if len(record) == 0 {
 			skipped++
 			continue
 		}
 
-		nombre := strings.TrimSpace(record[1])
-		url := strings.TrimSpace(record[3])
+		var nombre, url string
+		if isHeader {
+			nombre = field(record, iNombre)
+			url = field(record, iURL)
+		} else if len(record) == 1 {
+			url = field(record, 0)
+		} else if len(record) == 2 {
+			a := field(record, 0)
+			b := field(record, 1)
+			if looksLikeURL(a) {
+				url, nombre = a, b
+			} else {
+				nombre, url = a, b
+			}
+		} else {
+			nombre = field(record, 1)
+			url = field(record, 3)
+		}
 
-		if nombre == "" || url == "" {
+		if url == "" {
 			skipped++
 			continue
+		}
+		if nombre == "" {
+			nombre = nombreFromURL(url)
 		}
 
 		var descripcion *string
-		if len(record) > 2 && strings.TrimSpace(record[2]) != "" {
-			descripcionStr := strings.TrimSpace(record[2])
-			descripcion = &descripcionStr
-		}
-
 		var categoriaID *int64
-		if len(record) > 4 && strings.TrimSpace(record[4]) != "" {
-			catID, err := strconv.ParseInt(strings.TrimSpace(record[4]), 10, 64)
-			if err == nil {
-				categoriaID = &catID
-			}
-		}
-
 		var paisID *int64
-		if len(record) > 6 && strings.TrimSpace(record[6]) != "" {
-			pID, err := strconv.ParseInt(strings.TrimSpace(record[6]), 10, 64)
-			if err == nil {
-				paisID = &pID
-			}
-		}
-
 		var idioma *string
-		if len(record) > 8 && strings.TrimSpace(record[8]) != "" {
-			lang := strings.TrimSpace(record[8])
-			if len(lang) > 2 {
-				lang = lang[:2]
-			}
-			idioma = &lang
-		}
-
 		activo := true
-		if len(record) > 9 && strings.TrimSpace(record[9]) != "" {
-			activo = strings.ToLower(strings.TrimSpace(record[9])) == "true"
+		var fallos int64
+
+		if isHeader {
+			if d := field(record, iDesc); d != "" {
+				descripcion = &d
+			}
+			if v := field(record, iCat); v != "" {
+				if id, err := strconv.ParseInt(v, 10, 64); err == nil {
+					categoriaID = &id
+				}
+			}
+			if v := field(record, iPais); v != "" {
+				if id, err := strconv.ParseInt(v, 10, 64); err == nil {
+					paisID = &id
+				}
+			}
+			if l := field(record, iLang); l != "" {
+				if len(l) > 2 {
+					l = l[:2]
+				}
+				idioma = &l
+			}
+			if a := field(record, iActivo); a != "" {
+				activo = strings.ToLower(a) == "true"
+			}
+			if f := field(record, iFallos); f != "" {
+				if v, err := strconv.ParseInt(f, 10, 64); err == nil {
+					fallos = v
+				}
+			}
+		} else {
+			if d := field(record, 2); d != "" {
+				descripcion = &d
+			}
+			if v := field(record, 4); v != "" {
+				if id, err := strconv.ParseInt(v, 10, 64); err == nil {
+					categoriaID = &id
+				}
+			}
+			if v := field(record, 6); v != "" {
+				if id, err := strconv.ParseInt(v, 10, 64); err == nil {
+					paisID = &id
+				}
+			}
+			if l := field(record, 8); l != "" {
+				if len(l) > 2 {
+					l = l[:2]
+				}
+				idioma = &l
+			}
+			if a := field(record, 9); a != "" {
+				activo = strings.ToLower(a) == "true"
+			}
+			if f := field(record, 10); f != "" {
+				if v, err := strconv.ParseInt(f, 10, 64); err == nil {
+					fallos = v
+				}
+			}
 		}
 
-		var fallos int64
-		if len(record) > 10 && strings.TrimSpace(record[10]) != "" {
-			f, err := strconv.ParseInt(strings.TrimSpace(record[10]), 10, 64)
-			if err == nil {
-				fallos = f
-			}
+		if _, err := tx.Exec(context.Background(), "SAVEPOINT sp"); err != nil {
+			failed++
+			errors = append(errors, fmt.Sprintf("Error for %s: %v", url, err))
+			continue
 		}
 
 		var existingID int64
@@ -490,22 +570,25 @@ func ImportFeeds(c *gin.Context) {
 				WHERE id=$8`,
 				nombre, descripcion, categoriaID, paisID, idioma, activo, fallos, existingID,
 			)
-			if err != nil {
-				failed++
-				errors = append(errors, fmt.Sprintf("Error updating %s: %v", url, err))
-				continue
-			}
 		} else {
 			_, err = tx.Exec(context.Background(), `
 				INSERT INTO feeds (nombre, descripcion, url, categoria_id, pais_id, idioma, activo, fallos)
 				VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
 				nombre, descripcion, url, categoriaID, paisID, idioma, activo, fallos,
 			)
-			if err != nil {
-				failed++
-				errors = append(errors, fmt.Sprintf("Error inserting %s: %v", url, err))
-				continue
-			}
+		}
+
+		if err != nil {
+			tx.Exec(context.Background(), "ROLLBACK TO SAVEPOINT sp")
+			failed++
+			errors = append(errors, fmt.Sprintf("Error upserting %s: %v", url, err))
+			continue
+		}
+
+		if _, err := tx.Exec(context.Background(), "RELEASE SAVEPOINT sp"); err != nil {
+			failed++
+			errors = append(errors, fmt.Sprintf("Error for %s: %v", url, err))
+			continue
 		}
 
 		imported++
@@ -523,6 +606,22 @@ func ImportFeeds(c *gin.Context) {
 		"errors":   errors,
 		"message":  fmt.Sprintf("Import completed. Imported: %d, Skipped: %d, Failed: %d", imported, skipped, failed),
 	})
+}
+
+func looksLikeURL(s string) bool {
+	return strings.HasPrefix(s, "http://") || strings.HasPrefix(s, "https://") || strings.HasPrefix(s, "http://www.") || strings.HasPrefix(s, "https://www.") || strings.HasPrefix(s, "www.") || strings.HasPrefix(s, "feed://")
+}
+
+func nombreFromURL(u string) string {
+	u = strings.TrimSpace(u)
+	if !strings.HasPrefix(u, "http://") && !strings.HasPrefix(u, "https://") {
+		u = "https://" + u
+	}
+	parsed, err := url.Parse(u)
+	if err != nil || parsed.Host == "" {
+		return u
+	}
+	return strings.TrimPrefix(parsed.Host, "www.")
 }
 
 func stringOrEmpty(s *string) string {
