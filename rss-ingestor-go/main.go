@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/lib/pq"
+	_ "github.com/lib/pq"
 	"github.com/mmcdole/gofeed"
 )
 
@@ -302,35 +302,10 @@ func processFeed(fp *gofeed.Parser, feed Feed, results chan<- int) {
 }
 
 func insertNoticias(noticias []Noticia) int {
-	if len(noticias) == 0 {
-		return 0
-	}
-
-	// Using COPY for bulk insert is most efficient, but complexity with handling conflicts
-	// "ON CONFLICT DO NOTHING" works best with normal INSERT.
-	// For simplicity and correctness with "ON CONFLICT", we use transaction and prepared statement.
-	// For very high performance, we could channel all to a batch writer. 
-	// Given 1400 feeds, batch of 10-20 items per feed, standard Insert is okay if parallelized.
-	
-	txn, err := db.Begin()
-	if err != nil {
-		log.Printf("Error beginning txn: %v", err)
-		return 0
-	}
-	defer txn.Rollback()
-
-	stmt, err := txn.Prepare(pq.CopyIn("noticias", "id", "titulo", "resumen", "url", "fecha", "imagen_url", "fuente_nombre", "categoria_id", "pais_id"))
-	if err != nil {
-		// Fallback to individual inserts if CopyIn is too complex with ON CONFLICT (CopyIn doesn't support ON CONFLICT natively easily without temp tables)
-		// Let's use multi-row INSERT with ON CONFLICT.
-		return insertNoticiasWithConflict(noticias)
-	}
-	defer stmt.Close()
-	
-	// WAIT. lib/pq CopyIn does NOT support ON CONFLICT DO NOTHING.
-	// It will fail if duplicates exist. Since we expect duplicates (RSS feeds repeat items),
-	// CopyIn is risky directly into main table.
-	// Strategy: Use INSERT ... ON CONFLICT DO NOTHING with unnest or VALUES.
+	// Bulk insert with INSERT ... ON CONFLICT DO NOTHING.
+	// NOTE: do NOT use pq.CopyIn here: preparing a CopyIn leaves the backend in
+	// COPY mode waiting for data, which can hold an ACCESS EXCLUSIVE lock on the
+	// table and block the whole database if the stream is never completed.
 	return insertNoticiasWithConflict(noticias)
 }
 
