@@ -23,7 +23,8 @@ RUN pip install --no-cache-dir \
     protobuf==3.20.3 \
     "numpy<2" \
     psycopg2-binary \
-    langdetect
+    langdetect \
+    redis
 
 # === ARREGLAR EL EXECUTABLE STACK ===
 RUN find /usr/local/lib/python3.11/site-packages/ctranslate2* \

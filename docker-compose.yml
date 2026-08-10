@@ -92,8 +92,9 @@ services:
       DB_NAME: ${DB_NAME:-rss}
       DB_USER: ${DB_USER:-rss}
       DB_PASS: ${DB_PASS}
-      RSS_MAX_WORKERS: 100
-      RSS_POKE_INTERVAL_MIN: 60
+      RSS_MAX_WORKERS: ${RSS_MAX_WORKERS:-100}
+      RSS_POKE_INTERVAL_MIN: ${RSS_POKE_INTERVAL_MIN:-60}
+      RSS_HOST_DELAY_MS: ${RSS_HOST_DELAY_MS:-500}
       TZ: Europe/Madrid
     networks:
       - backend
@@ -155,6 +156,7 @@ services:
       SCRAPER_SLEEP: 60
       SCRAPER_BATCH: 10
       SCRAPER_ENRICH_LIMIT: 20
+      SCRAPER_WORKERS: ${SCRAPER_WORKERS:-5}
       TZ: Europe/Madrid
     networks:
       - backend
@@ -304,7 +306,7 @@ services:
       DB_USER: ${DB_USER:-rss}
       DB_PASS: ${DB_PASS}
       TARGET_LANGS: es
-      TRANSLATOR_BATCH: 32
+      TRANSLATOR_BATCH: ${TRANSLATOR_BATCH:-128}
       CT2_MODEL_PATH: /app/models/nllb-ct2
       CT2_DEVICE: cpu
       CT2_COMPUTE_TYPE: int8
@@ -313,6 +315,7 @@ services:
       HF_HOME: /app/hf_cache
       TZ: Europe/Madrid
       TRANSLATOR_ID: ${TRANSLATOR_ID:-}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-rss_redis_pass_2024}@redis:6379
       PYTORCH_ENABLE_MPS_FALLBACK: 1
     volumes:
       - ./workers:/app/workers
@@ -341,7 +344,7 @@ services:
       DB_USER: ${DB_USER:-rss}
       DB_PASS: ${DB_PASS}
       TARGET_LANGS: es
-      TRANSLATOR_BATCH: 32
+      TRANSLATOR_BATCH: ${TRANSLATOR_BATCH:-128}
       CT2_MODEL_PATH: /app/models/nllb-ct2
       CT2_DEVICE: cpu
       CT2_COMPUTE_TYPE: int8
@@ -350,6 +353,7 @@ services:
       HF_HOME: /app/hf_cache
       TZ: Europe/Madrid
       TRANSLATOR_ID: ${TRANSLATOR_ID:-}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-rss_redis_pass_2024}@redis:6379
       PYTORCH_ENABLE_MPS_FALLBACK: 1
     volumes:
       - ./workers:/app/workers

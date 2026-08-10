@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -25,6 +26,7 @@ var (
 	sleepInterval = 60
 	batchSize     = 10
 	enrichLimit   = 20
+	scraperWorkers = 5
 )
 
 type URLSource struct {
@@ -63,6 +65,7 @@ func loadConfig() {
 	sleepInterval = getEnvInt("SCRAPER_SLEEP", 60)
 	batchSize = getEnvInt("SCRAPER_BATCH", 10)
 	enrichLimit = getEnvInt("SCRAPER_ENRICH_LIMIT", 20)
+	scraperWorkers = getEnvInt("SCRAPER_WORKERS", 5)
 }
 
 func getEnvInt(key string, defaultValue int) int {
@@ -406,6 +409,41 @@ func processSource(ctx context.Context, source URLSource) {
 	}
 }
 
+// enrichConcurrent enriches noticias in parallel with a bounded worker pool.
+func enrichConcurrent(ctx context.Context, noticias []Noticia) {
+	limiter := make(chan struct{}, scraperWorkers)
+	var wg sync.WaitGroup
+	for _, noticia := range noticias {
+		wg.Add(1)
+		limiter <- struct{}{}
+		go func(n Noticia) {
+			defer wg.Done()
+			defer func() { <-limiter }()
+			if processEnrichment(ctx, n) {
+				time.Sleep(1 * time.Second)
+			}
+		}(noticia)
+	}
+	wg.Wait()
+}
+
+// scrapeSources processes fuentes_url in parallel with a bounded worker pool.
+func scrapeSources(ctx context.Context, sources []URLSource) {
+	limiter := make(chan struct{}, scraperWorkers)
+	var wg sync.WaitGroup
+	for _, source := range sources {
+		wg.Add(1)
+		limiter <- struct{}{}
+		go func(src URLSource) {
+			defer wg.Done()
+			defer func() { <-limiter }()
+			time.Sleep(1 * time.Second) // polite pacing across workers
+			processSource(ctx, src)
+		}(source)
+	}
+	wg.Wait()
+}
+
 func main() {
 	loadConfig()
 	logger.Println("Starting Scraper Worker")
@@ -443,12 +481,8 @@ func main() {
 			if err != nil {
 				logger.Printf("Error fetching noticias to enrich: %v", err)
 			} else if len(noticias) > 0 {
-				logger.Printf("Enriching %d noticias", len(noticias))
-				for _, noticia := range noticias {
-					if processEnrichment(ctx, noticia) {
-						time.Sleep(3 * time.Second)
-					}
-				}
+				logger.Printf("Enriching %d noticias (%d workers)", len(noticias), scraperWorkers)
+				enrichConcurrent(ctx, noticias)
 			}
 
 			sources, err := getActiveURLs(ctx)
@@ -462,12 +496,8 @@ func main() {
 				continue
 			}
 
-			logger.Printf("Processing %d sources", len(sources))
-
-			for _, source := range sources {
-				processSource(ctx, source)
-				time.Sleep(2 * time.Second) // Rate limiting
-			}
+			logger.Printf("Processing %d sources (%d workers)", len(sources), scraperWorkers)
+			scrapeSources(ctx, sources)
 		}
 	}
 }

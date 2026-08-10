@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -29,6 +30,7 @@ type Config struct {
 	MaxFailures  int
 	PokeInterval time.Duration
 	FeedTimeout  int
+	HostDelay    time.Duration
 }
 
 // Feed represents a row in the feeds table
@@ -57,9 +59,30 @@ type Noticia struct {
 }
 
 var (
-	db     *sql.DB
-	config Config
+	db         *sql.DB
+	config     Config
+	httpClient *http.Client
 )
+
+// Per-host politeness limiter so parallel workers don't hammer one domain.
+var (
+	rateMu      sync.Mutex
+	lastRequest = make(map[string]time.Time)
+)
+
+func politeDelay(host string) {
+	if config.HostDelay <= 0 || host == "" {
+		return
+	}
+	rateMu.Lock()
+	now := time.Now()
+	next := lastRequest[host].Add(config.HostDelay)
+	lastRequest[host] = next
+	rateMu.Unlock()
+	if wait := next.Sub(now); wait > 0 {
+		time.Sleep(wait)
+	}
+}
 
 func loadConfig() {
 	config = Config{
@@ -72,6 +95,19 @@ func loadConfig() {
 		MaxFailures:  getEnvInt("RSS_MAX_FAILURES", 10),
 		PokeInterval: time.Duration(getEnvInt("RSS_POKE_INTERVAL_MIN", 8)) * time.Minute,
 		FeedTimeout:  getEnvInt("RSS_FEED_TIMEOUT", 60),
+		HostDelay:    time.Duration(getEnvInt("RSS_HOST_DELAY_MS", 500)) * time.Millisecond,
+	}
+}
+
+func initHTTPClient() {
+	httpClient = &http.Client{
+		Timeout: time.Duration(config.FeedTimeout) * time.Second,
+		Transport: &http.Transport{
+			MaxIdleConns:        config.MaxWorkers * 2,
+			MaxIdleConnsPerHost: 2,
+			IdleConnTimeout:     90 * time.Second,
+			TLSHandshakeTimeout: 10 * time.Second,
+		},
 	}
 }
 
@@ -200,11 +236,9 @@ func extractImage(item *gofeed.Item) string {
 }
 
 func processFeed(fp *gofeed.Parser, feed Feed, results chan<- int) {
-	// Configure custom HTTP client with timeout and User-Agent
-	client := &http.Client{
-		Timeout: time.Duration(config.FeedTimeout) * time.Second,
-	}
-	
+	// Shared HTTP client with connection pooling across workers
+	client := httpClient
+
 	// Create request to set User-Agent
 	req, err := http.NewRequest("GET", feed.URL, nil)
 	if err != nil {
@@ -215,10 +249,21 @@ func processFeed(fp *gofeed.Parser, feed Feed, results chan<- int) {
 	}
 	req.Header.Set("User-Agent", "RSS2-Ingestor-Go/1.0")
 
-	// NOTE: We INTENTIONALLY SKIP ETag/Last-Modified headers based on user issues
-	// If needed in future, uncomment:
-	// if feed.LastEtag.Valid { req.Header.Set("If-None-Match", feed.LastEtag.String) }
-	// if feed.LastModified.Valid { req.Header.Set("If-Modified-Since", feed.LastModified.String) }
+	// Reuse ETag/Last-Modified so servers can reply 304 Not Modified,
+	// avoiding re-downloading unchanged feeds in every cycle.
+	if feed.LastEtag.Valid && feed.LastEtag.String != "" {
+		req.Header.Set("If-None-Match", feed.LastEtag.String)
+	}
+	if feed.LastModified.Valid && feed.LastModified.String != "" {
+		req.Header.Set("If-Modified-Since", feed.LastModified.String)
+	}
+
+	// Per-host politeness: pace parallel fetches to the same domain
+	host := feed.URL
+	if u, perr := url.Parse(feed.URL); perr == nil && u.Host != "" {
+		host = u.Host
+	}
+	politeDelay(host)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -229,10 +274,29 @@ func processFeed(fp *gofeed.Parser, feed Feed, results chan<- int) {
 	}
 	defer resp.Body.Close()
 
+	// Honor Retry-After on rate limits without punishing the feed with failures
+	if resp.StatusCode == 429 || resp.StatusCode == 503 {
+		ra, raErr := strconv.Atoi(resp.Header.Get("Retry-After"))
+		if raErr == nil && ra > 0 && ra <= 3600 {
+			log.Printf("[Feed %d] Rate limited (%d), sleeping %ds (Retry-After)", feed.ID, resp.StatusCode, ra)
+			time.Sleep(time.Duration(ra) * time.Second)
+		}
+		results <- 0
+		return
+	}
+
+	// On 304, keep the stored validators; update only if the server sends new ones.
 	if resp.StatusCode == 304 {
 		log.Printf("[Feed %d] Not Modified (304)", feed.ID)
-		// Update timestamp only? Or keep as is.
-		updateFeedStatus(feed.ID, feed.LastEtag.String, feed.LastModified.String, true, "")
+		newEtag := feed.LastEtag.String
+		newModified := feed.LastModified.String
+		if h := resp.Header.Get("ETag"); h != "" {
+			newEtag = h
+		}
+		if h := resp.Header.Get("Last-Modified"); h != "" {
+			newModified = h
+		}
+		updateFeedStatus(feed.ID, newEtag, newModified, true, "")
 		results <- 0
 		return
 	}
@@ -433,6 +497,7 @@ func ingestCycle() {
 
 func main() {
 	loadConfig()
+	initHTTPClient()
 	initDB()
 	
 	// Run immediately on start

@@ -67,6 +67,7 @@ models/nllb-ct2-1.3b/
 # Wikipedia images - downloaded by wiki_worker
 data/wiki_images/
 data/backups/
+backups/
 
 # Database storage (PostgreSQL)
 data/pgdata/

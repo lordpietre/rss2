@@ -1,8 +1,9 @@
 import os
+import re
 import time
 import logging
-import re
 import fcntl
+import hashlib
 from typing import List, Optional
 
 import psycopg2
@@ -19,6 +20,62 @@ LOG = logging.getLogger("translator_ct2")
 
 TRANSLATOR_ID = os.environ.get("TRANSLATOR_ID", "")
 TRANSLATOR_TOTAL = int(os.environ.get("TRANSLATOR_TOTAL", "1"))
+
+CACHE_TTL = int(os.environ.get("TRANSLATION_CACHE_TTL", str(30 * 24 * 3600)))
+_redis_client = None
+
+
+def get_redis():
+    """Return a Redis client or None. Cache is best-effort: never blocks translation."""
+    global _redis_client
+    if _redis_client is not None:
+        return _redis_client if _redis_client is not False else None
+    url = os.environ.get("REDIS_URL", "redis://localhost:6379")
+    try:
+        import redis
+        client = redis.Redis.from_url(
+            url, decode_responses=True,
+            socket_connect_timeout=2, socket_timeout=2,
+        )
+        client.ping()
+        _redis_client = client
+        LOG.info("Redis translation cache enabled")
+        return client
+    except Exception as e:
+        LOG.warning(f"Redis cache unavailable, translating without cache: {e}")
+        _redis_client = False
+        return None
+
+
+def cache_key(lang_from: str, lang_to: str, text: str) -> str:
+    digest = hashlib.md5((text or "").encode("utf-8", "ignore")).hexdigest()
+    return f"tr:{lang_from}:{lang_to}:{digest}"
+
+
+def lookup_cache(keys: List[str]) -> dict:
+    r = get_redis()
+    if not r or not keys:
+        return {}
+    try:
+        vals = r.mget(keys)
+        return {k: v for k, v in zip(keys, vals) if v}
+    except Exception as e:
+        LOG.warning(f"Redis mget error: {e}")
+        return {}
+
+
+def store_cache(pairs, ttl: int = CACHE_TTL):
+    r = get_redis()
+    if not r or not pairs:
+        return
+    try:
+        pipe = r.pipeline(transaction=False)
+        for k, v in pairs:
+            if v:
+                pipe.setex(k, ttl, v)
+        pipe.execute()
+    except Exception as e:
+        LOG.warning(f"Redis cache store error: {e}")
 
 
 def clean_text(text: str) -> str:
@@ -403,33 +460,64 @@ def process_batch(conn, rows):
         LOG.info(f"Translating {lang_from} -> {lang_to} ({len(items)} items)")
 
         try:
+            # --- TITLES (served from Redis cache when possible) ---
             titles = [i["titulo"] for i in items]
-            translated_titles = translate_texts(lang_from, lang_to, titles)
+            title_keys = [cache_key(lang_from, lang_to, t) for t in titles]
+            title_cache = lookup_cache(title_keys)
+            if title_cache:
+                LOG.info(f"Title cache hits: {len(title_cache)}/{len(titles)}")
 
-            # Collect all body chunks across all items for a single batched call
+            translated_titles = [title_cache.get(k) for k in title_keys]
+            title_miss = [i for i, k in enumerate(title_keys) if k not in title_cache]
+            if title_miss:
+                miss_texts = [titles[i] for i in title_miss]
+                miss_translated = translate_texts(lang_from, lang_to, miss_texts)
+                store_cache([(title_keys[i], tr) for i, tr in zip(title_miss, miss_translated)])
+                for i, tr in zip(title_miss, miss_translated):
+                    translated_titles[i] = tr
+
+            # --- BODY chunks (single batched call for cache misses) ---
             flat_chunks = []
             flat_keys = []
+            flat_ck = []
             for item in items:
                 body = (item["resumen"] or "").strip()
                 if body:
                     chunks = split_body_into_chunks(body)
                     flat_chunks.extend(chunks)
                     flat_keys.extend([(item["tr_id"], i) for i in range(len(chunks))])
+                    flat_ck.extend([cache_key(lang_from, lang_to, c) for c in chunks])
 
-            translated_bodies = []
-            if flat_chunks:
-                try:
-                    translated_bodies = translate_texts(lang_from, lang_to, flat_chunks)
-                except Exception as e:
-                    LOG.error(f"Batch body translation error: {e}")
-                    translated_bodies = flat_chunks
+            chunk_cache = lookup_cache(flat_ck)
+            if chunk_cache:
+                LOG.info(f"Body cache hits: {len(chunk_cache)}/{len(flat_ck)}")
 
             body_parts = defaultdict(list)
-            for (tr_id, _), tr in zip(flat_keys, translated_bodies):
-                if tr is None:
-                    continue
-                body_parts[tr_id].append(tr)
+            miss_idx = []
+            miss_texts = []
+            miss_keys = []
+            for idx, ck in enumerate(flat_ck):
+                tr_id, _ = flat_keys[idx]
+                if ck in chunk_cache:
+                    body_parts[tr_id].append(chunk_cache[ck])
+                else:
+                    miss_idx.append(idx)
+                    miss_texts.append(flat_chunks[idx])
+                    miss_keys.append(ck)
 
+            if miss_texts:
+                try:
+                    miss_translated = translate_texts(lang_from, lang_to, miss_texts)
+                    store_cache(list(zip(miss_keys, miss_translated)))
+                except Exception as e:
+                    LOG.error(f"Batch body translation error: {e}")
+                    miss_translated = miss_texts
+                for j, tr in enumerate(miss_translated):
+                    if tr:
+                        body_parts[flat_keys[miss_idx[j]][0]].append(tr)
+
+            # --- BATCH COMMIT: single transaction per group ---
+            updates = []
             for idx, item in enumerate(items):
                 tt = clean_text((translated_titles[idx] or "").strip())
                 parts = body_parts.get(item["tr_id"])
@@ -440,21 +528,23 @@ def process_batch(conn, rows):
                 if not tb:
                     tb = item["resumen"]
 
-                # 2. INDIVIDUAL COMMIT: Save each item as it's done
+                updates.append((tt, tb, item["tr_id"]))
+
+            if updates:
                 try:
                     cursor = conn.cursor()
-                    cursor.execute(
+                    cursor.executemany(
                         """
                         UPDATE traducciones 
                         SET titulo_trad = %s, resumen_trad = %s, status = 'done', locked_at = NULL
                         WHERE id = %s
                     """,
-                        (tt, tb, item["tr_id"]),
+                        updates,
                     )
                     conn.commit()
                     cursor.close()
                 except Exception as e:
-                    LOG.error(f"Update error for ID {item['tr_id']}: {e}")
+                    LOG.error(f"Batch update error (items stay pending for retry): {e}")
                     conn.rollback()
 
             LOG.info(f"Finished group {lang_from} -> {lang_to}")
