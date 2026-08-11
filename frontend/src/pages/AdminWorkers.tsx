@@ -1,12 +1,21 @@
 import { useState, useEffect } from 'react'
 import { api } from '../services/api'
-import { Cpu, Play, Square, Settings, RefreshCw, Loader2, Server, Wifi, Plus, Trash2, Key } from 'lucide-react'
+import { Cpu, Play, Square, Settings, RefreshCw, Loader2, Server, Wifi, Plus, Trash2, Key, TrendingUp } from 'lucide-react'
 
 interface WorkerStatus {
   type: string
   workers: number
   status: string
   running: number
+}
+
+interface TranslationStats {
+  translations_last_1min: number
+  translations_last_5min: number
+  rate_per_second: number
+  rate_per_minute: number
+  active_workers: number
+  remote_workers_online: number
 }
 
 interface RemoteWorker {
@@ -21,6 +30,7 @@ interface RemoteWorker {
 
 export function AdminWorkers() {
   const [status, setStatus] = useState<WorkerStatus | null>(null)
+  const [tStats, setTStats] = useState<TranslationStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [configType, setConfigType] = useState<'cpu' | 'gpu'>('cpu')
@@ -40,6 +50,9 @@ export function AdminWorkers() {
       setStatus(res.data)
       setConfigType(res.data.type)
       setConfigWorkers(res.data.workers)
+
+      const statsRes = await api.get('/admin/workers/stats')
+      setTStats(statsRes.data)
     } catch (err: any) {
       console.error('Error fetching status:', err)
     } finally {
@@ -294,7 +307,32 @@ export function AdminWorkers() {
 
             <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
               <span className="font-medium">Workers activos</span>
-              <span className="text-lg font-bold">{status?.running || 0}</span>
+              <span className="text-lg font-bold">{tStats?.active_workers ?? status?.running ?? 0}</span>
+            </div>
+
+            <div className="rounded-lg border border-primary-200 dark:border-primary-800 p-4">
+              <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-primary-600" />
+                Rendimiento de Traducción
+              </h3>
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <div className="text-xl font-bold text-primary-600">{tStats?.rate_per_second ?? 0}</div>
+                  <div className="text-xs text-gray-500">noticias/seg</div>
+                </div>
+                <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <div className="text-xl font-bold text-primary-600">{tStats?.rate_per_minute ?? 0}</div>
+                  <div className="text-xs text-gray-500">noticias/min</div>
+                </div>
+                <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <div className="text-xl font-bold text-primary-600">{tStats?.translations_last_1min ?? 0}</div>
+                  <div className="text-xs text-gray-500">últ. 1 min</div>
+                </div>
+              </div>
+              <div className="text-xs text-gray-500 mt-2">
+                {tStats?.translations_last_5min ?? 0} traducidas en los últimos 5 min ·{' '}
+                {tStats?.remote_workers_online ?? 0} remotos online
+              </div>
             </div>
 
             <div className="flex gap-3 pt-2">

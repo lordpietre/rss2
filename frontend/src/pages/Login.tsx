@@ -9,6 +9,9 @@ export function Login() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+  const [sessionExpired] = useState<boolean>(
+    () => new URLSearchParams(window.location.search).get('expired') === '1',
+  )
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -52,6 +55,12 @@ export function Login() {
         {successMessage && (
           <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4 text-center">
             {successMessage}
+          </div>
+        )}
+        
+        {sessionExpired && !successMessage && (
+          <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4 text-center">
+            Tu sesión ha expirado. Inicia sesión de nuevo.
           </div>
         )}
         

@@ -49,7 +49,13 @@ func GetNews(c *gin.Context) {
 	argNum := 1
 
 	if query != "" {
-		where += fmt.Sprintf(" AND (n.titulo ILIKE $%d OR n.resumen ILIKE $%d)", argNum, argNum)
+		if translatedOnly {
+			// With translated_only, search the translated fields too so users can
+			// find translated news by the Spanish (translated) wording.
+			where += fmt.Sprintf(" AND (n.titulo ILIKE $%d OR n.resumen ILIKE $%d OR t.titulo_trad ILIKE $%d OR t.resumen_trad ILIKE $%d)", argNum, argNum, argNum, argNum)
+		} else {
+			where += fmt.Sprintf(" AND (n.titulo ILIKE $%d OR n.resumen ILIKE $%d)", argNum, argNum)
+		}
 		args = append(args, "%"+query+"%")
 		argNum++
 	}
@@ -142,6 +148,117 @@ func GetNews(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"news":        newsList,
+		"total":       total,
+		"page":        page,
+		"per_page":    perPage,
+		"total_pages": totalPages,
+	})
+}
+
+// GetEntityNews returns the (translated) news that mention a given entity/alias value.
+func GetEntityNews(c *gin.Context) {
+	valor := c.Query("valor")
+	tipo := c.DefaultQuery("tipo", "persona")
+	pageStr := c.DefaultQuery("page", "1")
+	perPageStr := c.DefaultQuery("per_page", "20")
+
+	page, _ := strconv.Atoi(pageStr)
+	perPage, _ := strconv.Atoi(perPageStr)
+	if page < 1 {
+		page = 1
+	}
+	if perPage < 1 || perPage > 50 {
+		perPage = 20
+	}
+	offset := (page - 1) * perPage
+
+	daysStr := c.Query("days")
+	days := 0
+	if daysStr != "" {
+		days, _ = strconv.Atoi(daysStr)
+		if days < 1 {
+			days = 0
+		}
+	}
+	today := c.Query("today") == "true"
+	offsetStr := c.Query("day_offset")
+	dayOffset := 0
+	useDayOffset := false
+	if offsetStr != "" {
+		dayOffset, _ = strconv.Atoi(offsetStr)
+		if dayOffset < 0 {
+			dayOffset = 0
+		}
+		useDayOffset = true
+	}
+
+	params := []interface{}{valor, tipo}
+	next := 3
+	timeCond := ""
+	switch {
+	case useDayOffset:
+		// Día exacto: desde el inicio del día (hoy - offset) hasta el inicio del día siguiente
+		timeCond = fmt.Sprintf(
+			" AND n.fecha >= (CURRENT_DATE - %d)::timestamp AND n.fecha < (CURRENT_DATE - %d + 1)::timestamp",
+			dayOffset, dayOffset)
+	case today:
+		timeCond = " AND n.fecha >= date_trunc('day', NOW())"
+	case days > 0:
+		timeCond = fmt.Sprintf(" AND n.fecha >= NOW() - make_interval(days => $%d)", next)
+		params = append(params, days)
+		next++
+	}
+
+	base := fmt.Sprintf(`
+		FROM tags_noticia tn
+		JOIN tags t ON tn.tag_id = t.id
+		JOIN traducciones tr ON tn.traduccion_id = tr.id
+		JOIN noticias n ON tr.noticia_id = n.id
+		LEFT JOIN entity_aliases ea ON LOWER(ea.alias) = LOWER(t.valor) AND ea.tipo = t.tipo
+		WHERE LOWER(COALESCE(ea.canonical_name, t.valor)) = LOWER($1) AND t.tipo = $2%s`, timeCond)
+
+	var total int
+	if err := db.GetPool().QueryRow(c.Request.Context(),
+		fmt.Sprintf("SELECT COUNT(DISTINCT tn.noticia_id) %s", base), params...).Scan(&total); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to count entity news", Message: err.Error()})
+		return
+	}
+
+	query := fmt.Sprintf(`
+		SELECT DISTINCT n.id, n.titulo, COALESCE(n.resumen,''), n.url, n.fecha, n.imagen_url,
+		       n.fuente_nombre, tr.titulo_trad, tr.resumen_trad
+		%s
+		ORDER BY n.fecha DESC
+		LIMIT $%d OFFSET $%d`, base, next, next+1)
+
+	rows, err := db.GetPool().Query(c.Request.Context(), query, append(params, perPage, offset)...)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to get entity news", Message: err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	var news []NewsResponse
+	for rows.Next() {
+		var n NewsResponse
+		var img *string
+		if err := rows.Scan(&n.ID, &n.Titulo, &n.Resumen, &n.URL, &n.Fecha, &img,
+			&n.FuenteNombre, &n.TitleTranslated, &n.SummaryTranslated); err != nil {
+			continue
+		}
+		if img != nil {
+			n.ImagenURL = img
+		}
+		news = append(news, n)
+	}
+	if news == nil {
+		news = []NewsResponse{}
+	}
+
+	totalPages := (total + perPage - 1) / perPage
+
+	c.JSON(http.StatusOK, gin.H{
+		"news":        news,
 		"total":       total,
 		"page":        page,
 		"per_page":    perPage,

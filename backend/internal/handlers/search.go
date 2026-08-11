@@ -3,12 +3,81 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/rss2/backend/internal/auth"
 	"github.com/rss2/backend/internal/db"
 	"github.com/rss2/backend/internal/models"
 	"github.com/rss2/backend/internal/services"
 )
+
+// LogSearch records a logged-in user's search term so frequent searches gain priority.
+func LogSearch(c *gin.Context) {
+	user := c.MustGet("user").(*auth.Claims)
+	var req struct {
+		Query string `json:"q"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Invalid request"})
+		return
+	}
+	term := strings.ToLower(strings.TrimSpace(req.Query))
+	if term == "" {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "q requerido"})
+		return
+	}
+	if len(term) > 100 {
+		term = term[:100]
+	}
+
+	_, err := db.GetPool().Exec(c.Request.Context(), `
+		INSERT INTO user_search_tags (user_id, term, count, last_used)
+		VALUES ($1, $2, 1, NOW())
+		ON CONFLICT (user_id, term)
+		DO UPDATE SET count = user_search_tags.count + 1, last_used = NOW()
+	`, user.UserID, term)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to save search", Message: err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+// SearchSuggestions returns the user's most used search terms (dynamic tags).
+func SearchSuggestions(c *gin.Context) {
+	user := c.MustGet("user").(*auth.Claims)
+	q := strings.TrimSpace(c.Query("q"))
+
+	query := `
+		SELECT term FROM user_search_tags
+		WHERE user_id = $1`
+	args := []interface{}{user.UserID}
+	if q != "" {
+		query += ` AND term ILIKE $2`
+		args = append(args, "%"+q+"%")
+	}
+	query += ` ORDER BY count DESC, last_used DESC LIMIT 10`
+
+	rows, err := db.GetPool().Query(c.Request.Context(), query, args...)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to get suggestions", Message: err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	terms := []string{}
+	for rows.Next() {
+		var t string
+		if err := rows.Scan(&t); err != nil {
+			continue
+		}
+		terms = append(terms, t)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"terms": terms})
+}
 
 func SearchNews(c *gin.Context) {
 	query := c.Query("q")

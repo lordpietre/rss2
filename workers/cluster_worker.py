@@ -259,7 +259,7 @@ def fetch_traducciones_info_batch(conn, tr_ids: List[int]) -> Dict[int, Dict[str
             "traduccion_id": tr_id,
             "noticia_id": row["noticia_id"],
             "fecha": row["fecha"],
-            "titulo_evento": row["titulo_evento"] or "",
+            "titulo_evento": (row["titulo_evento"] or "")[:255],
         }
     return result
 

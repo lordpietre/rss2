@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../services/api'
 import { WikiTooltip } from '../components/ui/WikiTooltip'
 
@@ -32,6 +33,15 @@ const TIPOS = [
   { value: 'tema', label: '📰 Tema', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' },
 ]
 
+const TIMELINE_WINDOWS: { key: string; label: string; title: string; offset: number }[] = [
+  { key: '0', label: 'Hoy', title: 'hoy', offset: 0 },
+  { key: '1', label: '1d', title: 'hace 1 día', offset: 1 },
+  { key: '2', label: '2d', title: 'hace 2 días', offset: 2 },
+  { key: '3', label: '3d', title: 'hace 3 días', offset: 3 },
+  { key: '4', label: '4d', title: 'hace 4 días', offset: 4 },
+  { key: '5', label: '5d', title: 'hace 5 días', offset: 5 },
+]
+
 function getTipoInfo(tipo: string) {
   return TIPOS.find(t => t.value === tipo) || TIPOS[3]
 }
@@ -51,6 +61,14 @@ export function Populares() {
   const [configModal, setConfigModal] = useState<ConfigModal | null>(null)
   const [saving, setSaving] = useState(false)
   const [successMsg, setSuccessMsg] = useState('')
+
+  // News-by-entity modal state
+  const [newsModal, setNewsModal] = useState<Entity | null>(null)
+  const [newsModalMode, setNewsModalMode] = useState<'news' | 'timeline'>('news')
+  const [timelineLabel, setTimelineLabel] = useState('últimas 24 horas')
+  const [entityNews, setEntityNews] = useState<any[]>([])
+  const [newsLoading, setNewsLoading] = useState(false)
+  const [newsTotal, setNewsTotal] = useState(0)
 
   // Form state for configure modal
   const [newTipo, setNewTipo] = useState('')
@@ -106,6 +124,50 @@ export function Populares() {
     setConfigModal(null)
     setSaving(false)
     setSuccessMsg('')
+  }
+
+  const openNews = async (entity: Entity) => {
+    setNewsModalMode('news')
+    setNewsModal(entity)
+    setNewsLoading(true)
+    setEntityNews([])
+    setNewsTotal(0)
+    try {
+      const params = new URLSearchParams()
+      params.append('valor', entity.valor)
+      params.append('tipo', entity.tipo)
+      params.append('per_page', '30')
+      const res = await api.get(`/entities/news?${params}`)
+      setEntityNews(res.data.news || [])
+      setNewsTotal(res.data.total || 0)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setNewsLoading(false)
+    }
+  }
+
+  const openTimeline = async (entity: Entity, win: typeof TIMELINE_WINDOWS[number]) => {
+    setTimelineLabel(win.title)
+    setNewsModalMode('timeline')
+    setNewsModal(entity)
+    setNewsLoading(true)
+    setEntityNews([])
+    setNewsTotal(0)
+    try {
+      const params = new URLSearchParams()
+      params.append('valor', entity.valor)
+      params.append('tipo', entity.tipo)
+      params.append('day_offset', String(win.offset))
+      params.append('per_page', '50')
+      const res = await api.get(`/entities/news?${params}`)
+      setEntityNews(res.data.news || [])
+      setNewsTotal(res.data.total || 0)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setNewsLoading(false)
+    }
   }
 
   const handleSaveTipo = async () => {
@@ -351,13 +413,36 @@ export function Populares() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <button
-                        onClick={() => openConfig(entity)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                        title="Configurar entidad"
-                      >
-                        ⚙️ Configurar
-                      </button>
+                      <div className="flex flex-col items-center gap-1">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => openNews(entity)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                            title="Ver noticias donde se menciona"
+                          >
+                            🔍 Buscar
+                          </button>
+                          <button
+                            onClick={() => openConfig(entity)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                            title="Configurar entidad"
+                          >
+                            ⚙️ Configurar
+                          </button>
+                        </div>
+                        <div className="flex flex-wrap items-center justify-center gap-1">
+                          {TIMELINE_WINDOWS.map((win) => (
+                            <button
+                              key={win.key}
+                              onClick={() => openTimeline(entity, win)}
+                              className="inline-flex items-center px-1.5 py-0.5 text-[10px] rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                              title={win.title}
+                            >
+                              {win.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     </td>
                   </tr>
                 )
@@ -514,6 +599,129 @@ export function Populares() {
                     {saving ? 'Creando...' : 'Crear alias'}
                   </button>
                 </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* News-by-entity Modal */}
+      {newsModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setNewsModal(null)}>
+          <div
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b dark:border-gray-700">
+              <div>
+                <h2 className="text-lg font-bold">
+                  {newsModalMode === 'timeline'
+                    ? <>📈 Timeline de &quot;{newsModal.valor}&quot;</>
+                    : <>Noticias sobre &quot;{newsModal.valor}&quot;</>}
+                </h2>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  {newsModalMode === 'timeline'
+                    ? `Últimas ${Math.min(entityNews.length, 50)} noticias · ${timelineLabel} (${getTipoInfo(newsModal.tipo).label})`
+                    : `${newsTotal} noticias encontradas (${getTipoInfo(newsModal.tipo).label})`}
+                </p>
+              </div>
+              <button
+                onClick={() => setNewsModal(null)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl leading-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto">
+              {newsLoading ? (
+                <div className="text-center py-10 text-gray-400">Cargando...</div>
+              ) : entityNews.length === 0 ? (
+                <div className="text-center py-10 text-gray-400">
+                  {newsModalMode === 'timeline'
+                    ? `No hay noticias de esta entidad para ${timelineLabel}.`
+                    : 'No hay noticias que mencionen a esta entidad.'}
+                </div>
+              ) : newsModalMode === 'timeline' ? (
+                <ol className="relative border-l-2 border-blue-200 dark:border-blue-800 ml-2 space-y-4">
+                  {entityNews.map((n) => (
+                    <li key={n.id} className="ml-4 relative">
+                      <span className="absolute -left-[21px] top-2 h-3 w-3 rounded-full bg-blue-500 ring-2 ring-blue-100 dark:ring-blue-900" />
+                      <div className="flex items-baseline gap-2">
+                        {n.fecha && (
+                          <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 shrink-0 tabular-nums">
+                            {new Date(n.fecha).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        )}
+                        {n.fecha && (
+                          <span className="text-[10px] text-gray-400 shrink-0 tabular-nums">
+                            {new Date(n.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                          </span>
+                        )}
+                      </div>
+                      <Link
+                        to={`/news/${n.id}`}
+                        onClick={() => setNewsModal(null)}
+                        className="block p-3 mt-1 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border border-gray-100 dark:border-gray-700"
+                      >
+                        <div className="flex items-start gap-3">
+                          {n.imagen_url && (
+                            <img
+                              src={n.imagen_url}
+                              alt=""
+                              className="w-20 h-14 object-cover rounded-md shrink-0"
+                              onError={(e) => (e.currentTarget.style.display = 'none')}
+                            />
+                          )}
+                          <div className="min-w-0">
+                            <div className="font-medium text-sm line-clamp-2">
+                              {n.title_translated || n.titulo}
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                              {n.summary_translated || n.resumen}
+                            </p>
+                          </div>
+                        </div>
+                      </Link>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <ul className="space-y-2">
+                  {entityNews.map((n) => (
+                    <li key={n.id}>
+                      <Link
+                        to={`/news/${n.id}`}
+                        onClick={() => setNewsModal(null)}
+                        className="block p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border border-gray-100 dark:border-gray-700"
+                      >
+                        <div className="flex items-start gap-3">
+                          {n.imagen_url && (
+                            <img
+                              src={n.imagen_url}
+                              alt=""
+                              className="w-20 h-14 object-cover rounded-md shrink-0"
+                              onError={(e) => (e.currentTarget.style.display = 'none')}
+                            />
+                          )}
+                          <div className="min-w-0">
+                            <div className="font-medium text-sm line-clamp-2">
+                              {n.title_translated || n.titulo}
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                              {n.summary_translated || n.resumen}
+                            </p>
+                            {n.fecha && (
+                              <span className="text-[11px] text-gray-400 mt-1 block">
+                                {new Date(n.fecha).toLocaleDateString('es-ES')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
           </div>

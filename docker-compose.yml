@@ -46,6 +46,7 @@ services:
     deploy:
       resources:
         limits:
+          cpus: '2'
           memory: 8G
         reservations:
           memory: 4G
@@ -94,7 +95,7 @@ services:
       DB_PASS: ${DB_PASS}
       RSS_MAX_WORKERS: ${RSS_MAX_WORKERS:-100}
       RSS_POKE_INTERVAL_MIN: ${RSS_POKE_INTERVAL_MIN:-60}
-      RSS_HOST_DELAY_MS: ${RSS_HOST_DELAY_MS:-500}
+      RSS_HOST_DELAY_MS: ${RSS_HOST_DELAY_MS:-800}
       TZ: Europe/Madrid
     networks:
       - backend
@@ -153,10 +154,10 @@ services:
       DB_NAME: ${DB_NAME:-rss}
       DB_USER: ${DB_USER:-rss}
       DB_PASS: ${DB_PASS}
-      SCRAPER_SLEEP: 60
+      SCRAPER_SLEEP: 120
       SCRAPER_BATCH: 10
-      SCRAPER_ENRICH_LIMIT: 20
-      SCRAPER_WORKERS: ${SCRAPER_WORKERS:-5}
+      SCRAPER_ENRICH_LIMIT: 10
+      SCRAPER_WORKERS: ${SCRAPER_WORKERS:-2}
       TZ: Europe/Madrid
     networks:
       - backend
@@ -215,6 +216,7 @@ services:
       DB_USER: ${DB_USER:-rss}
       DB_PASS: ${DB_PASS}
       WIKI_SLEEP: 10
+      WIKI_BATCH: 20
       TZ: Europe/Madrid
     volumes:
       - ./data/wiki_images:/app/data/wiki_images
@@ -255,6 +257,11 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 512M
 
   # ==================================================================================
   # FRONTEND REACT
@@ -272,6 +279,11 @@ services:
     depends_on:
       - backend-go
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
 
   # ==================================================================================
   # NGINX (Puerto 8001 - sirve React + proxy API)
@@ -382,7 +394,8 @@ services:
       DB_USER: ${DB_USER:-rss}
       DB_PASS: ${DB_PASS}
       TARGET_LANGS: es
-      SCHEDULER_BATCH: 1000
+      SCHEDULER_BATCH: 200
+      SCHEDULER_AGE_DAYS: 30
       SCHEDULER_SLEEP: 30
       TZ: Europe/Madrid
     volumes:
@@ -412,10 +425,10 @@ services:
       DB_USER: ${DB_USER:-rss}
       DB_PASS: ${DB_PASS}
       EMB_MODEL: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
-      EMB_BATCH: 64
+      EMB_BATCH: 32
       EMB_SLEEP_IDLE: 5
       EMB_LANGS: es
-      EMB_LIMIT: 1000
+      EMB_LIMIT: 300
       DEVICE: cpu
       HF_HOME: /app/hf_cache
       TZ: Europe/Madrid
@@ -565,7 +578,7 @@ services:
       DB_USER: ${DB_USER:-rss}
       DB_PASS: ${DB_PASS}
       NER_LANG: es
-      NER_BATCH: 64
+      NER_BATCH: 24
       HF_HOME: /app/hf_cache
       TZ: Europe/Madrid
     volumes:

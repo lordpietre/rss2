@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { apiService, News, Category, Country } from '../services/api'
+import { apiService, api, News, Category, Country } from '../services/api'
 import { Search as SearchIcon, Filter } from 'lucide-react'
 
 export function Search() {
@@ -10,6 +10,14 @@ export function Search() {
   const lang = searchParams.get('lang') || ''
   const categoria = searchParams.get('categoria') || ''
   const pais = searchParams.get('pais') || ''
+  const [suggestions, setSuggestions] = useState<string[]>([])
+
+  useEffect(() => {
+    if (!localStorage.getItem('token')) return
+    api.get('/search/suggestions')
+      .then((res) => setSuggestions(res.data.terms || []))
+      .catch(() => {})
+  }, [])
 
   const { data: categorias } = useQuery({
     queryKey: ['categories'],
@@ -34,7 +42,12 @@ export function Search() {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
     const newParams: Record<string, string> = {}
-    if (formData.get('q')) newParams.q = formData.get('q') as string
+    if (formData.get('q')) {
+      newParams.q = formData.get('q') as string
+      if (localStorage.getItem('token')) {
+        api.post('/searchlog', { q: formData.get('q') }).catch(() => {})
+      }
+    }
     if (formData.get('lang')) newParams.lang = formData.get('lang') as string
     if (formData.get('categoria')) newParams.categoria = formData.get('categoria') as string
     if (formData.get('pais')) newParams.pais = formData.get('pais') as string
@@ -58,8 +71,12 @@ export function Search() {
               name="q"
               defaultValue={q}
               placeholder="Palabras clave..."
+              list="user-search-suggestions"
               className="input w-full"
             />
+            <datalist id="user-search-suggestions">
+              {suggestions.map((s) => <option key={s} value={s} />)}
+            </datalist>
           </div>
           
           <div className="w-32">

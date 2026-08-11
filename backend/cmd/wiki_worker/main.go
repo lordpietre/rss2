@@ -23,8 +23,9 @@ var (
 	logger        *log.Logger
 	pool          *pgxpool.Pool
 	sleepInterval = 30
-	batchSize     = 50
+	batchSize     = 20
 	imagesDir     = "/app/data/wiki_images"
+	maxImageBytes = int64(2 << 20)
 )
 
 type WikiSummary struct {
@@ -101,13 +102,17 @@ func downloadImage(imgURL, destPath string) error {
 		return fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 
+	if resp.ContentLength > maxImageBytes {
+		return fmt.Errorf("image too large (%d bytes)", resp.ContentLength)
+	}
+
 	out, err := os.Create(destPath)
 	if err != nil {
 		return err
 	}
 	defer out.Close()
 
-	_, err = io.Copy(out, resp.Body)
+	_, err = io.Copy(out, io.LimitReader(resp.Body, maxImageBytes))
 	return err
 }
 
@@ -210,9 +215,15 @@ func processTag(ctx context.Context, tag Tag) {
 }
 
 func main() {
+	var sleepVal, batchVal int
 	if val := os.Getenv("WIKI_SLEEP"); val != "" {
-		if sleep, err := fmt.Sscanf(val, "%d", &sleepInterval); err == nil && sleep > 0 {
-			sleepInterval = sleep
+		if _, err := fmt.Sscanf(val, "%d", &sleepVal); err == nil && sleepVal > 0 {
+			sleepInterval = sleepVal
+		}
+	}
+	if val := os.Getenv("WIKI_BATCH"); val != "" {
+		if _, err := fmt.Sscanf(val, "%d", &batchVal); err == nil && batchVal > 0 {
+			batchSize = batchVal
 		}
 	}
 

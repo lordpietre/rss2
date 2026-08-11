@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -383,6 +384,51 @@ func GetWorkerStatus(c *gin.Context) {
 		"workers": workers,
 		"status":  translatorStatus,
 		"running": runningCount,
+	})
+}
+
+// GetTranslationStats returns real translation throughput and live worker count.
+func GetTranslationStats(c *gin.Context) {
+	ctx := c.Request.Context()
+	var last1min, last5min, activeWorkers int64
+	var elapsed1min, elapsed5min float64
+
+	db.GetPool().QueryRow(ctx, `
+		SELECT COALESCE(SUM(items_translated),0), COALESCE(SUM(elapsed_ms),0)
+		FROM translation_stats WHERE created_at >= NOW() - INTERVAL '1 minute'
+	`).Scan(&last1min, &elapsed1min)
+
+	db.GetPool().QueryRow(ctx, `
+		SELECT COALESCE(SUM(items_translated),0), COALESCE(SUM(elapsed_ms),0)
+		FROM translation_stats WHERE created_at >= NOW() - INTERVAL '5 minutes'
+	`).Scan(&last5min, &elapsed5min)
+
+	// Live workers = distinct hosts that recorded stats in the last 2 minutes
+	db.GetPool().QueryRow(ctx, `
+		SELECT COUNT(DISTINCT hostname) FROM translation_stats
+		WHERE created_at >= NOW() - INTERVAL '2 minutes' AND hostname IS NOT NULL
+	`).Scan(&activeWorkers)
+
+	// Also count WS remote workers currently online
+	remoteOnline := 0
+	if err := db.GetPool().QueryRow(ctx, `
+		SELECT COUNT(*) FROM remote_workers WHERE status = 'online'
+	`).Scan(&remoteOnline); err != nil {
+		remoteOnline = 0
+	}
+
+	rateSec := 0.0
+	if elapsed1min > 0 {
+		rateSec = float64(last1min) / (elapsed1min / 1000.0)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"translations_last_1min":  last1min,
+		"translations_last_5min":  last5min,
+		"rate_per_second":         math.Round(rateSec*100) / 100,
+		"rate_per_minute":         math.Round(rateSec*60*100) / 100,
+		"active_workers":          activeWorkers + int64(remoteOnline),
+		"remote_workers_online":   remoteOnline,
 	})
 }
 

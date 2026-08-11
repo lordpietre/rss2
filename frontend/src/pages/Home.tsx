@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { apiService } from '../services/api'
+import { apiService, api } from '../services/api'
 import { Search, Globe, Newspaper, Filter } from 'lucide-react'
 
 export function Home() {
@@ -13,6 +13,15 @@ export function Home() {
   const categoryId = searchParams.get('category_id') || ''
   const countryId = searchParams.get('country_id') || ''
   const translatedOnly = searchParams.get('translated_only') === 'true'
+  const [suggestions, setSuggestions] = useState<string[]>([])
+
+  // Load the user's most frequent search terms (dynamic tags) when logged in
+  useEffect(() => {
+    if (!localStorage.getItem('token')) return
+    api.get('/search/suggestions')
+      .then((res) => setSuggestions(res.data.terms || []))
+      .catch(() => {})
+  }, [])
 
   const { data: categories } = useQuery({
     queryKey: ['categories'],
@@ -39,6 +48,10 @@ export function Home() {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
     const query = formData.get('q')
+    // Record the search for frequency-based suggestions (only when logged in)
+    if (localStorage.getItem('token') && query) {
+      api.post('/searchlog', { q: String(query) }).catch(() => {})
+    }
     setSearchParams({ 
       q: query as string, 
       page: '1',
@@ -83,8 +96,12 @@ export function Home() {
                 name="q"
                 defaultValue={q}
                 placeholder="Buscar noticias..."
+                list="user-search-suggestions"
                 className="input pl-10 w-full"
               />
+              <datalist id="user-search-suggestions">
+                {suggestions.map((s) => <option key={s} value={s} />)}
+              </datalist>
               <button type="submit" className="btn-primary">
                 Buscar
               </button>

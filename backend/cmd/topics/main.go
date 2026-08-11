@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -276,29 +277,46 @@ func processBatch(ctx context.Context, topics []Topic, countries []Country) (int
 		processedIDs = append(processedIDs, item.ID)
 	}
 
-	// Insert topic relations
+	// Insert topic relations (batched, upsert)
 	if len(topicMatches) > 0 {
-		for _, tm := range topicMatches {
-			_, err := dbPool.Exec(ctx, `
+		const chunkSize = 500
+		for i := 0; i < len(topicMatches); i += chunkSize {
+			end := i + chunkSize
+			if end > len(topicMatches) {
+				end = len(topicMatches)
+			}
+			chunk := topicMatches[i:end]
+			values := make([]string, 0, len(chunk))
+			args := make([]interface{}, 0, len(chunk)*3)
+			for j, tm := range chunk {
+				values = append(values, fmt.Sprintf("($%d, $%d, $%d)", j*3+1, j*3+2, j*3+3))
+				args = append(args, tm.NoticiaID, tm.TopicID, tm.Score)
+			}
+			query := fmt.Sprintf(`
 				INSERT INTO news_topics (noticia_id, topic_id, score)
-				VALUES ($1, $2, $3)
+				VALUES %s
 				ON CONFLICT (noticia_id, topic_id) DO UPDATE SET score = EXCLUDED.score
-			`, tm.NoticiaID, tm.TopicID, tm.Score)
-			if err != nil {
-				logger.Printf("Error inserting topic: %v", err)
+			`, strings.Join(values, ","))
+			if _, err := dbPool.Exec(ctx, query, args...); err != nil {
+				logger.Printf("Error batch inserting topics: %v", err)
 			}
 		}
 	}
 
-	// Update country
+	// Update country (single bulk UPDATE)
 	if len(countryUpdates) > 0 {
-		for _, cu := range countryUpdates {
-			_, err := dbPool.Exec(ctx, `
-				UPDATE noticias SET pais_id = $1 WHERE id = $2
-			`, cu.PaisID, cu.NoticiaID)
-			if err != nil {
-				logger.Printf("Error updating country: %v", err)
-			}
+		paisSlice := make([]int32, len(countryUpdates))
+		idSlice := make([]string, len(countryUpdates))
+		for i, cu := range countryUpdates {
+			paisSlice[i] = int32(cu.PaisID)
+			idSlice[i] = cu.NoticiaID
+		}
+		if _, err := dbPool.Exec(ctx, `
+			UPDATE noticias n SET pais_id = u.pais
+			FROM unnest($1::int[], $2::varchar[]) AS u(pais, noticia_id)
+			WHERE n.id = u.noticia_id
+		`, paisSlice, idSlice); err != nil {
+			logger.Printf("Error bulk updating countries: %v", err)
 		}
 	}
 

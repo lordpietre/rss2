@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/md5"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -27,6 +28,7 @@ var (
 	batchSize     = 10
 	enrichLimit   = 20
 	scraperWorkers = 5
+	maxBodyBytes  = int64(512 << 10)
 )
 
 type URLSource struct {
@@ -169,7 +171,7 @@ func extractArticle(source URLSource) (*Article, error) {
 		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	doc, err := goquery.NewDocumentFromReader(io.LimitReader(resp.Body, maxBodyBytes))
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +258,7 @@ func extractContentFromURL(url string) (string, error) {
 		return "", fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	doc, err := goquery.NewDocumentFromReader(io.LimitReader(resp.Body, maxBodyBytes))
 	if err != nil {
 		return "", err
 	}

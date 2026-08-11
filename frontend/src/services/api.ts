@@ -17,6 +17,25 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+// If the session token expires (or is invalid), clear it and ask to log in again
+// instead of failing with confusing "Invalid token" errors on admin actions.
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status
+    const url = error?.config?.url || ''
+    const isAuthCall = url.includes('/auth/login') || url.includes('/auth/register')
+    if (status === 401 && !isAuthCall) {
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login?expired=1'
+      }
+    }
+    return Promise.reject(error)
+  },
+)
+
 export interface News {
   id: string
   titulo: string

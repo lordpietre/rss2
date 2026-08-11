@@ -170,8 +170,11 @@ func main() {
 		}
 
 		api.GET("/search", handlers.SearchNews)
+		api.GET("/search/suggestions", middleware.AuthRequired(), handlers.SearchSuggestions)
+		api.POST("/searchlog", middleware.AuthRequired(), handlers.LogSearch)
 
 		api.GET("/entities", handlers.GetEntities)
+		api.GET("/entities/news", handlers.GetEntityNews)
 
 		api.GET("/stats", handlers.GetStats)
 
@@ -193,6 +196,7 @@ func main() {
 			admin.POST("/users/:id/demote", handlers.DemoteUser)
 			admin.POST("/reset-db", handlers.ResetDatabase)
 			admin.GET("/workers/status", handlers.GetWorkerStatus)
+			admin.GET("/workers/stats", handlers.GetTranslationStats)
 			admin.POST("/workers/config", handlers.SetWorkerConfig)
 			admin.POST("/workers/start", handlers.StartWorkers)
 			admin.POST("/workers/stop", handlers.StopWorkers)

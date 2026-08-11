@@ -10,15 +10,18 @@ export function Feeds() {
   const [filtroActivo, setFiltroActivo] = useState('')
   const [filtroCategoria, setFiltroCategoria] = useState('')
   const [filtroPais, setFiltroPais] = useState('')
+  const [page, setPage] = useState(1)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number; failed: number; message: string } | null>(null)
 
   const { data: feedsData, isLoading } = useQuery({
-    queryKey: ['feeds', filtroActivo, filtroCategoria, filtroPais],
+    queryKey: ['feeds', filtroActivo, filtroCategoria, filtroPais, page],
     queryFn: () => apiService.getFeeds({
       activo: filtroActivo || undefined,
       categoria_id: filtroCategoria || undefined,
       pais_id: filtroPais || undefined,
+      page,
+      per_page: 50,
     }),
   })
 
@@ -165,7 +168,7 @@ export function Feeds() {
         <div className="flex flex-wrap gap-4">
           <select
             value={filtroActivo}
-            onChange={(e) => setFiltroActivo(e.target.value)}
+            onChange={(e) => { setFiltroActivo(e.target.value); setPage(1) }}
             className="input w-auto"
           >
             <option value="">Todos</option>
@@ -174,7 +177,7 @@ export function Feeds() {
           </select>
           <select
             value={filtroCategoria}
-            onChange={(e) => setFiltroCategoria(e.target.value)}
+            onChange={(e) => { setFiltroCategoria(e.target.value); setPage(1) }}
             className="input w-auto"
           >
             <option value="">Todas las categorías</option>
@@ -184,7 +187,7 @@ export function Feeds() {
           </select>
           <select
             value={filtroPais}
-            onChange={(e) => setFiltroPais(e.target.value)}
+            onChange={(e) => { setFiltroPais(e.target.value); setPage(1) }}
             className="input w-auto"
           >
             <option value="">Todos los países</option>
@@ -363,6 +366,30 @@ export function Feeds() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {!isLoading && feedsData && feedsData.total_pages > 1 && (
+        <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+          <div>
+            Página <span className="font-semibold text-gray-900 dark:text-white">{page}</span> de <span className="font-semibold text-gray-900 dark:text-white">{feedsData.total_pages}</span>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="px-4 py-2 border rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-600 dark:hover:bg-gray-700 transition-colors"
+            >
+              Anterior
+            </button>
+            <button
+              onClick={() => setPage(p => Math.min(feedsData.total_pages, p + 1))}
+              disabled={page >= feedsData.total_pages}
+              className="px-4 py-2 border rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-600 dark:hover:bg-gray-700 transition-colors"
+            >
+              Siguiente
+            </button>
+          </div>
         </div>
       )}
     </div>

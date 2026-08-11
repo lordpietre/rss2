@@ -583,7 +583,7 @@ def fetch_pending_translations(conn):
             WHERE t.lang_to = %s 
               AND (t.titulo_trad IS NULL OR t.resumen_trad IS NULL)
               AND (t.locked_at IS NULL OR t.locked_at < NOW() - INTERVAL '10 minutes')
-            ORDER BY n.fecha DESC
+            ORDER BY n.fecha ASC
             LIMIT %s
             FOR UPDATE SKIP LOCKED
         """,
@@ -593,7 +593,23 @@ def fetch_pending_translations(conn):
         rows = cursor.fetchall()
         if rows:
             LOG.info(f"Found {len(rows)} pending translations for {lang}")
+            start_ts = time.time()
             process_batch(conn, rows)
+            elapsed_ms = int((time.time() - start_ts) * 1000)
+            try:
+                metrics_cur = conn.cursor()
+                metrics_cur.execute(
+                    """
+                    INSERT INTO translation_stats (lang_to, items_translated, elapsed_ms, hostname)
+                    VALUES (%s, %s, %s, %s)
+                    """,
+                    (lang, len(rows), elapsed_ms, worker_id),
+                )
+                conn.commit()
+                metrics_cur.close()
+            except Exception as e:
+                LOG.error(f"Error recording translation stats: {e}")
+                conn.rollback()
             total_found += len(rows)
 
     cursor.close()
