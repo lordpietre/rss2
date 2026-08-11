@@ -339,6 +339,14 @@ services:
       db:
         condition: service_healthy
     restart: unless-stopped
+    # Prioridad BAJA: el traductor no debe acaparar toda la CPU.
+    # cpu_shares menor que el resto (1024) + tope de 2 núcleos dejan CPU para NER, embeddings, etc.
+    cpu_shares: 512
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 6G
 
   # ==================================================================================
   # TRANSLATOR CPU Nº2 - Segundo worker CPU (paralelo al translator)
@@ -377,6 +385,13 @@ services:
       db:
         condition: service_healthy
     restart: unless-stopped
+    # Prioridad BAJA: mismo trato que el translator.
+    cpu_shares: 512
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 6G
 
   # ==================================================================================
   # TRANSLATION SCHEDULER - Creates translation jobs
@@ -440,6 +455,7 @@ services:
     deploy:
       resources:
         limits:
+          cpus: '2'
           memory: 6G
     depends_on:
       db:

@@ -125,6 +125,7 @@ TARGET_LANGS = _env_list("TARGET_LANGS")
 BATCH_SIZE = _env_int("TRANSLATOR_BATCH", 128)
 MAX_SRC_TOKENS = _env_int("MAX_SRC_TOKENS", 256)
 MAX_NEW_TOKENS = _env_int("MAX_NEW_TOKENS", 256)
+MAX_SEQ_PER_CALL = _env_int("MAX_SEQ_PER_CALL", 128)
 
 CT2_MODEL_PATH = _env_str("CT2_MODEL_PATH", "/app/models/nllb-ct2")
 CT2_DEVICE = _env_str("CT2_DEVICE", "cpu")
@@ -133,6 +134,7 @@ UNIVERSAL_MODEL = _env_str("UNIVERSAL_MODEL", "facebook/nllb-200-distilled-600M"
 CT2_INTRA_THREADS = _env_int("CT2_INTRA_THREADS", 0)
 CT2_INTER_THREADS = _env_int("CT2_INTER_THREADS", 1)
 BODY_CHARS_CHUNK = _env_int("BODY_CHARS_CHUNK", 900)
+MAX_BODY_CHARS = _env_int("MAX_BODY_CHARS", 12000)
 
 LANG_CODE_MAP = {
     "en": "eng_Latn",
@@ -302,42 +304,45 @@ def translate_texts(src: str, tgt: str, texts: List[str]) -> List[str]:
 
     target_prefix = [[tgt_code]] * len(sources)
 
-    results = _translator.translate_batch(
-        sources,
-        target_prefix=target_prefix,
-        beam_size=1,
-        max_decoding_length=MAX_NEW_TOKENS,
-        repetition_penalty=1.2,
-        no_repeat_ngram_size=2,
-    )
-
     translated = []
-    for result in results:
-        try:
-            if result.hypotheses and len(result.hypotheses) > 0:
-                hyp = result.hypotheses[0]
-                if isinstance(hyp, list) and len(hyp) > 0:
-                    first_hyp = hyp[0]
-                    if isinstance(first_hyp, dict) and "token_ids" in first_hyp:
-                        tokens = first_hyp["token_ids"]
-                        text = _tokenizer.decode(tokens)
-                        translated.append(text.strip())
-                    elif isinstance(first_hyp, str):
-                        token_strings = hyp[1:] if len(hyp) > 1 else []
-                        if token_strings:
-                            text = _tokenizer.convert_tokens_to_string(token_strings)
+    # Bounded sub-batches: a big batch of long chunks translated in one call
+    # bloats RAM (several GB) on CPU and pushes the process into swap.
+    for i in range(0, len(sources), MAX_SEQ_PER_CALL):
+        results = _translator.translate_batch(
+            sources[i : i + MAX_SEQ_PER_CALL],
+            target_prefix=target_prefix[i : i + MAX_SEQ_PER_CALL],
+            beam_size=1,
+            max_decoding_length=MAX_NEW_TOKENS,
+            repetition_penalty=1.2,
+            no_repeat_ngram_size=2,
+        )
+
+        for result in results:
+            try:
+                if result.hypotheses and len(result.hypotheses) > 0:
+                    hyp = result.hypotheses[0]
+                    if isinstance(hyp, list) and len(hyp) > 0:
+                        first_hyp = hyp[0]
+                        if isinstance(first_hyp, dict) and "token_ids" in first_hyp:
+                            tokens = first_hyp["token_ids"]
+                            text = _tokenizer.decode(tokens)
                             translated.append(text.strip())
+                        elif isinstance(first_hyp, str):
+                            token_strings = hyp[1:] if len(hyp) > 1 else []
+                            if token_strings:
+                                text = _tokenizer.convert_tokens_to_string(token_strings)
+                                translated.append(text.strip())
+                            else:
+                                translated.append("")
                         else:
                             translated.append("")
                     else:
                         translated.append("")
                 else:
                     translated.append("")
-            else:
+            except Exception as e:
+                LOG.error(f"Error processing result: {e}")
                 translated.append("")
-        except Exception as e:
-            LOG.error(f"Error processing result: {e}")
-            translated.append("")
 
     return translated
 
@@ -482,6 +487,8 @@ def process_batch(conn, rows):
             flat_ck = []
             for item in items:
                 body = (item["resumen"] or "").strip()
+                if len(body) > MAX_BODY_CHARS:
+                    body = body[:MAX_BODY_CHARS]
                 if body:
                     chunks = split_body_into_chunks(body)
                     flat_chunks.extend(chunks)

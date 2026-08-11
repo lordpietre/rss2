@@ -76,6 +76,27 @@ func initDB() {
 		ON CONFLICT (key) DO NOTHING
 	`)
 
+	// Crear tabla de alertas si no existe
+	_, err = db.GetPool().Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS alertas (
+			id SERIAL PRIMARY KEY,
+			valor VARCHAR(255) NOT NULL,
+			tipo VARCHAR(32) NOT NULL,
+			periodo DATE NOT NULL,
+			hits INT NOT NULL,
+			baseline DOUBLE PRECISION NOT NULL,
+			ratio DOUBLE PRECISION NOT NULL,
+			status VARCHAR(16) NOT NULL DEFAULT 'nueva',
+			created_at TIMESTAMP DEFAULT NOW(),
+			UNIQUE(valor, tipo, periodo)
+		)
+	`)
+	if err != nil {
+		log.Printf("Warning: Could not create alertas table: %v", err)
+	} else {
+		log.Println("Table alertas ready")
+	}
+
 	// Crear tabla de remote_workers si no existe
 	_, err = db.GetPool().Exec(ctx, `
 		CREATE TABLE IF NOT EXISTS remote_workers (
@@ -175,6 +196,11 @@ func main() {
 
 		api.GET("/entities", handlers.GetEntities)
 		api.GET("/entities/news", handlers.GetEntityNews)
+		api.GET("/entities/mentions", handlers.GetEntityMentions)
+
+		api.GET("/alerts", handlers.GetAlertas)
+		api.POST("/alerts/:id/read", middleware.AuthRequired(), handlers.MarkAlertaRead)
+		api.POST("/alerts/read-all", middleware.AuthRequired(), handlers.MarkAllAlertasRead)
 
 		api.GET("/stats", handlers.GetStats)
 
@@ -195,6 +221,7 @@ func main() {
 			admin.POST("/users/:id/promote", handlers.PromoteUser)
 			admin.POST("/users/:id/demote", handlers.DemoteUser)
 			admin.POST("/reset-db", handlers.ResetDatabase)
+			admin.POST("/alerts/scan", handlers.ScanAlertasAdmin)
 			admin.GET("/workers/status", handlers.GetWorkerStatus)
 			admin.GET("/workers/stats", handlers.GetTranslationStats)
 			admin.POST("/workers/config", handlers.SetWorkerConfig)
@@ -231,6 +258,7 @@ func main() {
 	}()
 
 	handlers.StartJobAssigner()
+	handlers.StartAlertScanner()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)

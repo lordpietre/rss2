@@ -95,6 +95,41 @@ export interface Country {
   continente: string
 }
 
+export interface MentionPoint {
+  fecha: string
+  count: number
+}
+
+export interface MentionSeries {
+  valor: string
+  tipo: string
+  count: number
+  data: MentionPoint[]
+}
+
+export interface MentionsResponse {
+  days: number
+  series: MentionSeries[]
+}
+
+export interface EntitySuggestion {
+  valor: string
+  tipo: string
+  cnt: number
+}
+
+export interface Alerta {
+  id: number
+  valor: string
+  tipo: string
+  periodo: string
+  hits: number
+  baseline: number
+  ratio: number
+  status: string
+  created_at: string
+}
+
 export interface Stats {
   total_news: number
   total_feeds: number
@@ -173,6 +208,31 @@ export const apiService = {
   getCountries: async (): Promise<Country[]> => {
     const { data } = await api.get('/countries')
     return data
+  },
+
+  getEntityMentions: async (params: { values: string[]; days?: number }): Promise<MentionsResponse> => {
+    const { data } = await api.get('/entities/mentions', {
+      params: { values: params.values.join(','), days: params.days || 30 },
+    })
+    return data
+  },
+
+  searchEntities: async (params: { tipo: string; q?: string; page?: number; per_page?: number }): Promise<{ entities: EntitySuggestion[]; total: number }> => {
+    const { data } = await api.get('/entities', { params })
+    return data
+  },
+
+  getAlertas: async (params?: { status?: string; limit?: number }): Promise<{ alertas: Alerta[]; total: number; nuevas: number }> => {
+    const { data } = await api.get('/alerts', { params })
+    return data
+  },
+
+  markAlertaRead: async (id: number): Promise<void> => {
+    await api.post(`/alerts/${id}/read`)
+  },
+
+  markAllAlertasRead: async (): Promise<void> => {
+    await api.post('/alerts/read-all')
   },
 
   login: async (email: string, password: string): Promise<{ token: string; user: any }> => {

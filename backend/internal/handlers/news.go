@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -483,4 +485,141 @@ func GetEntities(c *gin.Context) {
 		PerPage:    perPage,
 		TotalPages: totalPages,
 	})
+}
+
+type MentionPoint struct {
+	Fecha string `json:"fecha"`
+	Count int    `json:"count"`
+}
+
+type MentionSeries struct {
+	Valor string         `json:"valor"`
+	Tipo  string         `json:"tipo"`
+	Count int            `json:"count"`
+	Data  []MentionPoint `json:"data"`
+}
+
+type MentionsResponse struct {
+	Days   int             `json:"days"`
+	Series []MentionSeries `json:"series"`
+}
+
+func GetEntityMentions(c *gin.Context) {
+	valuesRaw := c.DefaultQuery("values", "")
+	days := 30
+	if v := c.Query("days"); v != "" {
+		if d, err := strconv.Atoi(v); err == nil && d >= 1 && d <= 365 {
+			days = d
+		}
+	}
+
+	var values []string
+	for _, v := range strings.Split(valuesRaw, ",") {
+		v = strings.TrimSpace(v)
+		if v != "" {
+			values = append(values, v)
+		}
+	}
+	if len(values) == 0 {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "values is required (comma separated)"})
+		return
+	}
+	if len(values) > 20 {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Too many values (max 20)"})
+		return
+	}
+
+	start := time.Now().AddDate(0, 0, -(days - 1)).Truncate(24 * time.Hour)
+
+	series := make([]MentionSeries, 0, len(values))
+	for _, valor := range values {
+		s, err := buildMentionSeries(c.Request.Context(), valor, days)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to get mentions", Message: err.Error()})
+			return
+		}
+
+		m := map[string]int{}
+		for _, p := range s.Data {
+			m[p.Fecha] = p.Count
+		}
+		data := make([]MentionPoint, 0, days)
+		for i := 0; i < days; i++ {
+			fecha := start.AddDate(0, 0, i).Format("2006-01-02")
+			data = append(data, MentionPoint{Fecha: fecha, Count: m[fecha]})
+		}
+		s.Data = data
+		s.Count = 0
+		for _, p := range s.Data {
+			s.Count += p.Count
+		}
+		if s.Tipo == "" {
+			s.Tipo = "desconocido"
+		}
+		series = append(series, *s)
+	}
+
+	c.JSON(http.StatusOK, MentionsResponse{Days: days, Series: series})
+}
+
+func buildMentionSeries(ctx context.Context, valor string, days int) (*MentionSeries, error) {
+	s := &MentionSeries{Valor: valor}
+
+	var tagIDs []int64
+	rows, err := db.GetPool().Query(ctx, `
+		SELECT DISTINCT t.id, t.tipo
+		FROM tags t
+		LEFT JOIN entity_aliases ea ON ea.tipo = t.tipo AND LOWER(ea.alias) = LOWER(t.valor)
+		WHERE LOWER(t.valor) = LOWER($1)
+		   OR LOWER(COALESCE(ea.canonical_name, t.valor)) = LOWER($1)
+	`, valor)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var id int64
+		var tipo string
+		if err := rows.Scan(&id, &tipo); err != nil {
+			continue
+		}
+		tagIDs = append(tagIDs, id)
+		if s.Tipo == "" {
+			s.Tipo = tipo
+		}
+	}
+	rows.Close()
+
+	if len(tagIDs) == 0 {
+		s.Data = []MentionPoint{}
+		return s, nil
+	}
+
+	drows, err := db.GetPool().Query(ctx, `
+		SELECT n.fecha::date::text AS dia, COUNT(DISTINCT n.id) AS cnt
+		FROM tags_noticia tn
+		JOIN tags t ON tn.tag_id = t.id
+		JOIN traducciones tr ON tn.traduccion_id = tr.id
+		JOIN noticias n ON tr.noticia_id = n.id
+		WHERE t.id = ANY($1) AND n.fecha >= CURRENT_DATE - ($2::int - 1)
+		GROUP BY n.fecha::date
+		ORDER BY n.fecha::date
+	`, tagIDs, days)
+	if err != nil {
+		return nil, err
+	}
+	defer drows.Close()
+
+	for drows.Next() {
+		var fecha string
+		var cnt int
+		if err := drows.Scan(&fecha, &cnt); err != nil {
+			continue
+		}
+		s.Data = append(s.Data, MentionPoint{Fecha: fecha, Count: cnt})
+	}
+	if s.Data == nil {
+		s.Data = []MentionPoint{}
+	}
+
+	return s, nil
 }

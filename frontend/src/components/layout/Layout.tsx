@@ -1,6 +1,7 @@
 import { Outlet, Link, useNavigate } from 'react-router-dom'
-import { Search, Rss, BarChart3, Home as HomeIcon, Heart, User, Flame, Settings, Users, Tags, Database, Server } from 'lucide-react'
+import { Search, Rss, BarChart3, Home as HomeIcon, Heart, User, Flame, Settings, Users, Tags, Database, Server, TrendingUp, Bell } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { apiService } from '../../services/api'
 
 export function Layout() {
   const navigate = useNavigate()
@@ -8,6 +9,7 @@ export function Layout() {
   const [username, setUsername] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
   const [showAdminMenu, setShowAdminMenu] = useState(false)
+  const [nuevasAlertas, setNuevasAlertas] = useState(0)
 
   const checkAuth = () => {
     const token = localStorage.getItem('token')
@@ -35,6 +37,20 @@ export function Layout() {
     // Listen for storage changes (when user logs in/out in another tab)
     window.addEventListener('storage', checkAuth)
     return () => window.removeEventListener('storage', checkAuth)
+  }, [])
+
+  useEffect(() => {
+    const loadAlertas = async () => {
+      try {
+        const r = await apiService.getAlertas({ status: 'nueva', limit: 1 })
+        setNuevasAlertas(r.nuevas)
+      } catch {
+        setNuevasAlertas(0)
+      }
+    }
+    loadAlertas()
+    const id = setInterval(loadAlertas, 60000)
+    return () => clearInterval(id)
   }, [])
 
   const handleLogout = () => {
@@ -71,6 +87,19 @@ export function Layout() {
                 <Link to="/populares" className="flex items-center gap-2 text-gray-600 hover:text-primary-600 transition-colors">
                   <Flame className="h-4 w-4" />
                   Popular
+                </Link>
+                <Link to="/analisis" className="flex items-center gap-2 text-gray-600 hover:text-primary-600 transition-colors">
+                  <TrendingUp className="h-4 w-4" />
+                  Evolución
+                </Link>
+                <Link to="/alertas" className="flex items-center gap-2 text-gray-600 hover:text-primary-600 transition-colors relative">
+                  <Bell className="h-4 w-4" />
+                  Alertas
+                  {nuevasAlertas > 0 && (
+                    <span className="absolute -top-1.5 -right-3 bg-red-600 text-white text-[10px] font-bold min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center">
+                      {nuevasAlertas > 99 ? '99+' : nuevasAlertas}
+                    </span>
+                  )}
                 </Link>
                 <Link to="/stats" className="flex items-center gap-2 text-gray-600 hover:text-primary-600 transition-colors">
                   <BarChart3 className="h-4 w-4" />
