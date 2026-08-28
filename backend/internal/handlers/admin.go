@@ -738,7 +738,23 @@ func resolvePgConnInfo() pgConnInfo {
 	return info
 }
 
-// BackupDatabase runs pg_dump and returns the SQL as a downloadable file
+// flushWriter flushes the underlying response writer after every write so that
+// large backups stream to the client instead of being buffered in RAM.
+type flushWriter struct {
+	w io.Writer
+}
+
+func (fw flushWriter) Write(p []byte) (int, error) {
+	n, err := fw.w.Write(p)
+	if f, ok := fw.w.(http.Flusher); ok {
+		f.Flush()
+	}
+	return n, err
+}
+
+// BackupDatabase runs pg_dump and returns the SQL as a downloadable file.
+// The output is streamed to the client so arbitrarily large dumps do not
+// exhaust the container memory.
 func BackupDatabase(c *gin.Context) {
 	info := resolvePgConnInfo()
 
@@ -752,12 +768,12 @@ func BackupDatabase(c *gin.Context) {
 	)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", info.pass))
 
-	var out bytes.Buffer
+	pr, pw := io.Pipe()
+	cmd.Stdout = pw
 	var stderr bytes.Buffer
-	cmd.Stdout = &out
 	cmd.Stderr = &stderr
 
-	if err := cmd.Run(); err != nil {
+	if err := cmd.Start(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "pg_dump failed",
 			"details": stderr.String(),
@@ -769,10 +785,29 @@ func BackupDatabase(c *gin.Context) {
 	c.Header("Content-Type", "application/octet-stream")
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
 	c.Header("Cache-Control", "no-cache")
-	c.Data(http.StatusOK, "application/octet-stream", out.Bytes())
+	c.Status(http.StatusOK)
+
+	fw := flushWriter{w: c.Writer}
+	copyDone := make(chan struct{})
+	go func() {
+		defer close(copyDone)
+		_, _ = io.Copy(fw, pr)
+	}()
+
+	err := cmd.Wait()
+	pw.Close()
+	<-copyDone
+
+	if err != nil {
+		log.Printf("BackupDatabase: pg_dump failed: %v: %s", err, stderr.String())
+		c.Writer.Flush()
+		return
+	}
+	c.Writer.Flush()
 }
 
-// BackupNewsZipped performs a pg_dump of news tables and returns a ZIP file
+// BackupNewsZipped performs a pg_dump of news tables and returns a ZIP file.
+// pg_dump output is streamed into the ZIP as it is produced, keeping memory usage flat.
 func BackupNewsZipped(c *gin.Context) {
 	info := resolvePgConnInfo()
 
@@ -794,12 +829,12 @@ func BackupNewsZipped(c *gin.Context) {
 	cmd := exec.Command("pg_dump", args...)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", info.pass))
 
-	var sqlOut bytes.Buffer
+	pr, pw := io.Pipe()
+	cmd.Stdout = pw
 	var stderr bytes.Buffer
-	cmd.Stdout = &sqlOut
 	cmd.Stderr = &stderr
 
-	if err := cmd.Run(); err != nil {
+	if err := cmd.Start(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "pg_dump failed",
 			"details": stderr.String(),
@@ -807,33 +842,40 @@ func BackupNewsZipped(c *gin.Context) {
 		return
 	}
 
-	// Create ZIP
-	buf := new(bytes.Buffer)
-	zw := zip.NewWriter(buf)
-
-	sqlFileName := fmt.Sprintf("backup_noticias_%s.sql", time.Now().Format("2006-01-02"))
-	f, err := zw.Create(sqlFileName)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create ZIP entry", "message": err.Error()})
-		return
-	}
-
-	_, err = f.Write(sqlOut.Bytes())
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to write to ZIP", "message": err.Error()})
-		return
-	}
-
-	if err := zw.Close(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to close ZIP writer", "message": err.Error()})
-		return
-	}
-
 	filename := fmt.Sprintf("backup_noticias_%s.zip", time.Now().Format("2006-01-02_15-04-05"))
 	c.Header("Content-Type", "application/zip")
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
 	c.Header("Cache-Control", "no-cache")
-	c.Data(http.StatusOK, "application/zip", buf.Bytes())
+	c.Status(http.StatusOK)
+
+	fw := flushWriter{w: c.Writer}
+	zw := zip.NewWriter(fw)
+
+	sqlFileName := fmt.Sprintf("backup_noticias_%s.sql", time.Now().Format("2006-01-02"))
+	f, err := zw.Create(sqlFileName)
+	if err != nil {
+		log.Printf("BackupNewsZipped: failed to create ZIP entry: %v", err)
+		pw.Close()
+		pr.Close()
+		return
+	}
+
+	copyDone := make(chan struct{})
+	go func() {
+		defer close(copyDone)
+		_, _ = io.Copy(f, pr)
+	}()
+
+	waitErr := cmd.Wait()
+	pw.Close()
+	<-copyDone
+	closeErr := zw.Close()
+	c.Writer.Flush()
+
+	if waitErr != nil || closeErr != nil {
+		log.Printf("BackupNewsZipped: pg_dump=%v zip=%v: %s", waitErr, closeErr, stderr.String())
+		return
+	}
 }
 
 // RestoreDatabase accepts an uploaded .sql or .zip backup and restores it via psql

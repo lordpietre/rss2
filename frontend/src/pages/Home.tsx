@@ -5,6 +5,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { apiService, api } from '../services/api'
 import { Search, Globe, Newspaper, Filter } from 'lucide-react'
+import { SkeletonNewsList, NoResultsFound } from '../components/ui'
 
 export function Home() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -156,13 +157,22 @@ export function Home() {
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-        </div>
+        <SkeletonNewsList count={6} />
       ) : error ? (
         <div className="text-center py-12 text-red-600">
           Error al cargar noticias
+          <button
+            onClick={() => window.location.reload()}
+            className="btn-primary mt-4"
+          >
+            Reintentar
+          </button>
         </div>
+      ) : data?.news?.length === 0 ? (
+        <NoResultsFound
+          query={q}
+          onClearFilters={() => setSearchParams({ page: '1', q })}
+        />
       ) : (
         <>
           <div className="mb-4 text-sm text-gray-600">

@@ -590,7 +590,7 @@ def fetch_pending_translations(conn):
             WHERE t.lang_to = %s 
               AND (t.titulo_trad IS NULL OR t.resumen_trad IS NULL)
               AND (t.locked_at IS NULL OR t.locked_at < NOW() - INTERVAL '10 minutes')
-            ORDER BY n.fecha ASC
+            ORDER BY n.fecha DESC
             LIMIT %s
             FOR UPDATE SKIP LOCKED
         """,

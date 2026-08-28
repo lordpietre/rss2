@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -17,11 +16,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/rss2/backend/internal/logger"
 	"github.com/rss2/backend/internal/workers"
 )
 
 var (
-	logger     *log.Logger
 	dbPool     *pgxpool.Pool
 	qdrantURL  string
 	collection = "news_vectors"
@@ -30,28 +29,29 @@ var (
 )
 
 func init() {
-	logger = log.New(os.Stdout, "[QDRANT] ", log.LstdFlags)
+	logLevel := os.Getenv("LOG_LEVEL")
+	logger.Init("qdrant-worker", logLevel)
 }
 
 func loadConfig() {
 	sleepSec = getEnvInt("QDRANT_SLEEP", 30)
-	batchSize = getEnvInt("QDRANT_BATCH", 100)
-	qdrantHost := getEnv("QDRANT_HOST", "localhost")
-	qdrantPort := getEnvInt("QDRANT_PORT", 6333)
-	qdrantURL = fmt.Sprintf("http://%s:%d", qdrantHost, qdrantPort)
-	collection = getEnv("QDRANT_COLLECTION", "news_vectors")
+	batchSize = getEnvInt("QDRANT_BATCH",100)
+	qdrantHost := getEnv("QDRANT_HOST","localhost")
+	qdrantPort := getEnvInt("QDRANT_PORT",6333)
+	qdrantURL = fmt.Sprintf("http://%s:%d",qdrantHost,qdrantPort)
+	collection = getEnv("QDRANT_COLLECTION","news_vectors")
 }
 
-func getEnv(key, defaultValue string) string {
+func getEnv(key,defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
 	}
 	return defaultValue
 }
 
-func getEnvInt(key string, defaultValue int) int {
+func getEnvInt(key string,defaultValue int) int {
 	if value := os.Getenv(key); value != "" {
-		if intVal, err := strconv.Atoi(value); err == nil {
+		if intVal,err := strconv.Atoi(value); err == nil {
 			return intVal
 		}
 	}
@@ -310,17 +310,33 @@ func main() {
 
 	cfg := workers.LoadDBConfig()
 	if err := workers.Connect(cfg); err != nil {
-		logger.Fatalf("Failed to connect to database: %v", err)
+		logger.Fatal().Err(err).Msg("Failed to connect to database")
 	}
 	dbPool = workers.GetPool()
 	defer workers.Close()
 
-	logger.Println("Connected to PostgreSQL")
+	logger.Info().Msg("Connected to PostgreSQL")
 
-	ctx := context.Background()
+	// Start health check HTTP server
+	go func() {
+		http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+			if err := workers.HealthCheck(r.Context()); err != nil {
+				http.Error(w, "unhealthy", http.StatusServiceUnavailable)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("ok"))
+		})
+		logger.Info().Msg("Health check server listening on :8080")
+		if err := http.ListenAndServe(":8080", nil); err != nil {
+			logger.Error().Err(err).Msg("Health check server error")
+		}
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
 
 	if err := ensureCollection(ctx); err != nil {
-		logger.Printf("Warning: Could not ensure collection: %v", err)
+		logger.Warn().Err(err).Msg("Could not ensure collection")
 	}
 
 	sigChan := make(chan os.Signal, 1)
@@ -328,30 +344,36 @@ func main() {
 
 	go func() {
 		<-sigChan
-		logger.Println("Shutting down...")
+		logger.Info().Msg("Shutting down gracefully...")
+		cancel()
+		time.Sleep(2 * time.Second)
+		workers.Close()
 		os.Exit(0)
 	}()
 
-	logger.Printf("Config: qdrant=%s, collection=%s, sleep=%ds, batch=%d",
+	logger.Info().Msgf("Config: qdrant=%s, collection=%s, sleep=%ds, batch=%d",
 		qdrantURL, collection, sleepSec, batchSize)
 
 	totalProcessed := 0
 
 	for {
 		select {
+		case <-ctx.Done():
+			logger.Info().Msg("Context cancelled, stopping worker")
+			return
 		case <-time.After(time.Duration(sleepSec) * time.Second):
 			translations, err := getPendingTranslations(ctx)
 			if err != nil {
-				logger.Printf("Error fetching pending translations: %v", err)
+				logger.Error().Err(err).Msg("Error fetching pending translations")
 				continue
 			}
 
 			if len(translations) == 0 {
-				logger.Println("No pending translations to process")
+				logger.Info().Msg("No pending translations to process")
 				continue
 			}
 
-			logger.Printf("Processing %d translations...", len(translations))
+			logger.Info().Msgf("Processing %d translations...", len(translations))
 
 			// Generate point IDs once (used both in Qdrant and DB)
 			pointIDs := make([]string, len(translations))
@@ -361,21 +383,21 @@ func main() {
 
 			// Upload to Qdrant
 			if err := uploadToQdrant(translations, pointIDs); err != nil {
-				logger.Printf("Error uploading to Qdrant: %v", err)
+				logger.Error().Err(err).Msg("Error uploading to Qdrant")
 				continue
 			}
 
 			// Update DB status
 			if err := updateTranslationStatus(ctx, translations, pointIDs); err != nil {
-				logger.Printf("Error updating status: %v", err)
+				logger.Error().Err(err).Msg("Error updating status")
 			}
 
 			totalProcessed += len(translations)
-			logger.Printf("Processed %d translations (total: %d)", len(translations), totalProcessed)
+			logger.Info().Msgf("Processed %d translations (total: %d)", len(translations), totalProcessed)
 
 			total, vectorized, pending, err := getStats(ctx)
 			if err == nil {
-				logger.Printf("Stats: total=%d, vectorized=%d, pending=%d", total, vectorized, pending)
+				logger.Info().Msgf("Stats: total=%d, vectorized=%d, pending=%d", total, vectorized, pending)
 			}
 		}
 	}

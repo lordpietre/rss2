@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
@@ -10,11 +11,11 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/rss2/backend/internal/logger"
 	"github.com/rss2/backend/internal/workers"
 )
 
 var (
-	logger   *log.Logger
 	dbPool   *pgxpool.Pool
 	sleepSec = 10
 	topK     = 10
@@ -23,7 +24,8 @@ var (
 )
 
 func init() {
-	logger = log.New(os.Stdout, "[RELATED] ", log.LstdFlags)
+	logLevel := os.Getenv("LOG_LEVEL")
+	logger.Init("related-worker", logLevel)
 }
 
 func loadConfig() {
@@ -335,20 +337,36 @@ func processBatch(ctx context.Context, model string) (int, error) {
 
 func main() {
 	loadConfig()
-	logger.Println("Starting Related News Worker")
+	logger.Info().Msg("Starting Related News Worker")
 
 	cfg := workers.LoadDBConfig()
 	if err := workers.Connect(cfg); err != nil {
-		logger.Fatalf("Failed to connect to database: %v", err)
+		logger.Fatal().Err(err).Msg("Failed to connect to database")
 	}
 	dbPool = workers.GetPool()
 	defer workers.Close()
 
-	ctx := context.Background()
+	// Start health check HTTP server
+	go func() {
+		http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+			if err := workers.HealthCheck(r.Context()); err != nil {
+				http.Error(w, "unhealthy", http.StatusServiceUnavailable)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("ok"))
+		})
+		logger.Info().Msg("Health check server listening on :8080")
+		if err := http.ListenAndServe(":8080", nil); err != nil {
+			logger.Error().Err(err).Msg("Health check server error")
+		}
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
 
 	// Ensure schema
 	if err := ensureSchema(ctx); err != nil {
-		logger.Printf("Error ensuring schema: %v", err)
+		logger.Error().Err(err).Msg("Error ensuring schema")
 	}
 
 	model := os.Getenv("EMB_MODEL")
@@ -361,23 +379,29 @@ func main() {
 
 	go func() {
 		<-sigChan
-		logger.Println("Shutting down...")
+		logger.Info().Msg("Shutting down gracefully...")
+		cancel()
+		time.Sleep(2 * time.Second)
+		workers.Close()
 		os.Exit(0)
 	}()
 
-	logger.Printf("Config: sleep=%ds, topK=%d, batch=%d, model=%s", sleepSec, topK, batchSz, model)
+	logger.Info().Msgf("Config: sleep=%ds, topK=%d, batch=%d, model=%s", sleepSec, topK, batchSz, model)
 
 	for {
 		select {
+		case <-ctx.Done():
+			logger.Info().Msg("Context cancelled, stopping worker")
+			return
 		case <-time.After(time.Duration(sleepSec) * time.Second):
 			count, err := processBatch(ctx, model)
 			if err != nil {
-				logger.Printf("Error processing batch: %v", err)
+				logger.Error().Err(err).Msg("Error processing batch")
 				continue
 			}
 
 			if count > 0 {
-				logger.Printf("Generated related news for %d translations", count)
+				logger.Info().Msgf("Generated related news for %d translations", count)
 			}
 		}
 	}

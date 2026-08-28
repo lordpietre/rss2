@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { apiService, Alerta } from '../services/api'
-import { Bell, CheckCheck, ChevronDown, ChevronUp } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { apiService, api, Alerta, News } from '../services/api'
+import { Bell, CheckCheck, ChevronDown, ChevronUp, FileText } from 'lucide-react'
 
 const TIPO_LABEL: Record<string, string> = {
   persona: 'Persona',
@@ -14,6 +15,11 @@ export function Alertas() {
   const [loading, setLoading] = useState(true)
   const [nuevas, setNuevas] = useState(0)
   const [limit, setLimit] = useState(50)
+
+  const [newsModal, setNewsModal] = useState<Alerta | null>(null)
+  const [entityNews, setEntityNews] = useState<News[]>([])
+  const [newsLoading, setNewsLoading] = useState(false)
+  const [newsTotal, setNewsTotal] = useState(0)
 
   const load = async () => {
     setLoading(true)
@@ -40,6 +46,26 @@ export function Alertas() {
   const markAll = async () => {
     await apiService.markAllAlertasRead()
     load()
+  }
+
+  const openNews = async (alerta: Alerta) => {
+    setNewsModal(alerta)
+    setNewsLoading(true)
+    setEntityNews([])
+    setNewsTotal(0)
+    try {
+      const params = new URLSearchParams()
+      params.append('valor', alerta.valor)
+      params.append('tipo', alerta.tipo)
+      params.append('per_page', '50')
+      const res = await api.get(`/entities/news?${params}`)
+      setEntityNews(res.data.news || [])
+      setNewsTotal(res.data.total || 0)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setNewsLoading(false)
+    }
   }
 
   return (
@@ -108,13 +134,17 @@ export function Alertas() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    {a.status === 'nueva' ? (
-                      <button onClick={() => markRead(a.id)} className="btn-secondary text-xs py-1 px-3">
-                        Marcar leída
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => openNews(a)} className="btn-secondary text-xs py-1 px-3 flex items-center gap-1">
+                        <FileText className="h-3.5 w-3.5" />
+                        Noticias
                       </button>
-                    ) : (
-                      <span className="text-sm text-gray-300 dark:text-gray-600">—</span>
-                    )}
+                      {a.status === 'nueva' && (
+                        <button onClick={() => markRead(a.id)} className="btn-secondary text-xs py-1 px-3">
+                          Marcar leída
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -132,6 +162,75 @@ export function Alertas() {
           Mostrar {limit > 50 ? 'menos' : 'más'} ({limit})
         </button>
       </div>
+
+      {/* Noticias relacionadas del concepto */}
+      {newsModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setNewsModal(null)}>
+          <div
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b dark:border-gray-700">
+              <div>
+                <h2 className="text-lg font-bold">Noticias sobre &quot;{newsModal.valor}&quot;</h2>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  {newsTotal} noticias encontradas · {TIPO_LABEL[newsModal.tipo] || newsModal.tipo} · {newsModal.periodo}
+                </p>
+              </div>
+              <button
+                onClick={() => setNewsModal(null)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl leading-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto">
+              {newsLoading ? (
+                <div className="text-center py-10 text-gray-400">Cargando...</div>
+              ) : entityNews.length === 0 ? (
+                <div className="text-center py-10 text-gray-400">No hay noticias que mencionen a este concepto.</div>
+              ) : (
+                <ul className="space-y-2">
+                  {entityNews.map((n) => (
+                    <li key={n.id}>
+                      <Link
+                        to={`/news/${n.id}`}
+                        onClick={() => setNewsModal(null)}
+                        className="block p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border border-gray-100 dark:border-gray-700"
+                      >
+                        <div className="flex items-start gap-3">
+                          {n.imagen_url && (
+                            <img
+                              src={n.imagen_url}
+                              alt=""
+                              className="w-20 h-14 object-cover rounded-md shrink-0"
+                              onError={(e) => (e.currentTarget.style.display = 'none')}
+                            />
+                          )}
+                          <div className="min-w-0">
+                            <div className="font-medium text-sm line-clamp-2">
+                              {n.title_translated || n.titulo}
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                              {n.summary_translated || n.resumen}
+                            </p>
+                            {n.fecha && (
+                              <span className="text-[11px] text-gray-400 mt-1 block">
+                                {new Date(n.fecha).toLocaleDateString('es-ES')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

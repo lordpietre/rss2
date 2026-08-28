@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -14,12 +13,17 @@ import (
 	"github.com/rss2/backend/internal/config"
 	"github.com/rss2/backend/internal/db"
 	"github.com/rss2/backend/internal/handlers"
+	"github.com/rss2/backend/internal/logger"
 	"github.com/rss2/backend/internal/middleware"
 	"github.com/rss2/backend/internal/services"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
+	_ "github.com/rss2/backend/docs"
 )
 
 func initDB() {
 	ctx := context.Background()
+	log := logger.GetLogger()
 
 	// Crear tabla entity_aliases si no existe
 	_, err := db.GetPool().Exec(ctx, `
@@ -33,9 +37,9 @@ func initDB() {
 		)
 	`)
 	if err != nil {
-		log.Printf("Warning: Could not create entity_aliases table: %v", err)
+		log.Warn().Err(err).Msg("Could not create entity_aliases table")
 	} else {
-		log.Println("Table entity_aliases ready")
+		log.Info().Msg("Table entity_aliases ready")
 	}
 
 	// Añadir columna role a users si no existe
@@ -43,9 +47,9 @@ func initDB() {
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'user'
 	`)
 	if err != nil {
-		log.Printf("Warning: Could not add role column: %v", err)
+		log.Warn().Err(err).Msg("Could not add role column")
 	} else {
-		log.Println("Column role ready")
+		log.Info().Msg("Column role ready")
 	}
 
 	// Crear tabla de configuración si no existe
@@ -129,31 +133,66 @@ func initDB() {
 	if err != nil {
 		log.Printf("Warning: Could not add assigned_at column: %v", err)
 	}
+
+	// Crear índices para optimizar consultas críticas
+	indexes := []string{
+		"CREATE INDEX IF NOT EXISTS idx_noticias_fecha ON noticias(fecha DESC)",
+		"CREATE INDEX IF NOT EXISTS idx_noticias_fuente_nombre ON noticias(fuente_nombre)",
+		"CREATE INDEX IF NOT EXISTS idx_noticias_categoria_id ON noticias(categoria_id)",
+		"CREATE INDEX IF NOT EXISTS idx_noticias_pais_id ON noticias(pais_id)",
+		"CREATE INDEX IF NOT EXISTS idx_noticias_lang ON noticias(lang)",
+		"CREATE INDEX IF NOT EXISTS idx_traducciones_noticia_id_lang_to ON traducciones(noticia_id, lang_to)",
+		"CREATE INDEX IF NOT EXISTS idx_traducciones_status ON traducciones(status)",
+		"CREATE INDEX IF NOT EXISTS idx_tags_noticia_noticia_id_tag_id ON tags_noticia(noticia_id, tag_id)",
+		"CREATE INDEX IF NOT EXISTS idx_tags_noticia_traduccion_id ON tags_noticia(traduccion_id)",
+		"CREATE INDEX IF NOT EXISTS idx_tags_valor_tipo ON tags(valor, tipo)",
+		"CREATE INDEX IF NOT EXISTS idx_entity_aliases_alias_tipo ON entity_aliases(alias, tipo)",
+		"CREATE INDEX IF NOT EXISTS idx_alertas_valor_tipo_periodo ON alertas(valor, tipo, periodo)",
+		"CREATE INDEX IF NOT EXISTS idx_alertas_status ON alertas(status)",
+		"CREATE INDEX IF NOT EXISTS idx_user_search_tags_user_id ON user_search_tags(user_id)",
+		"CREATE INDEX IF NOT EXISTS idx_feeds_activo ON feeds(activo)",
+		"CREATE INDEX IF NOT EXISTS idx_feeds_categoria_id ON feeds(categoria_id)",
+		"CREATE INDEX IF NOT EXISTS idx_feeds_pais_id ON feeds(pais_id)",
+	}
+	for _, idx := range indexes {
+		_, err := db.GetPool().Exec(ctx, idx)
+		if err != nil {
+			log.Warn().Err(err).Msg("Could not create index")
+		} else {
+			log.Info().Msg("Index created/verified")
+		}
+	}
 }
 
 func main() {
 	cfg := config.Load()
 
+	// Initialize structured logger
+	logLevel := os.Getenv("LOG_LEVEL")
+	logger.Init("rss2-api", logLevel)
+	log := logger.GetLogger()
+
 	if err := db.Connect(cfg.DatabaseURL); err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		log.Fatal().Err(err).Msg("Failed to connect to database")
 	}
 	defer db.Close()
-	log.Println("Connected to PostgreSQL")
+	log.Info().Msg("Connected to PostgreSQL")
 
 	// Auto-setup DB tables
 	initDB()
 
 	if err := cache.Connect(cfg.RedisURL); err != nil {
-		log.Printf("Warning: Failed to connect to Redis: %v", err)
+		log.Warn().Err(err).Msg("Failed to connect to Redis")
 	} else {
 		defer cache.Close()
-		log.Println("Connected to Redis")
+		log.Info().Msg("Connected to Redis")
 	}
 
 	services.Init(cfg)
 
 	r := gin.Default()
 
+	r.Use(middleware.RequestIDMiddleware())
 	r.Use(middleware.CORSMiddleware())
 	r.Use(middleware.LoggerMiddleware())
 
@@ -161,14 +200,25 @@ func main() {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
+	// Swagger documentation
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
 	api := r.Group("/api")
 	{
 		// Serve static images downloaded by wiki_worker
 		api.StaticFS("/wiki-images", gin.Dir(cfg.WikiImagesPath, false))
 
-		api.POST("/auth/login", handlers.Login)
-		api.POST("/auth/register", handlers.Register)
-		api.GET("/auth/check-first-user", handlers.CheckFirstUser)
+		// Stricter rate limiting for auth endpoints
+		authGroup := api.Group("/auth")
+		authGroup.Use(middleware.RateLimitMiddleware(10)) // 10 req/min for auth
+		{
+			authGroup.POST("/login", handlers.Login)
+			authGroup.POST("/register", handlers.Register)
+			authGroup.GET("/check-first-user", handlers.CheckFirstUser)
+		}
+
+		// General rate limiting for API
+		api.Use(middleware.RateLimitMiddleware(cfg.RateLimitPerMinute))
 
 		news := api.Group("/news")
 		{
@@ -251,9 +301,9 @@ func main() {
 	addr := fmt.Sprintf(":%s", port)
 
 	go func() {
-		log.Printf("Server starting on %s", addr)
+		log.Info().Str("addr", addr).Msg("Server starting")
 		if err := r.Run(addr); err != nil {
-			log.Fatalf("Failed to start server: %v", err)
+			log.Fatal().Err(err).Msg("Failed to start server")
 		}
 	}()
 
@@ -264,5 +314,5 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Println("Shutting down server...")
+	log.Info().Msg("Shutting down server...")
 }

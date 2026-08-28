@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rss2/backend/internal/auth"
+	"github.com/rss2/backend/internal/cache"
 	"github.com/rss2/backend/internal/db"
 	"github.com/rss2/backend/internal/models"
 	"github.com/rss2/backend/internal/services"
@@ -79,10 +81,27 @@ func SearchSuggestions(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"terms": terms})
 }
 
+// SearchNews searches news with various filters
+// @Summary Search news
+// @Description Search news with text query, language, category, country, and semantic search options
+// @Tags search
+// @Produce json
+// @Param q query string false "Search query"
+// @Param page query int false "Page number" default(1) minimum(1)
+// @Param per_page query int false "Items per page" default(30) minimum(1) maximum(100)
+// @Param lang query string false "Language code" default("es")
+// @Param categoria_id query string false "Category ID filter"
+// @Param pais_id query string false "Country ID filter"
+// @Param semantic query string false "Use semantic search" default("false")
+// @Success 200 {object} map[string]interface{} "news, total, page, per_page, total_pages"
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /search [get]
 func SearchNews(c *gin.Context) {
 	query := c.Query("q")
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "30"))
+	page, perPage = validatePageParams(page, perPage, 30, 100)
 	lang := c.DefaultQuery("lang", "")
 	categoriaID := c.Query("categoria_id")
 	paisID := c.Query("pais_id")
@@ -91,13 +110,6 @@ func SearchNews(c *gin.Context) {
 	if query == "" && categoriaID == "" && paisID == "" && lang == "" {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "At least one filter is required (q, categoria_id, pais_id, or lang)"})
 		return
-	}
-
-	if page < 1 {
-		page = 1
-	}
-	if perPage < 1 || perPage > 100 {
-		perPage = 30
 	}
 
 	// Default to Spanish if no lang specified
@@ -114,6 +126,15 @@ func SearchNews(c *gin.Context) {
 			return
 		}
 		c.JSON(http.StatusOK, results)
+		return
+	}
+
+	// Cache key for search results
+	cacheKey := cache.SearchKey(query, lang, page, perPage)
+
+	// Try to get from cache
+	if cached, err := cache.Get(ctx, cacheKey); err == nil && cached != "" {
+		c.Data(http.StatusOK, "application/json", []byte(cached))
 		return
 	}
 
@@ -147,8 +168,8 @@ func SearchNews(c *gin.Context) {
 	}
 
 	sqlQuery := `
-		SELECT n.id, n.titulo, COALESCE(n.resumen, ''), n.url, n.fecha, n.imagen_url,
-		       n.categoria_id, n.pais_id, n.fuente_nombre,
+		SELECT n.id, n.titulo, COALESCE(n.resumen, ''), n.contenido, n.url, n.fecha, n.imagen_url,
+		       n.categoria_id, n.pais_id, n.fuente_nombre, n.lang,
 		       t.titulo_trad,
 		       t.resumen_trad,
 		       t.lang_to as lang_trad
@@ -167,15 +188,16 @@ func SearchNews(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var newsList []NewsResponse
+	var newsList []models.NewsWithTranslations
 	for rows.Next() {
-		var n NewsResponse
+		var n models.NewsWithTranslations
 		var imagenURL, fuenteNombre *string
 		var categoriaIDp, paisIDp *int64
+		var lang string
 
 		err := rows.Scan(
-			&n.ID, &n.Titulo, &n.Resumen, &n.URL, &n.Fecha, &imagenURL,
-			&categoriaIDp, &paisIDp, &fuenteNombre,
+			&n.ID, &n.Titulo, &n.Resumen, &n.Contenido, &n.URL, &n.Fecha, &imagenURL,
+			&categoriaIDp, &paisIDp, &fuenteNombre, &lang,
 			&n.TitleTranslated, &n.SummaryTranslated, &n.LangTranslated,
 		)
 		if err != nil {
@@ -187,8 +209,9 @@ func SearchNews(c *gin.Context) {
 		if fuenteNombre != nil {
 			n.FuenteNombre = *fuenteNombre
 		}
-		n.CategoriaID = categoriaIDp
-		n.PaisID = paisIDp
+		n.CategoryID = categoriaIDp
+		n.CountryID = paisIDp
+		n.Lang = lang
 		newsList = append(newsList, n)
 	}
 
@@ -206,19 +229,42 @@ func SearchNews(c *gin.Context) {
 
 	totalPages := (total + perPage - 1) / perPage
 
-	c.JSON(http.StatusOK, gin.H{
+	response := gin.H{
 		"news":        newsList,
 		"total":       total,
 		"page":        page,
 		"per_page":    perPage,
 		"total_pages": totalPages,
-	})
+	}
+
+	// Cache the response
+	if data, err := json.Marshal(response); err == nil {
+		cache.Set(ctx, cacheKey, string(data), cache.TTLShort)
+	}
+
+c.JSON(http.StatusOK, response)
 }
 
+// GetStats returns global statistics
+// @Summary Get statistics
+// @Description Returns global statistics about news, feeds, users, and translations
+// @Tags stats
+// @Produce json
+// @Success 200 {object} models.Stats
+// @Failure 500 {object} models.ErrorResponse
+// @Router /stats [get]
 func GetStats(c *gin.Context) {
+	ctx := c.Request.Context()
+	cacheKey := cache.StatsKey()
+
+	if cached, err := cache.Get(ctx, cacheKey); err == nil && cached != "" {
+		c.Data(http.StatusOK, "application/json", []byte(cached))
+		return
+	}
+
 	var stats models.Stats
 
-	err := db.GetPool().QueryRow(c.Request.Context(), `
+	err := db.GetPool().QueryRow(ctx, `
 		SELECT 
 			(SELECT COUNT(*) FROM noticias) as total_news,
 			(SELECT COUNT(*) FROM feeds WHERE activo = true) as total_feeds,
@@ -237,7 +283,7 @@ func GetStats(c *gin.Context) {
 		return
 	}
 
-	rows, err := db.GetPool().Query(c.Request.Context(), `
+	rows, err := db.GetPool().Query(ctx, `
 		SELECT c.id, c.nombre, COUNT(n.id) as count
 		FROM categorias c
 		LEFT JOIN noticias n ON n.categoria_id = c.id
@@ -249,12 +295,12 @@ func GetStats(c *gin.Context) {
 		defer rows.Close()
 		for rows.Next() {
 			var cs models.CategoryStat
-			rows.Scan(&cs.CategoryID, &cs.CategoryName, &cs.Count)
+			rows.Scan(&cs.CategoriaID, &cs.CategoriaName, &cs.Count)
 			stats.TopCategories = append(stats.TopCategories, cs)
 		}
 	}
 
-	rows, err = db.GetPool().Query(c.Request.Context(), `
+	rows, err = db.GetPool().Query(ctx, `
 		SELECT p.id, p.nombre, p.flag_emoji, COUNT(n.id) as count
 		FROM paises p
 		LEFT JOIN noticias n ON n.pais_id = p.id
@@ -266,16 +312,28 @@ func GetStats(c *gin.Context) {
 		defer rows.Close()
 		for rows.Next() {
 			var cs models.CountryStat
-			rows.Scan(&cs.CountryID, &cs.CountryName, &cs.FlagEmoji, &cs.Count)
+			rows.Scan(&cs.PaisID, &cs.PaisName, &cs.FlagEmoji, &cs.Count)
 			stats.TopCountries = append(stats.TopCountries, cs)
 		}
+	}
+
+	if data, err := json.Marshal(stats); err == nil {
+		cache.Set(ctx, cacheKey, string(data), cache.TTLMedium)
 	}
 
 	c.JSON(http.StatusOK, stats)
 }
 
 func GetCategories(c *gin.Context) {
-	rows, err := db.GetPool().Query(c.Request.Context(), `
+	ctx := c.Request.Context()
+	cacheKey := cache.CategoriesKey()
+
+	if cached, err := cache.Get(ctx, cacheKey); err == nil && cached != "" {
+		c.Data(http.StatusOK, "application/json", []byte(cached))
+		return
+	}
+
+	rows, err := db.GetPool().Query(ctx, `
 		SELECT id, nombre FROM categorias ORDER BY nombre`)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to get categories", Message: err.Error()})
@@ -283,23 +341,30 @@ func GetCategories(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	type Category struct {
-		ID     int64  `json:"id"`
-		Nombre string `json:"nombre"`
-	}
-
-	var categories []Category
+	var categories []models.Category
 	for rows.Next() {
-		var cat Category
+		var cat models.Category
 		rows.Scan(&cat.ID, &cat.Nombre)
 		categories = append(categories, cat)
+	}
+
+	if data, err := json.Marshal(categories); err == nil {
+		cache.Set(ctx, cacheKey, string(data), cache.TTLLong)
 	}
 
 	c.JSON(http.StatusOK, categories)
 }
 
 func GetCountries(c *gin.Context) {
-	rows, err := db.GetPool().Query(c.Request.Context(), `
+	ctx := c.Request.Context()
+	cacheKey := cache.CountriesKey()
+
+	if cached, err := cache.Get(ctx, cacheKey); err == nil && cached != "" {
+		c.Data(http.StatusOK, "application/json", []byte(cached))
+		return
+	}
+
+	rows, err := db.GetPool().Query(ctx, `
 		SELECT p.id, p.nombre, c.nombre as continente
 		FROM paises p
 		LEFT JOIN continentes c ON c.id = p.continente_id
@@ -310,17 +375,15 @@ func GetCountries(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	type Country struct {
-		ID         int64  `json:"id"`
-		Nombre     string `json:"nombre"`
-		Continente string `json:"continente"`
-	}
-
-	var countries []Country
+	var countries []models.Country
 	for rows.Next() {
-		var country Country
+		var country models.Country
 		rows.Scan(&country.ID, &country.Nombre, &country.Continente)
 		countries = append(countries, country)
+	}
+
+	if data, err := json.Marshal(countries); err == nil {
+		cache.Set(ctx, cacheKey, string(data), cache.TTLLong)
 	}
 
 	c.JSON(http.StatusOK, countries)

@@ -8,9 +8,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/rss2/backend/internal/db"
 )
-
-var pool *pgxpool.Pool
 
 type Config struct {
 	Host     string
@@ -31,39 +30,23 @@ func LoadDBConfig() *Config {
 }
 
 func Connect(cfg *Config) error {
-	dsn := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
-		cfg.User, cfg.Password, cfg.Host, cfg.Port, cfg.DBName)
-
-	poolConfig, err := pgxpool.ParseConfig(dsn)
-	if err != nil {
-		return fmt.Errorf("failed to parse config: %w", err)
+	// Just verify the main pool is accessible
+	if db.GetPool() == nil {
+		return fmt.Errorf("database pool not initialized")
 	}
-
-	poolConfig.MaxConns = 25
-	poolConfig.MinConns = 5
-	poolConfig.MaxConnLifetime = time.Hour
-	poolConfig.MaxConnIdleTime = 30 * time.Minute
-
-	pool, err = pgxpool.NewWithConfig(context.Background(), poolConfig)
-	if err != nil {
-		return fmt.Errorf("failed to create pool: %w", err)
-	}
-
-	if err = pool.Ping(context.Background()); err != nil {
-		return fmt.Errorf("failed to ping database: %w", err)
-	}
-
-	return nil
+	return db.HealthCheck(context.Background())
 }
 
 func GetPool() *pgxpool.Pool {
-	return pool
+	return db.GetPool()
 }
 
 func Close() {
-	if pool != nil {
-		pool.Close()
-	}
+	// No-op: main db package manages the pool
+}
+
+func HealthCheck(ctx context.Context) error {
+	return db.HealthCheck(ctx)
 }
 
 func getEnv(key, defaultValue string) string {

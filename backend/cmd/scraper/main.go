@@ -5,7 +5,6 @@ import (
 	"crypto/md5"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -17,12 +16,11 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/rss2/backend/internal/logger"
 	"github.com/rss2/backend/internal/workers"
 )
 
 var (
-	logger        *log.Logger
-	dbPool        *workers.Config
 	pool          *pgxpool.Pool
 	sleepInterval = 60
 	batchSize     = 10
@@ -59,15 +57,31 @@ type Article struct {
 }
 
 func init() {
-	logger = log.New(os.Stdout, "[SCRAPER] ", log.LstdFlags)
-	logger.SetOutput(os.Stdout)
+	logLevel := os.Getenv("LOG_LEVEL")
+	logger.Init("scraper-worker", logLevel)
 }
 
 func loadConfig() {
-	sleepInterval = getEnvInt("SCRAPER_SLEEP", 60)
-	batchSize = getEnvInt("SCRAPER_BATCH", 10)
-	enrichLimit = getEnvInt("SCRAPER_ENRICH_LIMIT", 20)
-	scraperWorkers = getEnvInt("SCRAPER_WORKERS", 5)
+	if v := os.Getenv("SCRAPER_INTERVAL"); v != "" {
+		if i, err := strconv.Atoi(v); err == nil && i > 0 {
+			sleepInterval = i
+		}
+	}
+	if v := os.Getenv("SCRAPER_BATCH"); v != "" {
+		if i, err := strconv.Atoi(v); err == nil && i > 0 {
+			batchSize = i
+		}
+	}
+	if v := os.Getenv("SCRAPER_ENRICH_LIMIT"); v != "" {
+		if i, err := strconv.Atoi(v); err == nil && i > 0 {
+			enrichLimit = i
+		}
+	}
+	if v := os.Getenv("SCRAPER_WORKERS"); v != "" {
+		if i, err := strconv.Atoi(v); err == nil && i > 0 {
+			scraperWorkers = i
+		}
+	}
 }
 
 func getEnvInt(key string, defaultValue int) int {
@@ -448,18 +462,34 @@ func scrapeSources(ctx context.Context, sources []URLSource) {
 
 func main() {
 	loadConfig()
-	logger.Println("Starting Scraper Worker")
+	logger.Info().Msg("Starting Scraper Worker")
 
 	cfg := workers.LoadDBConfig()
 	if err := workers.Connect(cfg); err != nil {
-		logger.Fatalf("Failed to connect to database: %v", err)
+		logger.Fatal().Err(err).Msg("Failed to connect to database")
 	}
 	pool = workers.GetPool()
 	defer workers.Close()
 
-	logger.Println("Connected to PostgreSQL")
+	logger.Info().Msg("Connected to PostgreSQL")
 
-	ctx := context.Background()
+	// Start health check HTTP server
+	go func() {
+		http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+			if err := workers.HealthCheck(r.Context()); err != nil {
+				http.Error(w, "unhealthy", http.StatusServiceUnavailable)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("ok"))
+		})
+		logger.Info().Msg("Health check server listening on :8080")
+		if err := http.ListenAndServe(":8080", nil); err != nil {
+			logger.Error().Err(err).Msg("Health check server error")
+		}
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
 
 	// Handle shutdown
 	sigChan := make(chan os.Signal, 1)
@@ -467,38 +497,44 @@ func main() {
 
 	go func() {
 		<-sigChan
-		logger.Println("Shutting down...")
+		logger.Info().Msg("Shutting down gracefully...")
+		cancel()
+		time.Sleep(2 * time.Second)
+		workers.Close()
 		os.Exit(0)
 	}()
 
-	logger.Printf("Config: sleep=%ds, batch=%d, enrich=%d", sleepInterval, batchSize, enrichLimit)
+	logger.Info().Msgf("Config: sleep=%ds, batch=%d, enrich=%d", sleepInterval, batchSize, enrichLimit)
 
 	ticker := time.NewTicker(time.Duration(sleepInterval) * time.Second)
 	defer ticker.Stop()
 
 	for {
 		select {
+		case <-ctx.Done():
+			logger.Info().Msg("Context cancelled, stopping worker")
+			return
 		case <-ticker.C:
 			noticias, err := getNoticiasToEnrich(ctx, enrichLimit)
 			if err != nil {
-				logger.Printf("Error fetching noticias to enrich: %v", err)
+				logger.Error().Err(err).Msg("Error fetching noticias to enrich")
 			} else if len(noticias) > 0 {
-				logger.Printf("Enriching %d noticias (%d workers)", len(noticias), scraperWorkers)
+				logger.Info().Msgf("Enriching %d noticias (%d workers)", len(noticias), scraperWorkers)
 				enrichConcurrent(ctx, noticias)
 			}
 
 			sources, err := getActiveURLs(ctx)
 			if err != nil {
-				logger.Printf("Error fetching URLs: %v", err)
+				logger.Error().Err(err).Msg("Error fetching URLs")
 				continue
 			}
 
 			if len(sources) == 0 {
-				logger.Println("No active URLs to process")
+				logger.Info().Msg("No active URLs to process")
 				continue
 			}
 
-			logger.Printf("Processing %d sources (%d workers)", len(sources), scraperWorkers)
+			logger.Info().Msgf("Processing %d sources (%d workers)", len(sources), scraperWorkers)
 			scrapeSources(ctx, sources)
 		}
 	}

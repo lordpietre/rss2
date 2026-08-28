@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
@@ -12,11 +13,11 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/rss2/backend/internal/logger"
 	"github.com/rss2/backend/internal/workers"
 )
 
 var (
-	logger   *log.Logger
 	dbPool   *pgxpool.Pool
 	sleepSec = 10
 	batchSz  = 500
@@ -35,7 +36,8 @@ type Country struct {
 }
 
 func init() {
-	logger = log.New(os.Stdout, "[TOPICS] ", log.LstdFlags)
+	logLevel := os.Getenv("LOG_LEVEL")
+	logger.Init("topics-worker", logLevel)
 }
 
 func loadConfig() {
@@ -335,20 +337,36 @@ func processBatch(ctx context.Context, topics []Topic, countries []Country) (int
 
 func main() {
 	loadConfig()
-	logger.Println("Starting Topics Worker")
+	logger.Info().Msg("Starting Topics Worker")
 
 	cfg := workers.LoadDBConfig()
 	if err := workers.Connect(cfg); err != nil {
-		logger.Fatalf("Failed to connect to database: %v", err)
+		logger.Fatal().Err(err).Msg("Failed to connect to database")
 	}
 	dbPool = workers.GetPool()
 	defer workers.Close()
 
-	ctx := context.Background()
+	// Start health check HTTP server
+	go func() {
+		http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+			if err := workers.HealthCheck(r.Context()); err != nil {
+				http.Error(w, "unhealthy", http.StatusServiceUnavailable)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("ok"))
+		})
+		logger.Info().Msg("Health check server listening on :8080")
+		if err := http.ListenAndServe(":8080", nil); err != nil {
+			logger.Error().Err(err).Msg("Health check server error")
+		}
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
 
 	// Ensure schema
 	if err := ensureSchema(ctx); err != nil {
-		logger.Printf("Error ensuring schema: %v", err)
+		logger.Error().Err(err).Msg("Error ensuring schema")
 	}
 
 	sigChan := make(chan os.Signal, 1)
@@ -356,41 +374,47 @@ func main() {
 
 	go func() {
 		<-sigChan
-		logger.Println("Shutting down...")
+		logger.Info().Msg("Shutting down gracefully...")
+		cancel()
+		time.Sleep(2 * time.Second)
+		workers.Close()
 		os.Exit(0)
 	}()
 
-	logger.Printf("Config: sleep=%ds, batch=%d", sleepSec, batchSz)
+	logger.Info().Msgf("Config: sleep=%ds, batch=%d", sleepSec, batchSz)
 
 	for {
 		select {
+		case <-ctx.Done():
+			logger.Info().Msg("Context cancelled, stopping worker")
+			return
 		case <-time.After(time.Duration(sleepSec) * time.Second):
 			topics, err := loadTopics(ctx)
 			if err != nil {
-				logger.Printf("Error loading topics: %v", err)
+				logger.Error().Err(err).Msg("Error loading topics")
 				continue
 			}
 
 			if len(topics) == 0 {
-				logger.Println("No topics found in DB")
+				logger.Info().Msg("No topics found in DB")
 				time.Sleep(time.Duration(sleepSec) * time.Second)
 				continue
 			}
 
 			countries, err := loadCountries(ctx)
 			if err != nil {
-				logger.Printf("Error loading countries: %v", err)
+				logger.Error().Err(err).Msg("Error loading countries")
 				continue
 			}
 
 			count, err := processBatch(ctx, topics, countries)
 			if err != nil {
-				logger.Printf("Error processing batch: %v", err)
+				logger.Error().Err(err).Msg("Error processing batch")
 				continue
 			}
 
 			if count > 0 {
-				logger.Printf("Processed %d news items", count)
+				logger.Info().Msgf("Processed %d news items", count)
 			}
 
 			if count < batchSz {

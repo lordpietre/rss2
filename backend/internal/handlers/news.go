@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -9,40 +10,45 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/rss2/backend/internal/config"
 	"github.com/rss2/backend/internal/db"
 	"github.com/rss2/backend/internal/models"
 )
 
-type NewsResponse struct {
-	ID                string     `json:"id"`
-	Titulo            string     `json:"titulo"`
-	Resumen           string     `json:"resumen"`
-	URL               string     `json:"url"`
-	Fecha             *time.Time `json:"fecha"`
-	ImagenURL         *string    `json:"imagen_url"`
-	CategoriaID       *int64     `json:"categoria_id"`
-	PaisID            *int64     `json:"pais_id"`
-	FuenteNombre      string     `json:"fuente_nombre"`
-	TitleTranslated   *string    `json:"title_translated"`
-	SummaryTranslated *string    `json:"summary_translated"`
-	LangTranslated    *string    `json:"lang_translated"`
-	Entities          []Entity   `json:"entities,omitempty"`
+// getTargetLang returns the target language for translations, defaulting to config DefaultLang
+func getTargetLang(c *gin.Context) string {
+	lang := c.Query("lang")
+	if lang == "" {
+		cfg := config.Load()
+		lang = cfg.DefaultLang
+	}
+	return lang
 }
 
+// GetNews returns paginated news with optional filters
+// @Summary List news
+// @Description Returns paginated news with optional filtering by query, category, country, and translation status
+// @Tags news
+// @Produce json
+// @Param page query int false "Page number" default(1) minimum(1)
+// @Param per_page query int false "Items per page" default(30) minimum(1) maximum(100)
+// @Param q query string false "Search query"
+// @Param category_id query string false "Category ID filter"
+// @Param country_id query string false "Country ID filter"
+// @Param lang query string false "Target translation language" default(es)
+// @Param translated_only query string false "Only show translated news" default("false")
+// @Success 200 {object} map[string]interface{} "news, total, page, per_page, total_pages"
+// @Failure 500 {object} models.ErrorResponse
+// @Router /news [get]
 func GetNews(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "30"))
+	page, perPage = validatePageParams(page, perPage, 30, 100)
 	query := c.Query("q")
 	categoryID := c.Query("category_id")
 	countryID := c.Query("country_id")
 	translatedOnly := c.Query("translated_only") == "true"
-
-	if page < 1 {
-		page = 1
-	}
-	if perPage < 1 || perPage > 100 {
-		perPage = 30
-	}
+	targetLang := getTargetLang(c)
 
 	offset := (page - 1) * perPage
 
@@ -53,7 +59,7 @@ func GetNews(c *gin.Context) {
 	if query != "" {
 		if translatedOnly {
 			// With translated_only, search the translated fields too so users can
-			// find translated news by the Spanish (translated) wording.
+			// find translated news by the target language wording.
 			where += fmt.Sprintf(" AND (n.titulo ILIKE $%d OR n.resumen ILIKE $%d OR t.titulo_trad ILIKE $%d OR t.resumen_trad ILIKE $%d)", argNum, argNum, argNum, argNum)
 		} else {
 			where += fmt.Sprintf(" AND (n.titulo ILIKE $%d OR n.resumen ILIKE $%d)", argNum, argNum)
@@ -76,7 +82,8 @@ func GetNews(c *gin.Context) {
 	}
 
 	var total int
-	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM noticias n LEFT JOIN traducciones t ON t.noticia_id = n.id AND t.lang_to = 'es' WHERE %s", where)
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM noticias n LEFT JOIN traducciones t ON t.noticia_id = n.id AND t.lang_to = $%d WHERE %s", argNum, where)
+	args = append(args, targetLang)
 	err := db.GetPool().QueryRow(c.Request.Context(), countQuery, args...).Scan(&total)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to count news", Message: err.Error()})
@@ -94,19 +101,18 @@ func GetNews(c *gin.Context) {
 		return
 	}
 
-	sqlQuery := fmt.Sprintf(`
-		SELECT n.id, n.titulo, COALESCE(n.resumen, ''), n.url, n.fecha, n.imagen_url, 
-		       n.categoria_id, n.pais_id, n.fuente_nombre,
+	sqlQuery := `
+		SELECT n.id, n.titulo, COALESCE(n.resumen, ''), n.contenido, n.url, n.fecha, n.imagen_url, 
+		       n.categoria_id, n.pais_id, n.fuente_nombre, n.lang,
 		       t.titulo_trad,
 		       t.resumen_trad,
 		       t.lang_to as lang_trad
 		FROM noticias n
-		LEFT JOIN traducciones t ON t.noticia_id = n.id AND t.lang_to = 'es'
-		WHERE %s
-		ORDER BY n.fecha DESC LIMIT $%d OFFSET $%d
-	`, where, argNum, argNum+1)
+		LEFT JOIN traducciones t ON t.noticia_id = n.id AND t.lang_to = $` + strconv.Itoa(argNum) + `
+		WHERE ` + where + `
+		ORDER BY n.fecha DESC LIMIT $` + strconv.Itoa(argNum+1) + ` OFFSET $` + strconv.Itoa(argNum+2)
 
-	args = append(args, perPage, offset)
+	args = append(args, targetLang, perPage, offset)
 
 	rows, err := db.GetPool().Query(c.Request.Context(), sqlQuery, args...)
 	if err != nil {
@@ -115,15 +121,16 @@ func GetNews(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var newsList []NewsResponse
+	var newsList []models.NewsWithTranslations
 	for rows.Next() {
-		var n NewsResponse
+		var n models.NewsWithTranslations
 		var imagenURL, fuenteNombre *string
 		var categoriaID, paisID *int32
+		var lang string
 
 		err := rows.Scan(
-			&n.ID, &n.Titulo, &n.Resumen, &n.URL, &n.Fecha, &imagenURL,
-			&categoriaID, &paisID, &fuenteNombre,
+			&n.ID, &n.Titulo, &n.Resumen, &n.Contenido, &n.URL, &n.Fecha, &imagenURL,
+			&categoriaID, &paisID, &fuenteNombre, &lang,
 			&n.TitleTranslated, &n.SummaryTranslated, &n.LangTranslated,
 		)
 		if err != nil {
@@ -137,12 +144,13 @@ func GetNews(c *gin.Context) {
 		}
 		if categoriaID != nil {
 			catID := int64(*categoriaID)
-			n.CategoriaID = &catID
+			n.CategoryID = &catID
 		}
 		if paisID != nil {
 			pID := int64(*paisID)
-			n.PaisID = &pID
+			n.CountryID = &pID
 		}
+		n.Lang = lang
 		newsList = append(newsList, n)
 	}
 
@@ -161,18 +169,11 @@ func GetNews(c *gin.Context) {
 func GetEntityNews(c *gin.Context) {
 	valor := c.Query("valor")
 	tipo := c.DefaultQuery("tipo", "persona")
-	pageStr := c.DefaultQuery("page", "1")
-	perPageStr := c.DefaultQuery("per_page", "20")
-
-	page, _ := strconv.Atoi(pageStr)
-	perPage, _ := strconv.Atoi(perPageStr)
-	if page < 1 {
-		page = 1
-	}
-	if perPage < 1 || perPage > 50 {
-		perPage = 20
-	}
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "20"))
+	page, perPage = validatePageParams(page, perPage, 20, 50)
 	offset := (page - 1) * perPage
+	targetLang := getTargetLang(c)
 
 	daysStr := c.Query("days")
 	days := 0
@@ -194,8 +195,8 @@ func GetEntityNews(c *gin.Context) {
 		useDayOffset = true
 	}
 
-	params := []interface{}{valor, tipo}
-	next := 3
+	params := []interface{}{valor, tipo, targetLang}
+	next := 4
 	timeCond := ""
 	switch {
 	case useDayOffset:
@@ -214,7 +215,7 @@ func GetEntityNews(c *gin.Context) {
 	base := fmt.Sprintf(`
 		FROM tags_noticia tn
 		JOIN tags t ON tn.tag_id = t.id
-		JOIN traducciones tr ON tn.traduccion_id = tr.id
+		JOIN traducciones tr ON tn.traduccion_id = tr.id AND tr.lang_to = $3
 		JOIN noticias n ON tr.noticia_id = n.id
 		LEFT JOIN entity_aliases ea ON LOWER(ea.alias) = LOWER(t.valor) AND ea.tipo = t.tipo
 		WHERE LOWER(COALESCE(ea.canonical_name, t.valor)) = LOWER($1) AND t.tipo = $2%s`, timeCond)
@@ -227,8 +228,8 @@ func GetEntityNews(c *gin.Context) {
 	}
 
 	query := fmt.Sprintf(`
-		SELECT DISTINCT n.id, n.titulo, COALESCE(n.resumen,''), n.url, n.fecha, n.imagen_url,
-		       n.fuente_nombre, tr.titulo_trad, tr.resumen_trad
+		SELECT DISTINCT n.id, n.titulo, COALESCE(n.resumen,''), n.contenido, n.url, n.fecha, n.imagen_url,
+		       n.fuente_nombre, n.lang, tr.titulo_trad, tr.resumen_trad
 		%s
 		ORDER BY n.fecha DESC
 		LIMIT $%d OFFSET $%d`, base, next, next+1)
@@ -240,12 +241,12 @@ func GetEntityNews(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var news []NewsResponse
+	var news []models.NewsWithTranslations
 	for rows.Next() {
-		var n NewsResponse
+		var n models.NewsWithTranslations
 		var img *string
-		if err := rows.Scan(&n.ID, &n.Titulo, &n.Resumen, &n.URL, &n.Fecha, &img,
-			&n.FuenteNombre, &n.TitleTranslated, &n.SummaryTranslated); err != nil {
+		if err := rows.Scan(&n.ID, &n.Titulo, &n.Resumen, &n.Contenido, &n.URL, &n.Fecha, &img,
+			&n.FuenteNombre, &n.Lang, &n.TitleTranslated, &n.SummaryTranslated); err != nil {
 			continue
 		}
 		if img != nil {
@@ -254,7 +255,7 @@ func GetEntityNews(c *gin.Context) {
 		news = append(news, n)
 	}
 	if news == nil {
-		news = []NewsResponse{}
+		news = []models.NewsWithTranslations{}
 	}
 
 	totalPages := (total + perPage - 1) / perPage
@@ -268,27 +269,65 @@ func GetEntityNews(c *gin.Context) {
 	})
 }
 
+// GetNewsByID returns a single news item with entities
+// @Summary Get news by ID
+// @Description Returns a single news item with translations and associated entities
+// @Tags news
+// @Produce json
+// @Param id path string true "News ID"
+// @Param lang query string false "Target translation language" default(es)
+// @Success 200 {object} models.NewsWithTranslations
+// @Failure 404 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /news/{id} [get]
 func GetNewsByID(c *gin.Context) {
 	id := c.Param("id")
+	targetLang := getTargetLang(c)
 
+	// Combined query to fetch news with entities in one round trip
 	sqlQuery := `
-		SELECT n.id, n.titulo, COALESCE(n.resumen, ''), n.url, n.fecha, n.imagen_url, 
-		       n.categoria_id, n.pais_id, n.fuente_nombre,
+		SELECT 
+			n.id, n.titulo, COALESCE(n.resumen, ''), n.contenido, n.url, n.fecha, n.imagen_url, 
+		       n.categoria_id, n.pais_id, n.fuente_nombre, n.lang,
 		       t.titulo_trad,
 		       t.resumen_trad,
-		       t.lang_to as lang_trad
+		       t.lang_to as lang_trad,
+		       json_agg(
+		           json_build_object(
+		               'valor', ent.valor,
+		               'tipo', ent.tipo,
+		               'count', ent.cnt,
+		               'wiki_summary', ent.wiki_summary,
+		               'wiki_url', ent.wiki_url,
+		               'image_path', ent.image_path
+		           )
+		       ) FILTER (WHERE ent.valor IS NOT NULL) as entities
 		FROM noticias n
-		LEFT JOIN traducciones t ON t.noticia_id = n.id AND t.lang_to = 'es'
-		WHERE n.id = $1`
+		LEFT JOIN traducciones t ON t.noticia_id = n.id AND t.lang_to = $1
+		LEFT JOIN (
+			SELECT tn.noticia_id, t.valor, t.tipo, 1 as cnt, t.wiki_summary, t.wiki_url, t.image_path
+			FROM tags_noticia tn
+			JOIN tags t ON tn.tag_id = t.id
+			JOIN traducciones tr ON tn.traduccion_id = tr.id
+			WHERE t.tipo IN ('persona', 'organizacion')
+		) ent ON ent.noticia_id = n.id
+		WHERE n.id = $2
+		GROUP BY n.id, n.titulo, n.resumen, n.contenido, n.url, n.fecha, n.imagen_url, 
+		         n.categoria_id, n.pais_id, n.fuente_nombre, n.lang,
+		         t.titulo_trad, t.resumen_trad, t.lang_to
+	`
 
-	var n NewsResponse
+	var n models.NewsWithTranslations
 	var imagenURL, fuenteNombre *string
 	var categoriaID, paisID *int32
+	var lang string
+	var entitiesJSON *string
 
-	err := db.GetPool().QueryRow(c.Request.Context(), sqlQuery, id).Scan(
-		&n.ID, &n.Titulo, &n.Resumen, &n.URL, &n.Fecha, &imagenURL,
-		&categoriaID, &paisID, &fuenteNombre,
+	err := db.GetPool().QueryRow(c.Request.Context(), sqlQuery, targetLang, id).Scan(
+		&n.ID, &n.Titulo, &n.Resumen, &n.Contenido, &n.URL, &n.Fecha, &imagenURL,
+		&categoriaID, &paisID, &fuenteNombre, &lang,
 		&n.TitleTranslated, &n.SummaryTranslated, &n.LangTranslated,
+		&entitiesJSON,
 	)
 	if err != nil {
 		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: "News not found"})
@@ -303,36 +342,23 @@ func GetNewsByID(c *gin.Context) {
 	}
 	if categoriaID != nil {
 		catID := int64(*categoriaID)
-		n.CategoriaID = &catID
+		n.CategoryID = &catID
 	}
 	if paisID != nil {
 		pID := int64(*paisID)
-		n.PaisID = &pID
+		n.CountryID = &pID
 	}
+	n.Lang = lang
 
-	// Fetch entities for this news
-	entitiesQuery := `
-		SELECT t.valor, t.tipo, 1 as cnt, t.wiki_summary, t.wiki_url, t.image_path
-		FROM tags_noticia tn
-		JOIN tags t ON tn.tag_id = t.id
-		JOIN traducciones tr ON tn.traduccion_id = tr.id
-		WHERE tr.noticia_id = $1 AND t.tipo IN ('persona', 'organizacion')
-	`
-	rows, err := db.GetPool().Query(c.Request.Context(), entitiesQuery, id)
-	var entities []Entity
-	if err == nil {
-		defer rows.Close()
-		for rows.Next() {
-			var e Entity
-			if err := rows.Scan(&e.Valor, &e.Tipo, &e.Count, &e.WikiSummary, &e.WikiURL, &e.ImagePath); err == nil {
-				entities = append(entities, e)
-			}
+	// Parse entities from JSON
+	if entitiesJSON != nil && *entitiesJSON != "null" {
+		var entities []models.Entity
+		if err := json.Unmarshal([]byte(*entitiesJSON), &entities); err == nil {
+			n.Entities = entities
 		}
+	} else {
+		n.Entities = []models.Entity{}
 	}
-	if entities == nil {
-		entities = []Entity{}
-	}
-	n.Entities = entities
 
 	c.JSON(http.StatusOK, n)
 }
@@ -354,23 +380,20 @@ func DeleteNews(c *gin.Context) {
 	c.JSON(http.StatusOK, models.SuccessResponse{Message: "News deleted successfully"})
 }
 
-type Entity struct {
-	Valor       string  `json:"valor"`
-	Tipo        string  `json:"tipo"`
-	Count       int     `json:"count"`
-	WikiSummary *string `json:"wiki_summary"`
-	WikiURL     *string `json:"wiki_url"`
-	ImagePath   *string `json:"image_path"`
-}
-
-type EntityListResponse struct {
-	Entities   []Entity `json:"entities"`
-	Total      int      `json:"total"`
-	Page       int      `json:"page"`
-	PerPage    int      `json:"per_page"`
-	TotalPages int      `json:"total_pages"`
-}
-
+// GetEntities returns paginated entities with optional filters
+// @Summary List entities
+// @Description Returns paginated entities (personas, organizations, locations) with optional filters
+// @Tags entities
+// @Produce json
+// @Param tipo query string false "Entity type" default("persona") Enums(persona, organizacion, lugar, tema)
+// @Param page query int false "Page number" default(1) minimum(1)
+// @Param per_page query int false "Items per page" default(50) minimum(1) maximum(100)
+// @Param country_id query string false "Country ID filter"
+// @Param category_id query string false "Category ID filter"
+// @Param q query string false "Search query"
+// @Success 200 {object} models.EntityListResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /entities [get]
 func GetEntities(c *gin.Context) {
 	countryID := c.Query("country_id")
 	categoryID := c.Query("category_id")
@@ -378,18 +401,9 @@ func GetEntities(c *gin.Context) {
 	
 	q := c.Query("q")
 	
-	pageStr := c.DefaultQuery("page", "1")
-	perPageStr := c.DefaultQuery("per_page", "50")
-
-	page, _ := strconv.Atoi(pageStr)
-	perPage, _ := strconv.Atoi(perPageStr)
-
-	if page < 1 {
-		page = 1
-	}
-	if perPage < 1 || perPage > 100 {
-		perPage = 50
-	}
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "50"))
+	page, perPage = validatePageParams(page, perPage, 50, 100)
 
 	offset := (page - 1) * perPage
 
@@ -430,8 +444,8 @@ func GetEntities(c *gin.Context) {
 	}
 
 	if total == 0 {
-		c.JSON(http.StatusOK, EntityListResponse{
-			Entities:   []Entity{},
+		c.JSON(http.StatusOK, models.EntityListResponse{
+			Entities:   []models.Entity{},
 			Total:      0,
 			Page:       page,
 			PerPage:    perPage,
@@ -463,9 +477,9 @@ func GetEntities(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var entities []Entity
+	var entities []models.Entity
 	for rows.Next() {
-		var e Entity
+		var e models.Entity
 		if err := rows.Scan(&e.Valor, &e.Tipo, &e.Count, &e.WikiSummary, &e.WikiURL, &e.ImagePath); err != nil {
 			continue
 		}
@@ -473,35 +487,18 @@ func GetEntities(c *gin.Context) {
 	}
 
 	if entities == nil {
-		entities = []Entity{}
+		entities = []models.Entity{}
 	}
 
 	totalPages := (total + perPage - 1) / perPage
 
-	c.JSON(http.StatusOK, EntityListResponse{
+	c.JSON(http.StatusOK, models.EntityListResponse{
 		Entities:   entities,
 		Total:      total,
 		Page:       page,
 		PerPage:    perPage,
 		TotalPages: totalPages,
 	})
-}
-
-type MentionPoint struct {
-	Fecha string `json:"fecha"`
-	Count int    `json:"count"`
-}
-
-type MentionSeries struct {
-	Valor string         `json:"valor"`
-	Tipo  string         `json:"tipo"`
-	Count int            `json:"count"`
-	Data  []MentionPoint `json:"data"`
-}
-
-type MentionsResponse struct {
-	Days   int             `json:"days"`
-	Series []MentionSeries `json:"series"`
 }
 
 func GetEntityMentions(c *gin.Context) {
@@ -531,7 +528,7 @@ func GetEntityMentions(c *gin.Context) {
 
 	start := time.Now().AddDate(0, 0, -(days - 1)).Truncate(24 * time.Hour)
 
-	series := make([]MentionSeries, 0, len(values))
+	series := make([]models.MentionSeries, 0, len(values))
 	for _, valor := range values {
 		s, err := buildMentionSeries(c.Request.Context(), valor, days)
 		if err != nil {
@@ -543,10 +540,10 @@ func GetEntityMentions(c *gin.Context) {
 		for _, p := range s.Data {
 			m[p.Fecha] = p.Count
 		}
-		data := make([]MentionPoint, 0, days)
+		data := make([]models.MentionPoint, 0, days)
 		for i := 0; i < days; i++ {
 			fecha := start.AddDate(0, 0, i).Format("2006-01-02")
-			data = append(data, MentionPoint{Fecha: fecha, Count: m[fecha]})
+			data = append(data, models.MentionPoint{Fecha: fecha, Count: m[fecha]})
 		}
 		s.Data = data
 		s.Count = 0
@@ -559,11 +556,11 @@ func GetEntityMentions(c *gin.Context) {
 		series = append(series, *s)
 	}
 
-	c.JSON(http.StatusOK, MentionsResponse{Days: days, Series: series})
+	c.JSON(http.StatusOK, models.MentionsResponse{Days: days, Series: series})
 }
 
-func buildMentionSeries(ctx context.Context, valor string, days int) (*MentionSeries, error) {
-	s := &MentionSeries{Valor: valor}
+func buildMentionSeries(ctx context.Context, valor string, days int) (*models.MentionSeries, error) {
+	s := &models.MentionSeries{Valor: valor}
 
 	var tagIDs []int64
 	rows, err := db.GetPool().Query(ctx, `
@@ -590,7 +587,7 @@ func buildMentionSeries(ctx context.Context, valor string, days int) (*MentionSe
 	rows.Close()
 
 	if len(tagIDs) == 0 {
-		s.Data = []MentionPoint{}
+		s.Data = []models.MentionPoint{}
 		return s, nil
 	}
 
@@ -615,10 +612,10 @@ func buildMentionSeries(ctx context.Context, valor string, days int) (*MentionSe
 		if err := drows.Scan(&fecha, &cnt); err != nil {
 			continue
 		}
-		s.Data = append(s.Data, MentionPoint{Fecha: fecha, Count: cnt})
+		s.Data = append(s.Data, models.MentionPoint{Fecha: fecha, Count: cnt})
 	}
 	if s.Data == nil {
-		s.Data = []MentionPoint{}
+		s.Data = []models.MentionPoint{}
 	}
 
 	return s, nil

@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -52,4 +53,17 @@ func ValidateToken(tokenString string) (*Claims, error) {
 	}
 
 	return claims, nil
+}
+
+type contextKey string
+
+const userContextKey contextKey = "user"
+
+func SetTestUser(ctx context.Context, claims *Claims) context.Context {
+	return context.WithValue(ctx, userContextKey, claims)
+}
+
+func GetUserFromContext(ctx context.Context) (*Claims, bool) {
+	claims, ok := ctx.Value(userContextKey).(*Claims)
+	return claims, ok
 }

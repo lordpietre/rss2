@@ -340,12 +340,12 @@ services:
         condition: service_healthy
     restart: unless-stopped
     # Prioridad BAJA: el traductor no debe acaparar toda la CPU.
-    # cpu_shares menor que el resto (1024) + tope de 2 núcleos dejan CPU para NER, embeddings, etc.
+    # cpu_shares menor que el resto (1024) + tope que deje CPU para NER, embeddings, etc.
     cpu_shares: 512
     deploy:
       resources:
         limits:
-          cpus: '2'
+          cpus: '4'
           memory: 6G
 
   # ==================================================================================
@@ -390,7 +390,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2'
+          cpus: '4'
           memory: 6G
 
   # ==================================================================================

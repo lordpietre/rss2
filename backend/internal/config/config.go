@@ -28,7 +28,12 @@ type Config struct {
 func Load() *Config {
 	secretKey := os.Getenv("SECRET_KEY")
 	if secretKey == "" {
-		secretKey = "change-this-secret-key"
+		panic("SECRET_KEY environment variable is required")
+	}
+
+	allowedOrigins := os.Getenv("ALLOWED_ORIGINS")
+	if allowedOrigins == "" {
+		allowedOrigins = "http://localhost:5173,http://localhost:3000"
 	}
 
 	return &Config{
@@ -47,7 +52,7 @@ func Load() *Config {
 		RateLimitPerMinute:   getEnvInt("RATE_LIMIT_PER_MINUTE", 60),
 		DockerComposeDir:     getEnv("DOCKER_COMPOSE_DIR", "/datos/rss2"),
 		WikiImagesPath:       getEnv("WIKI_IMAGES_PATH", "/app/data/wiki_images"),
-		AllowedOrigins:       getEnv("ALLOWED_ORIGINS", "*"),
+		AllowedOrigins:       allowedOrigins,
 	}
 }
 

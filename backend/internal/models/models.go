@@ -6,12 +6,12 @@ import (
 
 type News struct {
 	ID          int64      `json:"id"`
-	Title       string     `json:"title"`
-	Summary     string     `json:"summary"`
-	Content     string     `json:"content"`
+	Titulo      string     `json:"titulo"`
+	Resumen     string     `json:"resumen"`
+	Contenido   string     `json:"contenido"`
 	URL         string     `json:"url"`
-	ImageURL    *string    `json:"image_url"`
-	PublishedAt *time.Time `json:"published_at"`
+	ImagenURL   *string    `json:"imagen_url"`
+	Fecha       *time.Time `json:"fecha"`
 	Lang        string     `json:"lang"`
 	FeedID      int64      `json:"feed_id"`
 	CreatedAt   time.Time  `json:"created_at"`
@@ -20,35 +20,73 @@ type News struct {
 
 type NewsWithTranslations struct {
 	ID                int64     `json:"id"`
-	Title             string    `json:"title"`
-	Summary           string    `json:"summary"`
-	Content           string    `json:"content"`
+	Titulo            string    `json:"titulo"`
+	Resumen           string    `json:"resumen"`
+	Contenido         string    `json:"contenido"`
 	URL               string    `json:"url"`
-	ImageURL          *string   `json:"image_url"`
-	PublishedAt       *string   `json:"published_at"`
+	ImagenURL         *string   `json:"imagen_url"`
+	Fecha             *string   `json:"fecha"`
 	Lang              string    `json:"lang"`
 	FeedID            int64     `json:"feed_id"`
-	CategoryID        *int64    `json:"category_id"`
-	CountryID         *int64    `json:"country_id"`
+	CategoryID        *int64    `json:"categoria_id"`
+	CountryID         *int64    `json:"pais_id"`
+	FuenteNombre      string    `json:"fuente_nombre"`
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
 	TitleTranslated   *string   `json:"title_translated"`
 	SummaryTranslated *string   `json:"summary_translated"`
 	ContentTranslated *string   `json:"content_translated"`
 	LangTranslated    *string   `json:"lang_translated"`
+	Entities          []Entity  `json:"entities,omitempty"`
+}
+
+type Entity struct {
+	Valor       string  `json:"valor"`
+	Tipo        string  `json:"tipo"`
+	Count       int     `json:"count"`
+	WikiSummary *string `json:"wiki_summary"`
+	WikiURL     *string `json:"wiki_url"`
+	ImagePath   *string `json:"image_path"`
+}
+
+type EntityListResponse struct {
+	Entities   []Entity `json:"entities"`
+	Total      int      `json:"total"`
+	Page       int      `json:"page"`
+	PerPage    int      `json:"per_page"`
+	TotalPages int      `json:"total_pages"`
+}
+
+type MentionPoint struct {
+	Fecha string `json:"fecha"`
+	Count int    `json:"count"`
+}
+
+type MentionSeries struct {
+	Valor string         `json:"valor"`
+	Tipo  string         `json:"tipo"`
+	Count int            `json:"count"`
+	Data  []MentionPoint `json:"data"`
+}
+
+type MentionsResponse struct {
+	Days   int             `json:"days"`
+	Series []MentionSeries `json:"series"`
 }
 
 type Feed struct {
 	ID          int64      `json:"id"`
-	Title       string     `json:"title"`
+	Nombre      string     `json:"nombre"`
 	URL         string     `json:"url"`
 	SiteURL     *string    `json:"site_url"`
-	Description *string    `json:"description"`
-	ImageURL    *string    `json:"image_url"`
-	Language    *string    `json:"language"`
-	CategoryID  *int64     `json:"category_id"`
-	CountryID   *int64     `json:"country_id"`
-	Active      bool       `json:"active"`
+	Descripcion *string    `json:"descripcion"`
+	ImagenURL   *string    `json:"imagen_url"`
+	Idioma      *string    `json:"idioma"`
+	CategoriaID *int64     `json:"categoria_id"`
+	PaisID      *int64     `json:"pais_id"`
+	Activo      bool       `json:"activo"`
+	Fallos      *int64     `json:"fallos"`
+	LastError   *string    `json:"last_error"`
 	LastFetched *time.Time `json:"last_fetched"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
@@ -56,27 +94,27 @@ type Feed struct {
 
 type Category struct {
 	ID       int64  `json:"id"`
-	Name     string `json:"name"`
+	Nombre   string `json:"nombre"`
 	Color    string `json:"color"`
 	Icon     string `json:"icon"`
 	ParentID *int64 `json:"parent_id"`
 }
 
 type Country struct {
-	ID        int64  `json:"id"`
-	Name      string `json:"name"`
-	Code      string `json:"code"`
-	Continent string `json:"continent"`
-	FlagEmoji string `json:"flag_emoji"`
+	ID         int64  `json:"id"`
+	Nombre     string `json:"nombre"`
+	Codigo     string `json:"codigo"`
+	Continente string `json:"continente"`
+	FlagEmoji  string `json:"flag_emoji"`
 }
 
 type Translation struct {
 	ID        int64     `json:"id"`
-	NewsID    int64     `json:"news_id"`
+	NoticiaID int64     `json:"noticia_id"`
 	LangFrom  string    `json:"lang_from"`
 	LangTo    string    `json:"lang_to"`
-	Title     string    `json:"title"`
-	Summary   string    `json:"summary"`
+	Titulo    string    `json:"titulo"`
+	Resumen   string    `json:"resumen"`
 	Status    string    `json:"status"`
 	Error     *string   `json:"error"`
 	CreatedAt time.Time `json:"created_at"`
@@ -89,6 +127,7 @@ type User struct {
 	Username     string    `json:"username"`
 	PasswordHash string    `json:"-"`
 	IsAdmin      bool      `json:"is_admin"`
+	Role         string    `json:"role"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
@@ -97,8 +136,8 @@ type SearchHistory struct {
 	ID           int64     `json:"id"`
 	UserID       int64     `json:"user_id"`
 	Query        string    `json:"query"`
-	CategoryID   *int64    `json:"category_id"`
-	CountryID    *int64    `json:"country_id"`
+	CategoriaID  *int64    `json:"categoria_id"`
+	PaisID       *int64    `json:"pais_id"`
 	ResultsCount int       `json:"results_count"`
 	SearchedAt   time.Time `json:"searched_at"`
 }
@@ -132,14 +171,14 @@ type Stats struct {
 }
 
 type CategoryStat struct {
-	CategoryID   int64  `json:"category_id"`
-	CategoryName string `json:"category_name"`
-	Count        int64  `json:"count"`
+	CategoriaID   int64  `json:"categoria_id"`
+	CategoriaName string `json:"categoria_nombre"`
+	Count         int64  `json:"count"`
 }
 
 type CountryStat struct {
-	CountryID   int64  `json:"country_id"`
-	CountryName string `json:"country_name"`
+	PaisID      int64  `json:"pais_id"`
+	PaisName    string `json:"pais_nombre"`
 	FlagEmoji   string `json:"flag_emoji"`
 	Count       int64  `json:"count"`
 }

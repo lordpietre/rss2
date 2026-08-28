@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,39 +12,45 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/rss2/backend/internal/cache"
 	"github.com/rss2/backend/internal/db"
 	"github.com/rss2/backend/internal/models"
 )
 
-type FeedResponse struct {
-	ID          int64   `json:"id"`
-	Nombre      string  `json:"nombre"`
-	Descripcion *string `json:"descripcion"`
-	URL         string  `json:"url"`
-	CategoriaID *int64  `json:"categoria_id"`
-	PaisID      *int64  `json:"pais_id"`
-	Idioma      *string `json:"idioma"`
-	Activo      bool    `json:"activo"`
-	Fallos      *int64  `json:"fallos"`
-	LastError   *string `json:"last_error"`
-	FuenteURLID *int64  `json:"fuente_url_id"`
-}
-
+// GetFeeds returns paginated feeds with optional filters
+// @Summary List feeds
+// @Description Returns paginated feeds with optional filtering by active status, category, and country
+// @Tags feeds
+// @Produce json
+// @Param page query int false "Page number" default(1) minimum(1)
+// @Param per_page query int false "Items per page" default(50) minimum(1) maximum(100)
+// @Param activo query string false "Active status filter"
+// @Param categoria_id query string false "Category ID filter"
+// @Param pais_id query string false "Country ID filter"
+// @Success 200 {object} map[string]interface{} "feeds, total, page, per_page, total_pages"
+// @Failure 500 {object} models.ErrorResponse
+// @Router /feeds [get]
 func GetFeeds(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "50"))
+	page, perPage = validatePageParams(page, perPage, 50, 100)
 	activo := c.Query("activo")
 	categoriaID := c.Query("categoria_id")
 	paisID := c.Query("pais_id")
 
-	if page < 1 {
-		page = 1
-	}
-	if perPage < 1 || perPage > 100 {
-		perPage = 50
-	}
-
 	offset := (page - 1) * perPage
+
+	// Cache key based on filters
+	filterStr := fmt.Sprintf("activo_%s_cat_%s_pais_%s", activo, categoriaID, paisID)
+	cacheKey := cache.FeedListKey(filterStr, page, perPage)
+
+	ctx := c.Request.Context()
+
+	// Try to get from cache
+	if cached, err := cache.Get(ctx, cacheKey); err == nil && cached != "" {
+		c.Data(http.StatusOK, "application/json", []byte(cached))
+		return
+	}
 
 	where := "1=1"
 	args := []interface{}{}
@@ -67,7 +74,7 @@ func GetFeeds(c *gin.Context) {
 
 	var total int
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM feeds WHERE %s", where)
-	err := db.GetPool().QueryRow(c.Request.Context(), countQuery, args...).Scan(&total)
+	err := db.GetPool().QueryRow(ctx, countQuery, args...).Scan(&total)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to count feeds", Message: err.Error()})
 		return
@@ -75,7 +82,7 @@ func GetFeeds(c *gin.Context) {
 
 	sqlQuery := fmt.Sprintf(`
 		SELECT f.id, f.nombre, f.descripcion, f.url,
-		       f.categoria_id, f.pais_id, f.idioma, f.activo, f.fallos, f.last_error,
+		       f.categoria_id, f.pais_id, f.idioma, f.activo, f.fallos, f.last_error, f.last_fetched,
 		       c.nombre AS categoria, p.nombre AS pais,
 		       (SELECT COUNT(*) FROM noticias n WHERE n.fuente_nombre = f.nombre) as noticias_count
 		FROM feeds f
@@ -88,7 +95,7 @@ func GetFeeds(c *gin.Context) {
 
 	args = append(args, perPage, offset)
 
-	rows, err := db.GetPool().Query(c.Request.Context(), sqlQuery, args...)
+	rows, err := db.GetPool().Query(ctx, sqlQuery, args...)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to fetch feeds", Message: err.Error()})
 		return
@@ -96,7 +103,7 @@ func GetFeeds(c *gin.Context) {
 	defer rows.Close()
 
 	type FeedWithStats struct {
-		FeedResponse
+		models.Feed
 		Categoria     *string `json:"categoria"`
 		Pais          *string `json:"pais"`
 		NoticiasCount int64   `json:"noticias_count"`
@@ -107,7 +114,7 @@ func GetFeeds(c *gin.Context) {
 		var f FeedWithStats
 		err := rows.Scan(
 			&f.ID, &f.Nombre, &f.Descripcion, &f.URL,
-			&f.CategoriaID, &f.PaisID, &f.Idioma, &f.Activo, &f.Fallos, &f.LastError,
+			&f.CategoriaID, &f.PaisID, &f.Idioma, &f.Activo, &f.Fallos, &f.LastError, &f.LastFetched,
 			&f.Categoria, &f.Pais, &f.NoticiasCount,
 		)
 		if err != nil {
@@ -118,13 +125,20 @@ func GetFeeds(c *gin.Context) {
 
 	totalPages := (total + perPage - 1) / perPage
 
-	c.JSON(http.StatusOK, gin.H{
+	response := gin.H{
 		"feeds":       feeds,
 		"total":       total,
 		"page":        page,
 		"per_page":    perPage,
 		"total_pages": totalPages,
-	})
+	}
+
+	// Cache the response
+	if data, err := json.Marshal(response); err == nil {
+		cache.Set(ctx, cacheKey, string(data), cache.TTLMedium)
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 func GetFeedByID(c *gin.Context) {
@@ -134,12 +148,12 @@ func GetFeedByID(c *gin.Context) {
 		return
 	}
 
-	var f FeedResponse
+	var f models.Feed
 	err = db.GetPool().QueryRow(c.Request.Context(), `
-		SELECT id, nombre, descripcion, url, categoria_id, pais_id, idioma, activo, fallos
+		SELECT id, nombre, descripcion, url, categoria_id, pais_id, idioma, activo, fallos, last_fetched
 		FROM feeds WHERE id = $1`, id).Scan(
 		&f.ID, &f.Nombre, &f.Descripcion, &f.URL,
-		&f.CategoriaID, &f.PaisID, &f.Idioma, &f.Activo, &f.Fallos,
+		&f.CategoriaID, &f.PaisID, &f.Idioma, &f.Activo, &f.Fallos, &f.LastFetched,
 	)
 	if err != nil {
 		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: "Feed not found"})
@@ -177,6 +191,9 @@ func CreateFeed(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to create feed", Message: err.Error()})
 		return
 	}
+
+	// Invalidate feed list cache
+	cache.InvalidateFeedList(c.Request.Context())
 
 	c.JSON(http.StatusCreated, gin.H{"id": feedID, "message": "Feed created successfully"})
 }
@@ -228,6 +245,10 @@ func UpdateFeed(c *gin.Context) {
 		return
 	}
 
+	// Invalidate feed cache
+	cache.InvalidateFeed(c.Request.Context(), id)
+	cache.InvalidateFeedList(c.Request.Context())
+
 	c.JSON(http.StatusOK, models.SuccessResponse{Message: "Feed updated successfully"})
 }
 
@@ -248,6 +269,10 @@ func DeleteFeed(c *gin.Context) {
 		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: "Feed not found"})
 		return
 	}
+
+	// Invalidate feed cache
+	cache.InvalidateFeed(c.Request.Context(), id)
+	cache.InvalidateFeedList(c.Request.Context())
 
 	c.JSON(http.StatusOK, models.SuccessResponse{Message: "Feed deleted successfully"})
 }
@@ -271,6 +296,10 @@ func ToggleFeedActive(c *gin.Context) {
 		return
 	}
 
+	// Invalidate feed cache
+	cache.InvalidateFeed(c.Request.Context(), id)
+	cache.InvalidateFeedList(c.Request.Context())
+
 	c.JSON(http.StatusOK, models.SuccessResponse{Message: "Feed toggled successfully"})
 }
 
@@ -292,6 +321,10 @@ func ReactivateFeed(c *gin.Context) {
 		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: "Feed not found"})
 		return
 	}
+
+	// Invalidate feed cache
+	cache.InvalidateFeed(c.Request.Context(), id)
+	cache.InvalidateFeedList(c.Request.Context())
 
 	c.JSON(http.StatusOK, models.SuccessResponse{Message: "Feed reactivated successfully"})
 }
@@ -449,7 +482,12 @@ func ImportFeeds(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to start transaction", Message: err.Error()})
 		return
 	}
-	defer tx.Rollback(context.Background())
+	committed := false
+	defer func() {
+		if !committed {
+			tx.Rollback(context.Background())
+		}
+	}()
 
 	field := func(record []string, idx int) string {
 		if idx < 0 || idx >= len(record) {
@@ -579,7 +617,9 @@ func ImportFeeds(c *gin.Context) {
 		}
 
 		if err != nil {
-			tx.Exec(context.Background(), "ROLLBACK TO SAVEPOINT sp")
+			if _, rbErr := tx.Exec(context.Background(), "ROLLBACK TO SAVEPOINT sp"); rbErr != nil {
+				errors = append(errors, fmt.Sprintf("Rollback failed for %s: %v", url, rbErr))
+			}
 			failed++
 			errors = append(errors, fmt.Sprintf("Error upserting %s: %v", url, err))
 			continue
@@ -598,6 +638,7 @@ func ImportFeeds(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to commit transaction", Message: err.Error()})
 		return
 	}
+	committed = true
 
 	c.JSON(http.StatusOK, gin.H{
 		"imported": imported,

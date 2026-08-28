@@ -1,6 +1,6 @@
 import { Outlet, Link, useNavigate } from 'react-router-dom'
-import { Search, Rss, BarChart3, Home as HomeIcon, Heart, User, Flame, Settings, Users, Tags, Database, Server, TrendingUp, Bell } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { Search, Rss, BarChart3, Home as HomeIcon, Heart, User, Flame, Settings, Users, Tags, Database, Server, TrendingUp, Bell, X, Menu } from 'lucide-react'
+import { useEffect, useState, useRef } from 'react'
 import { apiService } from '../../services/api'
 
 export function Layout() {

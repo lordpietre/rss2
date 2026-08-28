@@ -10,6 +10,14 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// CheckFirstUser checks if this is the first user registration
+// @Summary Check if first user
+// @Description Returns whether this is the first user being registered (no users exist yet)
+// @Tags auth
+// @Produce json
+// @Success 200 {object} map[string]interface{} "is_first_user and total_users"
+// @Failure 500 {object} models.ErrorResponse
+// @Router /auth/check-first-user [get]
 func CheckFirstUser(c *gin.Context) {
 	var count int
 	err := db.GetPool().QueryRow(c.Request.Context(), "SELECT COUNT(*) FROM users").Scan(&count)
@@ -20,6 +28,18 @@ func CheckFirstUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"is_first_user": count == 0, "total_users": count})
 }
 
+// Login authenticates a user and returns a JWT token
+// @Summary User login
+// @Description Authenticate with email and password to receive a JWT token
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body models.LoginRequest true "Login credentials"
+// @Success 200 {object} models.AuthResponse
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 401 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /auth/login [post]
 func Login(c *gin.Context) {
 	var req models.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -56,6 +76,17 @@ func Login(c *gin.Context) {
 	})
 }
 
+// Register creates a new user account
+// @Summary Register new user
+// @Description Create a new user account (first user becomes admin automatically)
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body models.RegisterRequest true "Registration details"
+// @Success 201 {object} models.AuthResponse
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /auth/register [post]
 func Register(c *gin.Context) {
 	var req models.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -111,6 +142,16 @@ func Register(c *gin.Context) {
 	})
 }
 
+// GetCurrentUser returns the current authenticated user
+// @Summary Get current user
+// @Description Returns the currently authenticated user's profile
+// @Tags auth
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} models.User
+// @Failure 401 {object} models.ErrorResponse
+// @Failure 404 {object} models.ErrorResponse
+// @Router /auth/me [get]
 func GetCurrentUser(c *gin.Context) {
 	userVal, exists := c.Get("user")
 	if !exists {

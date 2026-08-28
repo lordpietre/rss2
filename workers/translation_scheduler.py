@@ -64,7 +64,7 @@ def create_translation_jobs(conn):
                       SELECT 1 FROM traducciones t 
                       WHERE t.noticia_id = n.id AND t.lang_to = %s
                   )
-                ORDER BY n.fecha ASC
+                ORDER BY n.fecha DESC
                 LIMIT %s
                 ON CONFLICT (noticia_id, lang_to) DO NOTHING
                 RETURNING noticia_id

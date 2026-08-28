@@ -33,13 +33,13 @@ const TIPOS = [
   { value: 'tema', label: '📰 Tema', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' },
 ]
 
-const TIMELINE_WINDOWS: { key: string; label: string; title: string; offset: number }[] = [
-  { key: '0', label: 'Hoy', title: 'hoy', offset: 0 },
-  { key: '1', label: '1d', title: 'hace 1 día', offset: 1 },
-  { key: '2', label: '2d', title: 'hace 2 días', offset: 2 },
-  { key: '3', label: '3d', title: 'hace 3 días', offset: 3 },
-  { key: '4', label: '4d', title: 'hace 4 días', offset: 4 },
-  { key: '5', label: '5d', title: 'hace 5 días', offset: 5 },
+const TIMELINE_WINDOWS: { key: string; label: string; title: string; days: number }[] = [
+  { key: '1', label: '24h', title: 'últimas 24 horas', days: 1 },
+  { key: '2', label: '2 días', title: 'últimos 2 días', days: 2 },
+  { key: '3', label: '3 días', title: 'últimos 3 días', days: 3 },
+  { key: '4', label: '4 días', title: 'últimos 4 días', days: 4 },
+  { key: '5', label: '5 días', title: 'últimos 5 días', days: 5 },
+  { key: '7', label: '7 días', title: 'últimos 7 días', days: 7 },
 ]
 
 function getTipoInfo(tipo: string) {
@@ -61,6 +61,8 @@ export function Populares() {
   const [configModal, setConfigModal] = useState<ConfigModal | null>(null)
   const [saving, setSaving] = useState(false)
   const [successMsg, setSuccessMsg] = useState('')
+  const [expandedEntities, setExpandedEntities] = useState<Set<string>>(new Set())
+  const [allExpanded, setAllExpanded] = useState(false)
 
   // News-by-entity modal state
   const [newsModal, setNewsModal] = useState<Entity | null>(null)
@@ -158,7 +160,7 @@ export function Populares() {
       const params = new URLSearchParams()
       params.append('valor', entity.valor)
       params.append('tipo', entity.tipo)
-      params.append('day_offset', String(win.offset))
+      params.append('days', String(win.days))
       params.append('per_page', '50')
       const res = await api.get(`/entities/news?${params}`)
       setEntityNews(res.data.news || [])
@@ -270,6 +272,29 @@ export function Populares() {
         <h1 className="text-2xl font-bold">
           🔥 Populares {selectedCountry ? `en ${selectedCountry.nombre}` : 'Global'}
         </h1>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => setAllExpanded(p => !p)}
+            className="px-3 py-1.5 text-sm border rounded hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600 transition-colors"
+            title="Expandir/collapse todo"
+          >
+            {allExpanded ? '← Contraer todas' : '→ Expandir todas'}
+          </button>
+          <button
+            onClick={() => setExpandedEntities(p => p.clear())}
+            className="px-3 py-1.5 text-sm border rounded hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600 transition-colors"
+            title="Contraer todas"
+          >
+            ← Contraer
+          </button>
+          <button
+            onClick={() => setExpandedEntities(p => p.add('all'))}
+            className="px-3 py-1.5 text-sm border rounded hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600 transition-colors"
+            title="Expandir todas"
+          >
+            Expandir →
+          </button>
+        </div>
         <div className="flex flex-wrap gap-2">
           <button
             onClick={handleExportAliases}
@@ -359,96 +384,102 @@ export function Populares() {
         </div>
       </div>
 
-      {/* Table */}
+      {/* Listado de entidades */}
       {loading ? (
         <div className="text-center py-12 text-gray-400">Cargando...</div>
       ) : entities.length === 0 ? (
         <div className="text-center py-12 text-gray-400">No se encontraron entidades</div>
       ) : (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50 dark:bg-gray-700">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-10">#</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Entidad</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Tipo</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Menciones</th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider w-24">Config</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-              {entities.map((entity, idx) => {
-                const tipoInfo = getTipoInfo(entity.tipo)
-                return (
-                  <tr key={entity.valor + idx} className="hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors">
-                    <td className="px-4 py-3 text-gray-400 text-sm">{(page - 1) * 50 + idx + 1}</td>
-                    <td className="px-4 py-3 font-medium">
+          <div className="p-4 bg-gray-50 dark:bg-gray-700 border-b dark:border-gray-700">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">📊 {entities.length} entidades populares</span>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setExpandedEntities(p => p.clear())}
+                  className="px-2 py-1 text-[10px] text-gray-500 hover:text-blue-600 dark:hover:text-blue-300 rounded"
+                  title="Contraer todas"
+                >
+                  ←
+                </button>
+                <button
+                  onClick={() => setExpandedEntities(p => p.add('all'))}
+                  className="px-2 py-1 text-[10px] text-gray-500 hover:text-blue-600 dark:hover:text-blue-300 rounded"
+                  title="Expandir todas"
+                >
+                  Expandir →
+                </button>
+              </div>
+            </div>
+          </div>
+          <div className="p-4 space-y-2">
+            {entities.map((entity, idx) => {
+              const isExpanded = allExpanded || expandedEntities.has(entity.valor)
+              const tipoInfo = getTipoInfo(entity.tipo)
+              return (
+                <div
+                  key={entity.valor}
+                  className={`collapse ${isExpanded ? 'in' : ''} transition-colors duration-300 ease-in-out`}
+                >
+                  <div className="flex items-center justify-between px-2 py-2 border-b dark:border-gray-700 last:border-0">
+                    <div className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" onClick={() => setExpandedEntities(p => p.toggle(entity.valor))}>
                       <WikiTooltip
                         name={entity.valor}
                         summary={entity.wiki_summary}
                         imagePath={entity.image_path}
                         wikiUrl={entity.wiki_url}
                       >
-                        <div className="flex items-center gap-3">
-                          {entity.image_path && (
-                            <img 
-                              src={entity.image_path} 
-                              alt="" 
-                              className="w-24 h-24 rounded-full object-cover border-2 border-white shadow-md mx-auto"
-                              onError={(e) => (e.currentTarget.style.display = 'none')}
-                            />
-                          )}
-                          <span>{entity.valor}</span>
-                        </div>
+                        <span className="font-medium text-blue-600 dark:text-blue-300 hover:underline transition-colors">
+                          {entity.valor}
+                        </span>
                       </WikiTooltip>
-                    </td>
-                    <td className="px-4 py-3 hidden md:table-cell">
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        #{entity.count} menciones
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${tipoInfo.color}`}>
                         {tipoInfo.label}
                       </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                        {entity.count}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <div className="flex flex-col items-center gap-1">
-                        <div className="flex items-center justify-center gap-1">
-                          <button
-                            onClick={() => openNews(entity)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                            title="Ver noticias donde se menciona"
-                          >
-                            🔍 Buscar
-                          </button>
-                          <button
-                            onClick={() => openConfig(entity)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                            title="Configurar entidad"
-                          >
-                            ⚙️ Configurar
-                          </button>
-                        </div>
-                        <div className="flex flex-wrap items-center justify-center gap-1">
-                          {TIMELINE_WINDOWS.map((win) => (
-                            <button
-                              key={win.key}
-                              onClick={() => openTimeline(entity, win)}
-                              className="inline-flex items-center px-1.5 py-0.5 text-[10px] rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-                              title={win.title}
-                            >
-                              {win.label}
-                            </button>
-                          ))}
-                        </div>
+                      <span>{entity.count}</span>
+                    </div>
+                  </div>
+                  {isExpanded && (
+                    <div className="p-3 pt-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <button
+                          onClick={() => openNews(entity)}
+                          className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                          title="Ver noticias donde se menciona"
+                        >
+                          🔍 Ver noticias
+                        </button>
+                        <button
+                          onClick={() => openConfig(entity)}
+                          className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                          title="Configurar entidad"
+                        >
+                          ⚙️ Configurar
+                        </button>
                       </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                      <div className="flex flex-wrap items-center justify-center gap-1">
+                        {TIMELINE_WINDOWS.map((win) => (
+                          <button
+                            key={win.key}
+                            onClick={() => openTimeline(entity, win)}
+                            className="inline-flex items-center px-1.5 py-0.5 text-[10px] rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                            title={win.title}
+                          >
+                            {win.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
 

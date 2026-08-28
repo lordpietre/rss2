@@ -16,11 +16,11 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/rss2/backend/internal/logger"
 	"github.com/rss2/backend/internal/workers"
 )
 
 var (
-	logger        *log.Logger
 	pool          *pgxpool.Pool
 	sleepInterval = 30
 	batchSize     = 20
@@ -52,7 +52,8 @@ type Tag struct {
 }
 
 func init() {
-	logger = log.New(os.Stdout, "[WIKI_WORKER] ", log.LstdFlags)
+	logLevel := os.Getenv("LOG_LEVEL")
+	logger.Init("wiki-worker", logLevel)
 }
 
 func getPendingTags(ctx context.Context) ([]Tag, error) {
@@ -227,52 +228,89 @@ func main() {
 		}
 	}
 
-	logger.Println("Iniciando Wiki Worker...")
+	logger.Info().Msg("Iniciando Wiki Worker...")
 
 	if err := os.MkdirAll(imagesDir, 0755); err != nil {
-		logger.Fatalf("Error creando directorio de imágenes: %v", err)
+		logger.Fatal().Err(err).Msg("Error creando directorio de imágenes")
 	}
 
 	cfg := workers.LoadDBConfig()
 	if err := workers.Connect(cfg); err != nil {
-		logger.Fatalf("Failed to connect to database: %v", err)
+		logger.Fatal().Err(err).Msg("Failed to connect to database")
 	}
 	pool = workers.GetPool()
 	defer workers.Close()
 
-	ctx := context.Background()
+	// Start health check HTTP server
+	go func() {
+		http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+			if err := workers.HealthCheck(r.Context()); err != nil {
+				http.Error(w, "unhealthy", http.StatusServiceUnavailable)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("ok"))
+		})
+		logger.Info().Msg("Health check server listening on :8080")
+		if err := http.ListenAndServe(":8080", nil); err != nil {
+			logger.Error().Err(err).Msg("Health check server error")
+		}
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
 		<-sigChan
-		logger.Println("Cerrando gracefully...")
+		logger.Info().Msg("Shutting down gracefully...")
+		cancel()
+		// Give time for in-flight requests to complete
+		time.Sleep(2 * time.Second)
 		workers.Close()
 		os.Exit(0)
 	}()
 
-	logger.Printf("Configuración: sleep=%ds, batch=%d", sleepInterval, batchSize)
+	logger.Info().Msgf("Configuración: sleep=%ds, batch=%d", sleepInterval, batchSize)
 
 	for {
-		tags, err := getPendingTags(ctx)
-		if err != nil {
-			logger.Printf("Error recuperando tags pendientes: %v", err)
-			time.Sleep(10 * time.Second)
-			continue
-		}
+		select {
+		case <-ctx.Done():
+			logger.Info().Msg("Context cancelled, stopping worker")
+			return
+		default:
+			tags, err := getPendingTags(ctx)
+			if err != nil {
+				logger.Error().Err(err).Msg("Error recuperando tags pendientes")
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(10 * time.Second):
+				}
+				continue
+			}
 
-		if len(tags) == 0 {
-			logger.Printf("No hay tags pendientes. Durmiendo %d segundos...", sleepInterval)
-			time.Sleep(time.Duration(sleepInterval) * time.Second)
-			continue
-		}
+			if len(tags) == 0 {
+				logger.Info().Msgf("No hay tags pendientes. Durmiendo %d segundos...", sleepInterval)
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(time.Duration(sleepInterval) * time.Second):
+				}
+				continue
+			}
 
-		logger.Printf("Recuperados %d tags para procesar...", len(tags))
+			logger.Info().Msgf("Recuperados %d tags para procesar...", len(tags))
 
-		for _, tag := range tags {
-			processTag(ctx, tag)
-			time.Sleep(3 * time.Second) // Increased delay to avoid Wikipedia Rate Limits (429)
+			for _, tag := range tags {
+				processTag(ctx, tag)
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(3 * time.Second): // Increased delay to avoid Wikipedia Rate Limits (429)
+				}
+			}
 		}
 	}
 }

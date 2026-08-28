@@ -109,10 +109,18 @@ func ScanAlertasAdmin(c *gin.Context) {
 }
 
 // RunAlertScan busca conceptos (persona, lugar, organizacion, tema) cuya
-// actividad de hoy supera significativamente su media de los últimos días.
+// actividad supera significativamente su media de los días anteriores.
+//
+// En lugar de comparar siempre contra CURRENT_DATE (que se queda vacío si la
+// cadena de traducción/NER va por detrás de la ingesta), se toma como día de
+// referencia el día más reciente que tenga datos de tags etiquetados y se
+// compara contra la media de los ALERTS_LOOKBACK_DAYS días previos, contando
+// los días sin actividad como 0.
 func RunAlertScan(ctx context.Context) (int, error) {
-	minHits := 3
+	minHits := 5
 	minRatio := 5.0
+	minBaseline := 2.0
+	lookbackDays := 8
 	if v := os.Getenv("ALERTS_MIN_HITS"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			minHits = n
@@ -121,6 +129,16 @@ func RunAlertScan(ctx context.Context) (int, error) {
 	if v := os.Getenv("ALERTS_MIN_RATIO"); v != "" {
 		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
 			minRatio = f
+		}
+	}
+	if v := os.Getenv("ALERTS_MIN_BASELINE"); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
+			minBaseline = f
+		}
+	}
+	if v := os.Getenv("ALERTS_LOOKBACK_DAYS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			lookbackDays = n
 		}
 	}
 
@@ -132,34 +150,43 @@ func RunAlertScan(ctx context.Context) (int, error) {
 			JOIN tags t ON tn.tag_id = t.id
 			JOIN traducciones tr ON tn.traduccion_id = tr.id
 			JOIN noticias n ON tr.noticia_id = n.id
-			WHERE n.fecha >= CURRENT_DATE - 8
+			WHERE n.fecha >= CURRENT_DATE - 30
+			  AND n.fecha <= CURRENT_DATE
 			  AND t.tipo IN ('persona', 'lugar', 'organizacion', 'tema')
 			GROUP BY t.id, t.valor, t.tipo, n.fecha::date
 		),
-		baseline AS (
-			SELECT tag_id, valor, tipo,
-			       AVG(cnt)::float AS baseline,
-			       MAX(cnt)::int AS max_prev
-			FROM daily
-			WHERE dia < CURRENT_DATE
-			GROUP BY tag_id, valor, tipo
+		ref AS (
+			SELECT MAX(dia) AS ref_date FROM daily
+		),
+		prev_series AS (
+			SELECT generate_series((SELECT ref_date - $3::int FROM ref),
+			                       (SELECT ref_date - 1 FROM ref), '1 day')::date AS dia
 		),
 		today AS (
 			SELECT tag_id, valor, tipo, SUM(cnt)::int AS hits
 			FROM daily
-			WHERE dia = CURRENT_DATE
+			WHERE dia = (SELECT ref_date FROM ref)
 			GROUP BY tag_id, valor, tipo
+		),
+		base AS (
+			SELECT t.tag_id, t.valor, t.tipo,
+			       AVG(COALESCE(d.cnt, 0))::float AS baseline
+			FROM today t
+			CROSS JOIN prev_series s
+			LEFT JOIN daily d ON d.tag_id = t.tag_id AND d.dia = s.dia
+			GROUP BY t.tag_id, t.valor, t.tipo
 		)
 		SELECT t.valor, t.tipo, t.hits, b.baseline,
-		       (t.hits::float / NULLIF(b.baseline, 0)) AS ratio
+		       (t.hits::float / b.baseline) AS ratio,
+		       (SELECT ref_date FROM ref)::date AS periodo
 		FROM today t
-		JOIN baseline b USING (tag_id)
+		JOIN base b USING (tag_id)
 		WHERE t.hits >= $1
-		  AND b.baseline >= 0.5
-		  AND (t.hits::float / NULLIF(b.baseline, 0)) >= $2
+		  AND b.baseline >= $4
+		  AND (t.hits::float / b.baseline) >= $2
 	`
 
-	rows, err := db.GetPool().Query(ctx, query, minHits, minRatio)
+	rows, err := db.GetPool().Query(ctx, query, minHits, minRatio, lookbackDays, minBaseline)
 	if err != nil {
 		return 0, err
 	}
@@ -170,14 +197,15 @@ func RunAlertScan(ctx context.Context) (int, error) {
 		var valor, tipo string
 		var hits int
 		var baseline, ratio float64
-		if err := rows.Scan(&valor, &tipo, &hits, &baseline, &ratio); err != nil {
+		var periodo time.Time
+		if err := rows.Scan(&valor, &tipo, &hits, &baseline, &ratio, &periodo); err != nil {
 			continue
 		}
 		res, err := db.GetPool().Exec(ctx, `
 			INSERT INTO alertas (valor, tipo, periodo, hits, baseline, ratio)
-			VALUES ($1, $2, CURRENT_DATE, $3, $4, $5)
+			VALUES ($1, $2, $3, $4, $5, $6)
 			ON CONFLICT (valor, tipo, periodo) DO NOTHING
-		`, valor, tipo, hits, baseline, ratio)
+		`, valor, tipo, periodo, hits, baseline, ratio)
 		if err != nil {
 			log.Printf("alerts: insert failed for %s (%s): %v", valor, tipo, err)
 			continue
@@ -200,12 +228,12 @@ func StartAlertScanner() {
 		}
 	}
 
-	go func() {
-		time.Sleep(45 * time.Second)
-		for {
-			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-			inserted, err := RunAlertScan(ctx)
-			cancel()
+		go func() {
+			time.Sleep(45 * time.Second)
+			for {
+				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+				inserted, err := RunAlertScan(ctx)
+				cancel()
 			if err != nil {
 				log.Printf("alerts: scan error: %v", err)
 			} else {

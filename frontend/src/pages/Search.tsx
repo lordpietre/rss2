@@ -3,6 +3,7 @@ import { useSearchParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { apiService, api, News, Category, Country } from '../services/api'
 import { Search as SearchIcon, Filter } from 'lucide-react'
+import { SkeletonNewsList, NoResultsFound, NoSearchResults } from '../components/ui'
 
 export function Search() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -132,13 +133,14 @@ export function Search() {
         <p className="text-gray-600 mb-4">{data.total} resultados encontrados</p>
       )}
 
-      {isLoading && (
-        <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-        </div>
-      )}
-
-      {data?.news && data.news.length > 0 && (
+      {isLoading ? (
+        <SkeletonNewsList count={6} />
+      ) : data?.news?.length === 0 ? (
+        <NoResultsFound
+          query={q}
+          onClearFilters={clearFilters}
+        />
+      ) : data?.news && data.news.length > 0 ? (
         <div className="space-y-4">
           {data.news.map((news: News) => (
             <Link key={news.id} to={`/news/${news.id}`} className="card p-4 block hover:shadow-md transition-shadow">
@@ -151,14 +153,8 @@ export function Search() {
             </Link>
           ))}
         </div>
-      )}
-
-      {(!q && !lang && !categoria && !pais) && (
-        <p className="text-center text-gray-500 mt-8">Introduce una búsqueda o selecciona filtros</p>
-      )}
-
-      {q && !isLoading && data?.news?.length === 0 && (
-        <p className="text-center text-gray-500 mt-8">No se encontraron resultados</p>
+      ) : (
+        <NoSearchResults query={q} onSearch={clearFilters} />
       )}
     </div>
   )

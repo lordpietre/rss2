@@ -1,0 +1,25 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# ==============================================================================
+# translate-worker - Worker de traducción MINIMO para Termux
+# ==============================================================================
+# Ejecuta el worker que se conecta al servidor y reenvía jobs de traducción.
+# Primera vez pide API key, luego funciona automáticamente.
+#==============================================================================
+
+export WORKER_NAME="${WORKER_NAME:-termux-$(date +%s)}"
+
+# Pedir API key si no está puesta
+if [ -z "$RSS2_API_KEY" ]; then
+    echo "🔑 RSS2 Translation Worker"
+    echo "========================="
+    read -p "API key: " RSS2_API_KEY
+    export RSS2_API_KEY
+fi
+
+echo "🚀 Iniciando worker de traducción mínima..."
+echo "   Worker: $WORKER_NAME"
+echo "   Modo: Reenvío de jobs al servidor"
+echo ""
+
+# Ejecutar worker Python mínimo
+exec python3 /home/x/rss2/translate_worker_termux.py "$@"

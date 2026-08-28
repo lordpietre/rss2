@@ -14,11 +14,11 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/mmcdole/gofeed"
+	"github.com/rss2/backend/internal/logger"
 	"github.com/rss2/backend/internal/workers"
 )
 
 var (
-	logger    *log.Logger
 	pool      *workers.Config
 	dbPool    *pgxpool.Pool
 	sleepSec  = 900 // 15 minutes
@@ -35,7 +35,8 @@ type URLSource struct {
 }
 
 func init() {
-	logger = log.New(os.Stdout, "[DISCOVERY] ", log.LstdFlags)
+	logLevel := os.Getenv("LOG_LEVEL")
+	logger.Init("discovery-worker", logLevel)
 }
 
 func loadConfig() {
@@ -416,48 +417,70 @@ func processURLSource(ctx context.Context, source URLSource) {
 
 func main() {
 	loadConfig()
-	logger.Println("Starting RSS Discovery Worker")
+	logger.Info().Msg("Starting RSS Discovery Worker")
 
 	cfg := workers.LoadDBConfig()
 	if err := workers.Connect(cfg); err != nil {
-		logger.Fatalf("Failed to connect to database: %v", err)
+		logger.Fatal().Err(err).Msg("Failed to connect to database")
 	}
 	dbPool = workers.GetPool()
 	defer workers.Close()
 
-	logger.Println("Connected to PostgreSQL")
+	logger.Info().Msg("Connected to PostgreSQL")
 
-	ctx := context.Background()
+	// Start health check HTTP server
+	go func() {
+		http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+			if err := workers.HealthCheck(r.Context()); err != nil {
+				http.Error(w, "unhealthy", http.StatusServiceUnavailable)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("ok"))
+		})
+		logger.Info().Msg("Health check server listening on :8080")
+		if err := http.ListenAndServe(":8080", nil); err != nil {
+			logger.Error().Err(err).Msg("Health check server error")
+		}
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
 		<-sigChan
-		logger.Println("Shutting down...")
+		logger.Info().Msg("Shutting down gracefully...")
+		cancel()
+		time.Sleep(2 * time.Second)
+		workers.Close()
 		os.Exit(0)
 	}()
 
-	logger.Printf("Config: interval=%ds, batch=%d", sleepSec, batchSize)
+	logger.Info().Msgf("Config: interval=%ds, batch=%d", sleepSec, batchSize)
 
 	ticker := time.NewTicker(time.Duration(sleepSec) * time.Second)
 	defer ticker.Stop()
 
 	for {
 		select {
+		case <-ctx.Done():
+			logger.Info().Msg("Context cancelled, stopping worker")
+			return
 		case <-ticker.C:
 			sources, err := getPendingURLs(ctx)
 			if err != nil {
-				logger.Printf("Error fetching URLs: %v", err)
+				logger.Error().Err(err).Msg("Error fetching URLs")
 				continue
 			}
 
 			if len(sources) == 0 {
-				logger.Println("No pending URLs to process")
+				logger.Info().Msg("No pending URLs to process")
 				continue
 			}
 
-			logger.Printf("Processing %d sources", len(sources))
+			logger.Info().Msgf("Processing %d sources", len(sources))
 
 			for _, source := range sources {
 				processURLSource(ctx, source)
