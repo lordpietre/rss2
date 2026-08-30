@@ -43,6 +43,7 @@ type NewsWithTranslations struct {
 type Entity struct {
 	Valor       string  `json:"valor"`
 	Tipo        string  `json:"tipo"`
+	Apellido    string  `json:"apellido"`
 	Count       int     `json:"count"`
 	WikiSummary *string `json:"wiki_summary"`
 	WikiURL     *string `json:"wiki_url"`
@@ -200,9 +201,9 @@ type AuthResponse struct {
 	IsFirstUser bool   `json:"is_first_user,omitempty"`
 }
 
-type ErrorResponse struct {
-	Error   string `json:"error"`
-	Message string `json:"message,omitempty"`
+type LastNameListResponse struct {
+	LastNames []string `json:"last_names"`
+	Total     int      `json:"total"`
 }
 
 type SuccessResponse struct {

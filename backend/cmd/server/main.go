@@ -244,9 +244,10 @@ func main() {
 		api.GET("/search/suggestions", middleware.AuthRequired(), handlers.SearchSuggestions)
 		api.POST("/searchlog", middleware.AuthRequired(), handlers.LogSearch)
 
-		api.GET("/entities", handlers.GetEntities)
-		api.GET("/entities/news", handlers.GetEntityNews)
-		api.GET("/entities/mentions", handlers.GetEntityMentions)
+api.GET("/entities", handlers.GetEntities)
+	api.GET("/entities/news", handlers.GetEntityNews)
+	api.GET("/entities/mentions", handlers.GetEntityMentions)
+	api.GET("/last-names", handlers.GetLastNames)
 
 		api.GET("/alerts", handlers.GetAlertas)
 		api.POST("/alerts/:id/read", middleware.AuthRequired(), handlers.MarkAlertaRead)

@@ -37,12 +37,15 @@ func CreateAlias(c *gin.Context) {
 	}
 	defer tx.Rollback(ctx)
 
+	// Extract last name from entity value (last word after splitting by space)
+	lastName := extractLastName(req.CanonicalName)
+
 	// 1. Ensure the canonical tag exists in tags table
 	var canonicalTagId int
 	err = tx.QueryRow(ctx, `
-		INSERT INTO tags (valor, tipo) VALUES ($1, $2)
-		ON CONFLICT (valor, tipo) DO UPDATE SET valor = EXCLUDED.valor
-		RETURNING id`, req.CanonicalName, req.Tipo).Scan(&canonicalTagId)
+		INSERT INTO tags (valor, tipo, apellido) VALUES ($1, $2, $3)
+		ON CONFLICT (valor, tipo) DO UPDATE SET valor = EXCLUDED.valor, apellido = EXCLUDED.apellido
+		RETURNING id`, req.CanonicalName, req.Tipo, lastName).Scan(&canonicalTagId)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to ensure canonical tag", "message": err.Error()})
 		return
@@ -110,6 +113,14 @@ func CreateAlias(c *gin.Context) {
 		"aliases_added":  req.Aliases,
 		"tipo":           req.Tipo,
 	})
+}
+
+func extractLastName(valor string) string {
+	parts := strings.Fields(valor)
+	if len(parts) > 0 {
+		return parts[len(parts)-1]
+	}
+	return ""
 }
 
 func ExportAliases(c *gin.Context) {
@@ -624,11 +635,12 @@ func PatchEntityTipo(c *gin.Context) {
 	}
 
 	// Make sure the target tag (valor, new_tipo) exists
+	lastName := extractLastName(req.Valor)
 	var targetTagId int
 	err = tx.QueryRow(ctx, `
-		INSERT INTO tags (valor, tipo) VALUES ($1, $2)
-		ON CONFLICT (valor, tipo) DO UPDATE SET valor = EXCLUDED.valor
-		RETURNING id`, req.Valor, req.NewTipo).Scan(&targetTagId)
+		INSERT INTO tags (valor, tipo, apellido) VALUES ($1, $2, $3)
+		ON CONFLICT (valor, tipo) DO UPDATE SET valor = EXCLUDED.valor, apellido = EXCLUDED.apellido
+		RETURNING id`, req.Valor, req.NewTipo, lastName).Scan(&targetTagId)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to ensure target tag", "message": err.Error()})
 		return

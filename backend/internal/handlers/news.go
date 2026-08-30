@@ -425,6 +425,11 @@ func GetEntities(c *gin.Context) {
 		args = append(args, "%"+q+"%")
 	}
 
+	if apellido := c.Query("apellido"); apellido != "" {
+		where += fmt.Sprintf(" AND t.apellido ILIKE $%d", len(args)+1)
+		args = append(args, "%"+apellido+"%")
+	}
+
 	// 1. Get the total count of distinct canonical entities matching the filter
 	countQuery := fmt.Sprintf(`
 		SELECT COUNT(DISTINCT COALESCE(ea.canonical_name, t.valor))
@@ -457,7 +462,7 @@ func GetEntities(c *gin.Context) {
 	// 2. Fetch the paginated entities
 	args = append(args, perPage, offset)
 	query := fmt.Sprintf(`
-		SELECT COALESCE(ea.canonical_name, t.valor) as valor, t.tipo, COUNT(*)::int as cnt,
+		SELECT COALESCE(ea.canonical_name, t.valor) as valor, t.tipo, t.apellido, COUNT(*)::int as cnt,
 		       MAX(t.wiki_summary), MAX(t.wiki_url), MAX(t.image_path)
 		FROM tags_noticia tn
 		JOIN tags t ON tn.tag_id = t.id
@@ -465,7 +470,7 @@ func GetEntities(c *gin.Context) {
 		JOIN noticias n ON tr.noticia_id = n.id
 		LEFT JOIN entity_aliases ea ON LOWER(ea.alias) = LOWER(t.valor) AND ea.tipo = t.tipo
 		WHERE %s
-		GROUP BY COALESCE(ea.canonical_name, t.valor), t.tipo
+		GROUP BY COALESCE(ea.canonical_name, t.valor), t.tipo, t.apellido
 		ORDER BY cnt DESC
 		LIMIT $%d OFFSET $%d
 	`, where, len(args)-1, len(args))
@@ -479,11 +484,13 @@ func GetEntities(c *gin.Context) {
 
 	var entities []models.Entity
 	for rows.Next() {
-		var e models.Entity
-		if err := rows.Scan(&e.Valor, &e.Tipo, &e.Count, &e.WikiSummary, &e.WikiURL, &e.ImagePath); err != nil {
+var e models.Entity
+	apellido := ""
+	if err := rows.Scan(&e.Valor, &e.Tipo, &e.Count, &apellido, &e.WikiSummary, &e.WikiURL, &e.ImagePath); err != nil {
 			continue
 		}
 		entities = append(entities, e)
+		e.Apellido = apellido
 	}
 
 	if entities == nil {
@@ -498,6 +505,36 @@ func GetEntities(c *gin.Context) {
 		Page:       page,
 		PerPage:    perPage,
 		TotalPages: totalPages,
+	})
+
+func GetLastNames(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	// Query distinct last names from tags table, only for persona type
+	rows, err := db.GetPool().Query(ctx, `
+		SELECT DISTINCT apellido 
+		FROM tags 
+		WHERE tipo = 'persona' AND apellido IS NOT NULL AND apellido != ''
+		ORDER BY apellido COLLATE "C"
+	`)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to get last names", Message: err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	var lastNames []string
+	for rows.Next() {
+		var apellido string
+		if err := rows.Scan(&apellido); err != nil {
+			continue
+		}
+		lastNames = append(lastNames, apellido)
+	}
+
+	c.JSON(http.StatusOK, models.LastNameListResponse{
+		LastNames: lastNames,
+		Total:     len(lastNames),
 	})
 }
 

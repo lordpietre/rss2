@@ -135,6 +135,7 @@ CREATE TABLE IF NOT EXISTS tags (
     id SERIAL PRIMARY KEY,
     valor VARCHAR(255) NOT NULL,
     tipo VARCHAR(32) NOT NULL,
+    apellido VARCHAR(100),
     UNIQUE(valor, tipo)
 );
 
@@ -151,6 +152,8 @@ CREATE TABLE IF NOT EXISTS topics (
 -- Agregar columnas faltantes si no existen
 ALTER TABLE topics ADD COLUMN IF NOT EXISTS weight REAL;
 ALTER TABLE topics ADD COLUMN IF NOT EXISTS keywords TEXT;
+
+ALTER TABLE tags ADD COLUMN IF NOT EXISTS apellido VARCHAR(100);
 
 -- =============================================================================
 -- SECCIÓN 2: TABLAS DEPENDIENTES (con foreign keys a tablas de arriba)
