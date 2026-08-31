@@ -122,23 +122,63 @@ export function AdminSettings() {
           </h2>
 
           <div className="space-y-4">
-            <div className="p-4 border border-gray-100 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900/50">
-              <h3 className="font-medium mb-1 flex items-center gap-2">
-                <FileArchive className="h-4 w-4" />
-                Noticias y Traducciones (ZIP)
-              </h3>
-              <p className="text-sm text-gray-500 mb-4">
-                Descarga un archivo comprimido con todas las noticias, traducciones y sus etiquetas (tags). 
-                Ideal para respaldar el contenido generado sin incluir configuraciones de sistema.
-              </p>
-              <button
-                onClick={() => apiService.backupNewsZipped()}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-              >
-                <Download className="h-4 w-4" />
-                Descargar Backup .zip
-              </button>
-            </div>
+<div className="p-4 border border-gray-100 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900/50">
+				<h3 className="font-medium mb-1 flex items-center gap-2">
+					<Rss className="h-4 w-4 text-blue-600" />
+					Feeds (CSV por país)
+				</h3>
+				<p className="text-sm text-gray-500 mb-4">
+					Descarga un archivo CSV con feeds filtrados por país. Ideal para respaldar fuentes específicas.
+				</p>
+				<div className="flex items-center gap-3 flex-wrap">
+					<select
+						value={paisFilter}
+						onChange={(e) => setPaisFilter(e.target.value)}
+						className="input w-auto"
+					>
+						<option value="">Todos los países</option>
+						{paises?.map((pais) => (
+							<option key={pais.id} value={pais.id}>{pais.nombre}</option>
+						))}
+					</select>
+					<button
+						onClick={() => apiService.exportFeeds({ pais_id: paisFilter })}
+						className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+					>
+						<Download className="h-4 w-4" />
+						Descargar Backup Feeds
+					</button>
+				</div>
+			</div>
+
+              <div className="p-4 border border-gray-100 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900/50">
+                <h3 className="font-medium mb-1 flex items-center gap-2">
+                  <Rss className="h-4 w-4 text-blue-600" />
+                  Feeds (CSV por país)
+                </h3>
+                <p className="text-sm text-gray-500 mb-4">
+                  Descarga un archivo CSV con feeds filtrados por país. Ideal para respaldar fuentes específicas.
+                </p>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <select
+                    value={paisFilter}
+                    onChange={(e) => setPaisFilter(e.target.value)}
+                    className="input w-auto"
+                  >
+                    <option value="">Todos los países</option>
+                    {paises?.map((pais) => (
+                      <option key={pais.id} value={pais.id}>{pais.nombre}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => apiService.exportFeeds({ pais_id: paisFilter })}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                  >
+                    <Download className="h-4 w-4" />
+                    Descargar Backup Feeds
+                  </button>
+                </div>
+              </div>
 
             <div className="p-4 border border-gray-100 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900/50">
               <h3 className="font-medium mb-1 flex items-center gap-2">

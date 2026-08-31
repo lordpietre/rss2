@@ -330,6 +330,22 @@ func ReactivateFeed(c *gin.Context) {
 }
 
 func ExportFeeds(c *gin.Context) {
+	// Add country filter parameter
+	paisID := c.Query("pais_id")
+	if paisID != "" {
+		// Add pais_id filter to query
+		where += fmt.Sprintf(" AND pais_id = $%d", argNum)
+		args = append(args, paisID)
+		argNum++
+	}
+	// Add country filter parameter
+	paisID := c.Query("pais_id")
+	if paisID != "" {
+		// Add pais_id filter to query
+		where += fmt.Sprintf(" AND pais_id = $%d", argNum)
+		args = append(args, paisID)
+		argNum++
+	}
 	activo := c.Query("activo")
 	categoriaID := c.Query("categoria_id")
 	paisID := c.Query("pais_id")
