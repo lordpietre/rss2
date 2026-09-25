@@ -1,102 +1,119 @@
 # ==================================================================================
-# CONFIGURACIÓN DE SECRETOS - Se cargan desde .env
+# RSS2 - Configuración Unificada (Go Puro + Servicios Externos)
 # ==================================================================================
-# Las variables POSTGRES_PASSWORD, REDIS_PASSWORD, DB_PASS, SECRET_KEY, GRAFANA_PASSWORD
-# deben estar definidas en un archivo .env antes de ejecutar docker compose up
-#
-# Para generar credenciales seguras automáticamente:
-#   ./generate_secure_credentials.sh --force
-#
-# Despliegue simple:
-#   docker compose up -d
+# Variables requeridas en .env:
+# POSTGRES_PASSWORD, REDIS_PASSWORD, DB_PASS, SECRET_KEY, GRAFANA_PASSWORD
 # ==================================================================================
 
 services:
+  # ------------------------------------------------------------------------------
+  # BASE DE DATOS Y CACHE
+  # ------------------------------------------------------------------------------
   db:
-    image: postgres:18-alpine
+    image: postgres:16-alpine
     container_name: rss2_db
-    shm_size: 4gb
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-rss}
       POSTGRES_USER: ${POSTGRES_USER:-rss}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C.UTF-8"
-      LANG: C.UTF-8
-      LC_ALL: C.UTF-8
-      TZ: Europe/Madrid
-      PGDATA: /var/lib/postgresql/data/18/main
     volumes:
       - ./data/pgdata:/var/lib/postgresql/data
-      - ./init-db:/docker-entrypoint-initdb.d:rw
-      - ./docker-entrypoint-db.sh:/docker-entrypoint-db.sh:ro
-    entrypoint: ["bash", "/docker-entrypoint-db.sh"]
+      - ./init-db:/docker-entrypoint-initdb.d:ro
     networks:
-      backend:
-        aliases:
-          - db
-          - rss2_db
+      - backend
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U $$POSTGRES_USER -d $$POSTGRES_DB || exit 1" ]
-      # NOTA: Si falla, verifica que POSTGRES_PASSWORD esté definido en .env
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 5s
       retries: 30
-      start_period: 20s
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 8G
-        reservations:
-          memory: 4G
 
   redis:
     image: redis:7-alpine
     container_name: rss2_redis
-    environment:
-      TZ: Europe/Madrid
-    # SEGURIDAD: Redis con autenticación
-    command: >
-      redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD:-!ERROR!REDIS_PASSWORD_NEEDED!}
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD}
     volumes:
       - ./data/redis-data:/data
-      - /etc/timezone:/etc/timezone:ro
-      - /etc/localtime:/etc/localtime:ro
     networks:
-      backend:
-        aliases:
-          - redis
-          - rss2_redis
+      - backend
     restart: unless-stopped
     healthcheck:
-      # VALIDACIÓN: Si REDIS_PASSWORD está vacío, esto fallará y detendrá el despliegue
-      test: [ "CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD}", "ping" ]
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
+
+  # ------------------------------------------------------------------------------
+  # SERVICIOS EXTERNOS (GPU/ML) - Se mantienen fuera de Go
+  # ------------------------------------------------------------------------------
+  # Traductor NLLB-200 (CTranslate2) - CPU
+  translator:
+    build:
+      context: ./translator
+      dockerfile: Dockerfile.cpu
+    container_name: rss2_translator
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q ctranslator /proc/1/cmdline"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+    environment:
+      CT2_MODEL_PATH: /models/nllb-ct2
+      CT2_DEVICE: cpu
+      CT2_COMPUTE_TYPE: int8
+      CT2_INTRA_THREADS: 2
+      TRANSLATOR_ID: "0"
+      TRANSLATOR_TOTAL: "2"
+      PORT: 8000
+      TARGET_LANGS: ${TARGET_LANGS:-es}
+      TRANSLATOR_BATCH: ${TRANSLATOR_BATCH:-32}
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-rss}
+      DB_USER: ${POSTGRES_USER:-rss}
+      DB_PASS: ${POSTGRES_PASSWORD}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+    volumes:
+      - ./models:/models:ro
+    networks:
+      - backend
+    restart: unless-stopped
     deploy:
       resources:
         limits:
-          memory: 768M
-        reservations:
-          memory: 512M
+          cpus: '2'
+          memory: 4G
 
-  rss-ingestor-go:
-    build:
-      context: ./rss-ingestor-go
-      dockerfile: Dockerfile
-    container_name: rss2_ingestor_go
+  # Réplicas 2-3 del translator (paso 1 velocidad): reutilizan la imagen
+  # ya construida; se reparten el trabajo por SKIP LOCKED en SQL.
+  translator-2:
+    image: rss2-translator
+    container_name: rss2_translator_2
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q ctranslator /proc/1/cmdline"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
     environment:
+      CT2_MODEL_PATH: /models/nllb-ct2
+      CT2_DEVICE: cpu
+      CT2_COMPUTE_TYPE: int8
+      CT2_INTRA_THREADS: 2
+      TRANSLATOR_ID: "1"
+      TRANSLATOR_TOTAL: "2"
+      PORT: 8000
+      TARGET_LANGS: ${TARGET_LANGS:-es}
+      TRANSLATOR_BATCH: ${TRANSLATOR_BATCH:-32}
       DB_HOST: db
       DB_PORT: 5432
-      DB_NAME: ${DB_NAME:-rss}
-      DB_USER: ${DB_USER:-rss}
-      DB_PASS: ${DB_PASS}
-      RSS_MAX_WORKERS: ${RSS_MAX_WORKERS:-100}
-      RSS_POKE_INTERVAL_MIN: ${RSS_POKE_INTERVAL_MIN:-60}
-      RSS_HOST_DELAY_MS: ${RSS_HOST_DELAY_MS:-800}
-      TZ: Europe/Madrid
+      DB_NAME: ${POSTGRES_DB:-rss}
+      DB_USER: ${POSTGRES_USER:-rss}
+      DB_PASS: ${POSTGRES_PASSWORD}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+    volumes:
+      - ./models:/models:ro
     networks:
       - backend
     depends_on:
@@ -107,117 +124,175 @@ services:
       resources:
         limits:
           cpus: '2'
-          memory: 2G
-        reservations:
-          memory: 512M
+          memory: 4G
 
+  # Traductor GPU (opcional, solo con --profile gpu y NVIDIA + nvidia-container-toolkit)
+  translator-gpu:
+    profiles: ["gpu"]
+    build:
+      context: ./translator
+      dockerfile: Dockerfile.gpu
+    container_name: rss2_translator_gpu
+    environment:
+      CT2_MODEL_PATH: /models/nllb-ct2
+      CT2_DEVICE: cuda
+      CT2_COMPUTE_TYPE: float16
+      CT2_INTRA_THREADS: 4
+      PORT: 8000
+      TARGET_LANGS: ${TARGET_LANGS:-es}
+      TRANSLATOR_BATCH: ${TRANSLATOR_BATCH:-32}
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-rss}
+      DB_USER: ${POSTGRES_USER:-rss}
+      DB_PASS: ${POSTGRES_PASSWORD}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+    volumes:
+      - ./models:/models:ro
+    networks:
+      - backend
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # ------------------------------------------------------------------------------
+  # INGESTA Y TRADUCCIÓN
+  # ------------------------------------------------------------------------------
+  # Ingestor RSS (Go): feeds -> noticias
+  ingestor:
+    build:
+      context: ./rss-ingestor-go
+    container_name: rss2_ingestor
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q rss-ingestor /proc/1/cmdline"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-rss}
+      DB_USER: ${POSTGRES_USER:-rss}
+      DB_PASS: ${POSTGRES_PASSWORD}
+      RSS_MAX_WORKERS: 20
+      RSS_POKE_INTERVAL_MIN: 8
+    networks:
+      - backend
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Scheduler: noticias -> traducciones pendientes (las consume el translator)
+  translation-scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile.scheduler
+    image: rss2-pyworkers
+    container_name: rss2_translation_scheduler
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q translation_scheduler /proc/1/cmdline"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-rss}
+      DB_USER: ${POSTGRES_USER:-rss}
+      DB_PASS: ${POSTGRES_PASSWORD}
+      TARGET_LANGS: ${TARGET_LANGS:-es}
+      SCHEDULER_BATCH: 2000
+      SCHEDULER_SLEEP: 30
+    networks:
+      - backend
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Langdetect: noticias.lang (lo necesita el scheduler para encolar traducciones)
   langdetect:
     build:
       context: .
-      dockerfile: Dockerfile
-    container_name: rss2_langdetect_py
-    command: bash -lc "python -m workers.langdetect_worker"
+      dockerfile: Dockerfile.scheduler
+    image: rss2-pyworkers
+    container_name: rss2_langdetect
+    command: ["python", "workers/langdetect_worker.py"]
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q langdetect /proc/1/cmdline"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     environment:
       DB_HOST: db
       DB_PORT: 5432
-      DB_NAME: ${DB_NAME:-rss}
-      DB_USER: ${DB_USER:-rss}
-      DB_PASS: ${DB_PASS}
-      LANG_DETECT_SLEEP: 60
-      LANG_DETECT_BATCH: 1000
-      TZ: Europe/Madrid
-    volumes:
-      - ./workers:/app/workers
+      DB_NAME: ${POSTGRES_DB:-rss}
+      DB_USER: ${POSTGRES_USER:-rss}
+      DB_PASS: ${POSTGRES_PASSWORD}
     networks:
       - backend
     depends_on:
       db:
         condition: service_healthy
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
 
-  # ==================================================================================
-  # SCRAPER WORKER (Go) - Extrae artículos de URLs
-  # ==================================================================================
-  scraper:
+  # NER (spaCy es_core_news_lg sobre traducciones done): tags -> Populares/Evolución/Alertas
+  ner:
     build:
       context: .
-      dockerfile: Dockerfile.scraper
-    container_name: rss2_scraper
+      dockerfile: Dockerfile.ner
+    container_name: rss2_ner
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q ner_worker /proc/1/cmdline"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 180s
     environment:
       DB_HOST: db
       DB_PORT: 5432
-      DB_NAME: ${DB_NAME:-rss}
-      DB_USER: ${DB_USER:-rss}
-      DB_PASS: ${DB_PASS}
-      SCRAPER_SLEEP: 120
-      SCRAPER_BATCH: 10
-      SCRAPER_ENRICH_LIMIT: 10
-      SCRAPER_WORKERS: ${SCRAPER_WORKERS:-2}
-      TZ: Europe/Madrid
+      DB_NAME: ${POSTGRES_DB:-rss}
+      DB_USER: ${POSTGRES_USER:-rss}
+      DB_PASS: ${POSTGRES_PASSWORD}
+      NER_LANG: es
+      NER_BATCH: 64
     networks:
       - backend
     depends_on:
       db:
         condition: service_healthy
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 512M
 
-  # ==================================================================================
-  # DISCOVERY WORKER (Go) - Descubre RSS feeds
-  # ==================================================================================
-  discovery:
-    build:
-      context: .
-      dockerfile: Dockerfile.discovery
-    container_name: rss2_discovery
+  # Wiki: enriquece tags (persona/organizacion) con resumen+imagen de Wikipedia.
+  # Reutiliza la imagen backend (el binario /wiki-worker ya se compila en
+  # backend/Dockerfile): evita el build con contexto raíz, que es muy pesado.
+  wiki:
+    image: rss2-backend
+    container_name: rss2_wiki
+    entrypoint: ["/wiki-worker"]
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q wiki-worker /proc/1/cmdline"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     environment:
       DB_HOST: db
       DB_PORT: 5432
-      DB_NAME: ${DB_NAME:-rss}
-      DB_USER: ${DB_USER:-rss}
-      DB_PASS: ${DB_PASS}
-      DISCOVERY_INTERVAL: 900
-      DISCOVERY_BATCH: 10
-      MAX_FEEDS_PER_URL: 5
-      TZ: Europe/Madrid
-    networks:
-      - backend
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 512M
-
-  # ==================================================================================
-  # WIKI WORKER (Go) - Wikipedia info and thumbnails
-  # ==================================================================================
-  wiki-worker:
-    build:
-      context: .
-      dockerfile: Dockerfile.wiki
-    container_name: rss2_wiki_worker
-    environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_NAME: ${DB_NAME:-rss}
-      DB_USER: ${DB_USER:-rss}
-      DB_PASS: ${DB_PASS}
+      DB_NAME: ${POSTGRES_DB:-rss}
+      DB_USER: ${POSTGRES_USER:-rss}
+      DB_PASS: ${POSTGRES_PASSWORD}
       WIKI_SLEEP: 10
       WIKI_BATCH: 20
-      TZ: Europe/Madrid
     volumes:
       - ./data/wiki_images:/app/data/wiki_images
     networks:
@@ -226,25 +301,182 @@ services:
       db:
         condition: service_healthy
     restart: unless-stopped
+
+  # Topics: clasifica noticias (news_topics) y puebla noticias.pais_id
+  # Reutiliza la imagen backend (sin build: evita el conflicto AlreadyExists
+  # de construir dos servicios contra el mismo tag en un solo comando).
+  topics:
+    image: rss2-backend
+    container_name: rss2_topics
+    entrypoint: ["/topics"]
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-rss}
+      DB_USER: ${POSTGRES_USER:-rss}
+      DB_PASS: ${POSTGRES_PASSWORD}
+      TOPICS_SLEEP: 10
+      TOPICS_BATCH: 500
+    networks:
+      - backend
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q topics /proc/1/cmdline"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  # Embeddings locales (sentence-transformers, CPU): traducciones done
+  # → traduccion_embeddings. Sustituto del Ollama retirado; alimenta a
+  # related (coseno SQL). Modelo pre-descargado en ./hf_cache.
+  embeddings:
+    build:
+      context: .
+      dockerfile: Dockerfile.embeddings
+    container_name: rss2_embeddings
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-rss}
+      DB_USER: ${POSTGRES_USER:-rss}
+      DB_PASS: ${POSTGRES_PASSWORD}
+      EMB_MODEL: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+      EMB_BATCH: 128
+      EMB_LANGS: es
+      EMB_LIMIT: 1000
+      DEVICE: cpu
+    volumes:
+      - ./hf_cache:/cache
+    networks:
+      - backend
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
     deploy:
       resources:
         limits:
-          cpus: '0.5'
-          memory: 256M
+          cpus: '2'
+          memory: 4G
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q embeddings_worker /proc/1/cmdline"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 300s
 
-  # ==================================================================================
-  # BACKEND GO (API REST)
-  # ==================================================================================
-  backend-go:
+  # Related: noticias relacionadas por coseno (CPU) sobre embeddings locales.
+  # EMB_MODEL debe coincidir con el del servicio embeddings.
+  related:
+    image: rss2-backend
+    container_name: rss2_related
+    entrypoint: ["/related"]
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-rss}
+      DB_USER: ${POSTGRES_USER:-rss}
+      DB_PASS: ${POSTGRES_PASSWORD}
+      RELATED_SLEEP: 30
+      RELATED_BATCH: 200
+      RELATED_TOPK: 10
+      EMB_MODEL: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+    networks:
+      - backend
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q related /proc/1/cmdline"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  # Scraper: completa resumen<200 y explora fuentes_url activas.
+  # Sin fuentes_url sembradas solo hace enriquecimiento (también útil).
+  scraper:
+    image: rss2-backend
+    container_name: rss2_scraper
+    entrypoint: ["/scraper"]
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-rss}
+      DB_USER: ${POSTGRES_USER:-rss}
+      DB_PASS: ${POSTGRES_PASSWORD}
+      SCRAPER_INTERVAL: 60
+      SCRAPER_WORKERS: 5
+      SCRAPER_BATCH: 10
+      SCRAPER_ENRICH_LIMIT: 20
+    networks:
+      - backend
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q scraper /proc/1/cmdline"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  # Discovery: fuentes_url → feeds (directos si hay categoria+pais,
+  # si no a feeds_pending para revisión). Dedupe por ON CONFLICT(url).
+  discovery:
+    image: rss2-backend
+    container_name: rss2_discovery
+    entrypoint: ["/discovery"]
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-rss}
+      DB_USER: ${POSTGRES_USER:-rss}
+      DB_PASS: ${POSTGRES_PASSWORD}
+      DISCOVERY_INTERVAL: 900
+      DISCOVERY_BATCH: 10
+      MAX_FEEDS_PER_URL: 5
+    networks:
+      - backend
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q discovery /proc/1/cmdline"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  # ------------------------------------------------------------------------------
+  # BACKEND UNIFICADO (Go) - Un solo binario, múltiples subcomandos
+  # ------------------------------------------------------------------------------
+  backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: rss2_backend_go
+    container_name: rss2_backend
+    command: server
     environment:
       TZ: Europe/Madrid
       DATABASE_URL: postgres://${POSTGRES_USER:-rss}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-rss}?sslmode=disable
-      REDIS_URL: redis://:${REDIS_PASSWORD:-rss_redis_pass_2024}@redis:6379
-      SECRET_KEY: ${SECRET_KEY:-change_this_to_a_long_random_string}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      SECRET_KEY: ${SECRET_KEY}
       SERVER_PORT: "8080"
     volumes:
       - ./data/wiki_images:/app/data/wiki_images
@@ -260,34 +492,28 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2'
-          memory: 512M
+          cpus: '4'
+          memory: 4G
 
-  # ==================================================================================
-  # FRONTEND REACT
-  # ==================================================================================
-  rss2_frontend:
+  # ------------------------------------------------------------------------------
+  # FRONTEND (React + Vite)
+  # ------------------------------------------------------------------------------
+  frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: rss2_frontend
     environment:
-      TZ: Europe/Madrid
       VITE_API_URL: /api
     networks:
       - frontend
     depends_on:
-      - backend-go
+      - backend
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 512M
 
-  # ==================================================================================
-  # NGINX (Puerto 8001 - sirve React + proxy API)
-  # ==================================================================================
+  # ------------------------------------------------------------------------------
+  # NGINX (Gateway - Puerto 8888)
+  # ------------------------------------------------------------------------------
   nginx:
     image: nginx:alpine
     container_name: rss2_nginx
@@ -298,367 +524,65 @@ services:
     networks:
       - frontend
     depends_on:
-      - rss2_frontend
-      - backend-go
+      - frontend
+      - backend
     restart: unless-stopped
 
-  # ==================================================================================
-  # TRANSLATOR CPU (CTranslate2) - Scale with: docker compose up -d --scale translator=3
-  # ==================================================================================
-  translator:
-    build:
-      context: .
-      dockerfile: Dockerfile.translator
-    image: rss2-translator:latest
-    command: bash -lc "python -m workers.ctranslator_worker"
-    environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_NAME: ${DB_NAME:-rss}
-      DB_USER: ${DB_USER:-rss}
-      DB_PASS: ${DB_PASS}
-      TARGET_LANGS: es
-      TRANSLATOR_BATCH: ${TRANSLATOR_BATCH:-128}
-      CT2_MODEL_PATH: /app/models/nllb-ct2
-      CT2_DEVICE: cpu
-      CT2_COMPUTE_TYPE: int8
-      CT2_INTRA_THREADS: 4
-      UNIVERSAL_MODEL: facebook/nllb-200-distilled-600M
-      HF_HOME: /app/hf_cache
-      TZ: Europe/Madrid
-      TRANSLATOR_ID: ${TRANSLATOR_ID:-}
-      REDIS_URL: redis://:${REDIS_PASSWORD:-rss_redis_pass_2024}@redis:6379
-      PYTORCH_ENABLE_MPS_FALLBACK: 1
+  # ------------------------------------------------------------------------------
+  # MONITOREO (Opcional - activar con profile monitoring)
+  # ------------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: rss2_prometheus
+    profiles: ["monitoring"]
     volumes:
-      - ./workers:/app/workers
-      - ./hf_cache:/app/hf_cache
-      - ./models:/app/models
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./data/prometheus:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
     networks:
       - backend
-    depends_on:
-      db:
-        condition: service_healthy
     restart: unless-stopped
-    # Prioridad BAJA: el traductor no debe acaparar toda la CPU.
-    # cpu_shares menor que el resto (1024) + tope que deje CPU para NER, embeddings, etc.
-    cpu_shares: 512
-    deploy:
-      resources:
-        limits:
-          cpus: '4'
-          memory: 6G
 
-  # ==================================================================================
-  # TRANSLATOR CPU Nº2 - Segundo worker CPU (paralelo al translator)
-  # ==================================================================================
-  translator-gpu:
-    build:
-      context: .
-      dockerfile: Dockerfile.translator
-    image: rss2-translator:latest
-    command: bash -lc "python -m workers.ctranslator_worker"
+  grafana:
+    image: grafana/grafana:latest
+    container_name: rss2_grafana
+    profiles: ["monitoring"]
     environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_NAME: ${DB_NAME:-rss}
-      DB_USER: ${DB_USER:-rss}
-      DB_PASS: ${DB_PASS}
-      TARGET_LANGS: es
-      TRANSLATOR_BATCH: ${TRANSLATOR_BATCH:-128}
-      CT2_MODEL_PATH: /app/models/nllb-ct2
-      CT2_DEVICE: cpu
-      CT2_COMPUTE_TYPE: int8
-      CT2_INTRA_THREADS: 4
-      UNIVERSAL_MODEL: facebook/nllb-200-distilled-600M
-      HF_HOME: /app/hf_cache
-      TZ: Europe/Madrid
-      TRANSLATOR_ID: ${TRANSLATOR_ID:-}
-      REDIS_URL: redis://:${REDIS_PASSWORD:-rss_redis_pass_2024}@redis:6379
-      PYTORCH_ENABLE_MPS_FALLBACK: 1
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
-      - ./workers:/app/workers
-      - ./hf_cache:/app/hf_cache
-      - ./models:/app/models
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./data/grafana:/var/lib/grafana
     networks:
       - backend
     depends_on:
-      db:
-        condition: service_healthy
+      - prometheus
     restart: unless-stopped
-    # Prioridad BAJA: mismo trato que el translator.
-    cpu_shares: 512
-    deploy:
-      resources:
-        limits:
-          cpus: '4'
-          memory: 6G
 
-  # ==================================================================================
-  # TRANSLATION SCHEDULER - Creates translation jobs
-  # ==================================================================================
-  translation-scheduler:
-    build:
-      context: .
-      dockerfile: Dockerfile.scheduler
-    image: rss2-scheduler:latest
-    container_name: rss2_translation_scheduler
-    environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_NAME: ${DB_NAME:-rss}
-      DB_USER: ${DB_USER:-rss}
-      DB_PASS: ${DB_PASS}
-      TARGET_LANGS: es
-      SCHEDULER_BATCH: 200
-      SCHEDULER_AGE_DAYS: 30
-      SCHEDULER_SLEEP: 30
-      TZ: Europe/Madrid
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: rss2_cadvisor
+    profiles: ["monitoring"]
     volumes:
-      - ./workers:/app/workers
-    networks:
-      - backend
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 256M
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: unless-stopped
-
-  embeddings:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: rss2_embeddings_py
-    command: bash -lc "python -m workers.embeddings_worker"
-    environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_NAME: ${DB_NAME:-rss}
-      DB_USER: ${DB_USER:-rss}
-      DB_PASS: ${DB_PASS}
-      EMB_MODEL: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
-      EMB_BATCH: 32
-      EMB_SLEEP_IDLE: 5
-      EMB_LANGS: es
-      EMB_LIMIT: 300
-      DEVICE: cpu
-      HF_HOME: /app/hf_cache
-      TZ: Europe/Madrid
-    volumes:
-      - ./workers:/app/workers
-      - ./hf_cache:/app/hf_cache
-    networks:
-      - backend
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 6G
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: unless-stopped
-
-  # ==================================================================================
-  # TOPICS WORKER (Go) - Matching temas y países
-  # ==================================================================================
-  topics:
-    build:
-      context: .
-      dockerfile: Dockerfile.topics
-    container_name: rss2_topics
-    environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_NAME: ${DB_NAME:-rss}
-      DB_USER: ${DB_USER:-rss}
-      DB_PASS: ${DB_PASS}
-      TOPICS_SLEEP: 10
-      TOPICS_BATCH: 500
-      TZ: Europe/Madrid
-    networks:
-      - backend
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 512M
-
-  # ==================================================================================
-  # RELATED WORKER (Go) - Noticias relacionadas
-  # ==================================================================================
-  related:
-    build:
-      context: .
-      dockerfile: Dockerfile.related
-    container_name: rss2_related
-    environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_NAME: ${DB_NAME:-rss}
-      DB_USER: ${DB_USER:-rss}
-      DB_PASS: ${DB_PASS}
-      RELATED_SLEEP: 10
-      RELATED_BATCH: 200
-      RELATED_TOPK: 10
-      EMB_MODEL: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
-      TZ: Europe/Madrid
-    networks:
-      - backend
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 1G
-
-  qdrant:
-    image: qdrant/qdrant:latest
-    container_name: rss2_qdrant
-    environment:
-      TZ: Europe/Madrid
-      QDRANT__SERVICE__GRPC_PORT: 6334
-    volumes:
-      - ./data/qdrant_storage:/qdrant/storage
-      - /etc/timezone:/etc/timezone:ro
-      - /etc/localtime:/etc/localtime:ro
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
     networks:
       - backend
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '4'
-          memory: 4G
-        reservations:
-          memory: 2G
 
-  # ==================================================================================
-  # QDRANT WORKER (Go) - Vectorización y búsqueda semántica
-  # ==================================================================================
-  qdrant-worker:
-    build:
-      context: .
-      dockerfile: Dockerfile.qdrant
-    container_name: rss2_qdrant_worker
-    environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_NAME: ${DB_NAME:-rss}
-      DB_USER: ${DB_USER:-rss}
-      DB_PASS: ${DB_PASS}
-      QDRANT_HOST: qdrant
-      QDRANT_PORT: 6333
-      QDRANT_COLLECTION: news_vectors
-      OLLAMA_URL: http://ollama:11434
-      QDRANT_SLEEP: 30
-      QDRANT_BATCH: 100
-      TZ: Europe/Madrid
-    networks:
-      - backend
-    depends_on:
-      db:
-        condition: service_healthy
-      qdrant:
-        condition: service_started
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 1G
-
-  # ==================================================================================
-  # NER WORKER (Python) - Extracción de entidades
-  # ==================================================================================
-  ner:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: rss2_ner
-    command: bash -lc "python -m workers.ner_worker"
-    environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_NAME: ${DB_NAME:-rss}
-      DB_USER: ${DB_USER:-rss}
-      DB_PASS: ${DB_PASS}
-      NER_LANG: es
-      NER_BATCH: 24
-      HF_HOME: /app/hf_cache
-      TZ: Europe/Madrid
-    volumes:
-      - ./workers:/app/workers
-      - ./hf_cache:/app/hf_cache
-    networks:
-      - backend
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
-
-  # ==================================================================================
-  # CLUSTER WORKER (Python) - Agrupación de noticias
-  # ==================================================================================
-  cluster:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: rss2_cluster_py
-    command: bash -lc "python -m workers.cluster_worker"
-    environment:
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_NAME: ${DB_NAME:-rss}
-      DB_USER: ${DB_USER:-rss}
-      DB_PASS: ${DB_PASS}
-      EVENT_DIST_THRESHOLD: 0.35
-      EMB_MODEL: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
-      TZ: Europe/Madrid
-    volumes:
-      - ./workers:/app/workers
-    networks:
-      - backend
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
-
-  # ==================================================================================
-  # REDES SEGMENTADAS
-  # ==================================================================================
+# ------------------------------------------------------------------------------
+# REDES
+# ------------------------------------------------------------------------------
 networks:
-  # Red frontal - Solo nginx y web app
   frontend:
     name: rss2_frontend
     driver: bridge
-    internal: false
-
-  # Red backend - Base de datos, workers, redis, qdrant
   backend:
     name: rss2_backend
     driver: bridge
-    internal: false # Acceso externo permitido (necesario para ingestor)
-
-volumes:
-  torch_extensions:

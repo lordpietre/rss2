@@ -15,15 +15,18 @@ import (
 )
 
 type Alerta struct {
-	ID        int64   `json:"id"`
-	Valor     string  `json:"valor"`
-	Tipo      string  `json:"tipo"`
-	Periodo   string  `json:"periodo"`
-	Hits      int     `json:"hits"`
-	Baseline  float64 `json:"baseline"`
-	Ratio     float64 `json:"ratio"`
-	Status    string  `json:"status"`
-	CreatedAt string  `json:"created_at"`
+	ID          int64   `json:"id"`
+	Valor       string  `json:"valor"`
+	Tipo        string  `json:"tipo"`
+	Periodo     string  `json:"periodo"`
+	Hits        int     `json:"hits"`
+	Baseline    float64 `json:"baseline"`
+	Ratio       float64 `json:"ratio"`
+	Status      string  `json:"status"`
+	CreatedAt   string  `json:"created_at"`
+	WikiSummary *string `json:"wiki_summary"`
+	WikiURL     *string `json:"wiki_url"`
+	ImagePath   *string `json:"image_path"`
 }
 
 func GetAlertas(c *gin.Context) {
@@ -36,15 +39,18 @@ func GetAlertas(c *gin.Context) {
 	}
 
 	query := `
-		SELECT id, valor, tipo, periodo::text, hits, baseline, ratio, status, to_char(created_at, 'YYYY-MM-DD HH24:MI') AS created_at
-		FROM alertas
+		SELECT a.id, a.valor, a.tipo, a.periodo::text, a.hits, a.baseline,
+		       a.ratio, a.status, to_char(a.created_at, 'YYYY-MM-DD HH24:MI'),
+		       t.wiki_summary, t.wiki_url, t.image_path
+		FROM alertas a
+		LEFT JOIN tags t ON t.valor = a.valor AND t.tipo = a.tipo
 	`
 	args := []interface{}{}
 	if status != "" {
-		query += fmt.Sprintf(" WHERE status = $%d", len(args)+1)
+		query += fmt.Sprintf(" WHERE a.status = $%d", len(args)+1)
 		args = append(args, status)
 	}
-	query += fmt.Sprintf(" ORDER BY periodo DESC, ratio DESC, id DESC LIMIT $%d", len(args)+1)
+	query += fmt.Sprintf(" ORDER BY a.periodo DESC, a.ratio DESC, a.id DESC LIMIT $%d", len(args)+1)
 	args = append(args, limit)
 
 	rows, err := db.GetPool().Query(c.Request.Context(), query, args...)
@@ -57,7 +63,8 @@ func GetAlertas(c *gin.Context) {
 	alertas := []Alerta{}
 	for rows.Next() {
 		var a Alerta
-		if err := rows.Scan(&a.ID, &a.Valor, &a.Tipo, &a.Periodo, &a.Hits, &a.Baseline, &a.Ratio, &a.Status, &a.CreatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.Valor, &a.Tipo, &a.Periodo, &a.Hits, &a.Baseline, &a.Ratio, &a.Status, &a.CreatedAt, &a.WikiSummary, &a.WikiURL, &a.ImagePath); err != nil {
+			log.Printf("alerts: scan row error: %v", err)
 			continue
 		}
 		alertas = append(alertas, a)
@@ -113,9 +120,10 @@ func ScanAlertasAdmin(c *gin.Context) {
 //
 // En lugar de comparar siempre contra CURRENT_DATE (que se queda vacío si la
 // cadena de traducción/NER va por detrás de la ingesta), se toma como día de
-// referencia el día más reciente que tenga datos de tags etiquetados y se
-// compara contra la media de los ALERTS_LOOKBACK_DAYS días previos, contando
-// los días sin actividad como 0.
+// referencia el último día COMPLETO (dia < CURRENT_DATE) que tenga datos de
+// tags etiquetados: el día en curso está incompleto y comparar contra él
+// impide que el scan dispare nunca. Se compara contra la media de los
+// ALERTS_LOOKBACK_DAYS días previos, contando los días sin actividad como 0.
 func RunAlertScan(ctx context.Context) (int, error) {
 	minHits := 5
 	minRatio := 5.0
@@ -151,7 +159,7 @@ func RunAlertScan(ctx context.Context) (int, error) {
 			JOIN traducciones tr ON tn.traduccion_id = tr.id
 			JOIN noticias n ON tr.noticia_id = n.id
 			WHERE n.fecha >= CURRENT_DATE - 30
-			  AND n.fecha <= CURRENT_DATE
+			  AND n.fecha < CURRENT_DATE
 			  AND t.tipo IN ('persona', 'lugar', 'organizacion', 'tema')
 			GROUP BY t.id, t.valor, t.tipo, n.fecha::date
 		),
@@ -199,6 +207,7 @@ func RunAlertScan(ctx context.Context) (int, error) {
 		var baseline, ratio float64
 		var periodo time.Time
 		if err := rows.Scan(&valor, &tipo, &hits, &baseline, &ratio, &periodo); err != nil {
+			log.Printf("alerts: scan row error: %v", err)
 			continue
 		}
 		res, err := db.GetPool().Exec(ctx, `

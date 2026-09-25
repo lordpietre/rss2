@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -314,23 +313,23 @@ func createFeedDirectly(ctx context.Context, feedURL string, fuenteURLID *int64,
 }
 
 func processURLSource(ctx context.Context, source URLSource) {
-	logger.Printf("Processing: %s (%s)", source.Nombre, source.URL)
+	logger.Info().Str("nombre", source.Nombre).Str("url", source.URL).Msg("Processing")
 
 	// Try to find feeds on this URL
 	feeds, err := discoverFeeds(source.URL)
 	if err != nil {
-		logger.Printf("Error discovering feeds: %v", err)
+		logger.Error().Err(err).Str("url", source.URL).Msg("Error discovering feeds")
 		updateURLStatus(ctx, source.ID, "error", err.Error()[:200], 0)
 		return
 	}
 
 	if len(feeds) == 0 {
-		logger.Printf("No feeds found for: %s", source.URL)
+		logger.Warn().Str("url", source.URL).Msg("No feeds found")
 		updateURLStatus(ctx, source.ID, "no_feeds", "No feeds found", 200)
 		return
 	}
 
-	logger.Printf("Found %d feeds for %s", len(feeds), source.URL)
+	logger.Info().Int("count", len(feeds)).Str("url", source.URL).Msg("Found feeds")
 
 	maxFeeds := getEnvInt("MAX_FEEDS_PER_URL", 5)
 	if len(feeds) > maxFeeds {
@@ -348,7 +347,7 @@ func processURLSource(ctx context.Context, source URLSource) {
 		// Get feed metadata
 		title, description, language, entryCount, err := getFeedMetadata(feedURL)
 		if err != nil {
-			logger.Printf("Error parsing feed %s: %v", feedURL, err)
+			logger.Error().Err(err).Str("feedURL", feedURL).Msg("Error parsing feed")
 			errors++
 			continue
 		}
@@ -368,7 +367,7 @@ func processURLSource(ctx context.Context, source URLSource) {
 		if !autoApprove {
 			// Create pending feed for review
 			if err := createPendingFeed(ctx, source.ID, feedURL, metadata); err != nil {
-				logger.Printf("Error creating pending feed: %v", err)
+				logger.Error().Err(err).Str("feedURL", feedURL).Msg("Error creating pending feed")
 				errors++
 			} else {
 				pending++
@@ -377,7 +376,7 @@ func processURLSource(ctx context.Context, source URLSource) {
 			// Create feed directly
 			createdFeed, err := createFeedDirectly(ctx, feedURL, &source.ID, source.CategoriaID, source.PaisID, source.Idioma)
 			if err != nil {
-				logger.Printf("Error creating feed: %v", err)
+				logger.Error().Err(err).Str("feedURL", feedURL).Msg("Error creating feed")
 				errors++
 			} else if createdFeed {
 				created++
@@ -411,11 +410,10 @@ func processURLSource(ctx context.Context, source URLSource) {
 	}
 
 	updateURLStatus(ctx, source.ID, status, message, 200)
-	logger.Printf("Processed %s: created=%d, pending=%d, existing=%d, errors=%d",
-		source.URL, created, pending, existing, errors)
+	logger.Info().Str("url", source.URL).Int("created", created).Int("pending", pending).Int("existing", existing).Int("errors", errors).Msg("Processed")
 }
 
-func main() {
+func Main() {
 	loadConfig()
 	logger.Info().Msg("Starting RSS Discovery Worker")
 
@@ -488,4 +486,8 @@ func main() {
 			}
 		}
 	}
+}
+
+func main() {
+	Main()
 }

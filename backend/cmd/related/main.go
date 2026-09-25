@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -279,7 +278,7 @@ func insertRelated(ctx context.Context, traduccionID int64, related []struct {
 			DO UPDATE SET score = EXCLUDED.score
 		`, traduccionID, r.ID, r.Score)
 		if err != nil {
-			logger.Printf("Error inserting related: %v", err)
+			logger.Error().Err(err).Int64("traduccion_id", traduccionID).Int64("related_id", r.ID).Msg("Error inserting related")
 		}
 	}
 	return nil
@@ -322,20 +321,20 @@ func processBatch(ctx context.Context, model string) (int, error) {
 			continue
 		}
 
-		topRelated := findTopK(*emb, allTranslations, topK, minScore)
+topRelated := findTopK(*emb, allTranslations, topK, minScore)
 
-		if err := insertRelated(ctx, tradID, topRelated); err != nil {
-			logger.Printf("Error inserting related for %d: %v", tradID, err)
-			continue
-		}
+	if err := insertRelated(ctx, tradID, topRelated); err != nil {
+		logger.Error().Err(err).Int64("traduccion_id", tradID).Msg("Error inserting related")
+		continue
+	}
 
-		processed++
+	processed++
 	}
 
 	return processed, nil
 }
 
-func main() {
+func Main() {
 	loadConfig()
 	logger.Info().Msg("Starting Related News Worker")
 
@@ -405,4 +404,8 @@ func main() {
 			}
 		}
 	}
+}
+
+func main() {
+	Main()
 }

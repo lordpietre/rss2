@@ -314,25 +314,25 @@ func extractContentFromURL(url string) (string, error) {
 }
 
 func processEnrichment(ctx context.Context, noticia Noticia) bool {
-	logger.Printf("Enriching: %s", noticia.Titulo)
+	logger.Info().Str("title", noticia.Titulo).Msg("Enriching")
 
 	content, err := extractContentFromURL(noticia.URL)
 	if err != nil {
-		logger.Printf("Error extracting content from %s: %v", noticia.URL, err)
+		logger.Error().Err(err).Str("url", noticia.URL).Msg("Error extracting content")
 		return false
 	}
 
 	if len(content) < 50 {
-		logger.Printf("Not enough content extracted from %s", noticia.URL)
+		logger.Warn().Str("url", noticia.URL).Msg("Not enough content extracted")
 		return false
 	}
 
 	if err := updateNoticiaResumen(ctx, noticia.ID, content); err != nil {
-		logger.Printf("Error updating resumen for %s: %v", noticia.ID, err)
+		logger.Error().Err(err).Str("id", noticia.ID).Msg("Error updating resumen")
 		return false
 	}
 
-	logger.Printf("Enriched: %s (content length: %d)", noticia.Titulo, len(content))
+	logger.Info().Str("title", noticia.Titulo).Int("length", len(content)).Msg("Enriched")
 	return true
 }
 
@@ -378,7 +378,7 @@ func saveArticle(ctx context.Context, source URLSource, article *Article) (bool,
 			id, titulo, resumen, url, fecha, imagen_url, 
 			fuente_nombre, categoria_id, pais_id
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		ON CONFLICT (id) DO NOTHING
+		ON CONFLICT DO NOTHING
 	`, articleID, title, summary, finalURL, pubDate, article.ImageURL,
 		source.Nombre, source.CategoriaID, source.PaisID)
 
@@ -390,11 +390,11 @@ func saveArticle(ctx context.Context, source URLSource, article *Article) (bool,
 }
 
 func processSource(ctx context.Context, source URLSource) {
-	logger.Printf("Processing: %s (%s)", source.Nombre, source.URL)
+	logger.Info().Str("nombre", source.Nombre).Str("url", source.URL).Msg("Processing")
 
 	article, err := extractArticle(source)
 	if err != nil {
-		logger.Printf("Error extracting article from %s: %v", source.URL, err)
+		logger.Error().Err(err).Str("url", source.URL).Msg("Error extracting article")
 		status := "ERROR"
 		if strings.Contains(err.Error(), "HTTP") {
 			status = "ERROR_HTTP"
@@ -404,23 +404,23 @@ func processSource(ctx context.Context, source URLSource) {
 	}
 
 	if article.Title == "" {
-		logger.Printf("No title found for %s", source.URL)
+		logger.Warn().Str("url", source.URL).Msg("No title found")
 		updateSourceStatus(ctx, source.ID, "ERROR_PARSE", "No title extracted", 200)
 		return
 	}
 
 	saved, err := saveArticle(ctx, source, article)
 	if err != nil {
-		logger.Printf("Error saving article: %v", err)
+		logger.Error().Err(err).Msg("Error saving article")
 		updateSourceStatus(ctx, source.ID, "ERROR_DB", err.Error()[:200], 0)
 		return
 	}
 
 	if saved {
-		logger.Printf("Saved: %s", article.Title)
+		logger.Info().Str("title", article.Title).Msg("Saved")
 		updateSourceStatus(ctx, source.ID, "OK", "News created successfully", 200)
 	} else {
-		logger.Printf("Already exists: %s", article.Title)
+		logger.Info().Str("title", article.Title).Msg("Already exists")
 		updateSourceStatus(ctx, source.ID, "OK", "News already exists", 200)
 	}
 }
@@ -460,7 +460,7 @@ func scrapeSources(ctx context.Context, sources []URLSource) {
 	wg.Wait()
 }
 
-func main() {
+func Main() {
 	loadConfig()
 	logger.Info().Msg("Starting Scraper Worker")
 
@@ -538,4 +538,8 @@ func main() {
 			scrapeSources(ctx, sources)
 		}
 	}
+}
+
+func main() {
+	Main()
 }

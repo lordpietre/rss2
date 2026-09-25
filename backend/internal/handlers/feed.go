@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"encoding/csv"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -82,7 +81,7 @@ func GetFeeds(c *gin.Context) {
 
 	sqlQuery := fmt.Sprintf(`
 		SELECT f.id, f.nombre, f.descripcion, f.url,
-		       f.categoria_id, f.pais_id, f.idioma, f.activo, f.fallos, f.last_error, f.last_fetched,
+		       f.categoria_id, f.pais_id, f.idioma, f.activo, f.fallos, f.last_error, f.last_fetch,
 		       c.nombre AS categoria, p.nombre AS pais,
 		       (SELECT COUNT(*) FROM noticias n WHERE n.fuente_nombre = f.nombre) as noticias_count
 		FROM feeds f
@@ -133,10 +132,8 @@ func GetFeeds(c *gin.Context) {
 		"total_pages": totalPages,
 	}
 
-	// Cache the response
-	if data, err := json.Marshal(response); err == nil {
-		cache.Set(ctx, cacheKey, string(data), cache.TTLMedium)
-	}
+	// Cache the response (pass the struct; cache.Set marshals once)
+	cache.Set(ctx, cacheKey, response, cache.TTLMedium)
 
 	c.JSON(http.StatusOK, response)
 }
@@ -150,7 +147,7 @@ func GetFeedByID(c *gin.Context) {
 
 	var f models.Feed
 	err = db.GetPool().QueryRow(c.Request.Context(), `
-		SELECT id, nombre, descripcion, url, categoria_id, pais_id, idioma, activo, fallos, last_fetched
+		SELECT id, nombre, descripcion, url, categoria_id, pais_id, idioma, activo, fallos, last_fetch
 		FROM feeds WHERE id = $1`, id).Scan(
 		&f.ID, &f.Nombre, &f.Descripcion, &f.URL,
 		&f.CategoriaID, &f.PaisID, &f.Idioma, &f.Activo, &f.Fallos, &f.LastFetched,
@@ -330,22 +327,6 @@ func ReactivateFeed(c *gin.Context) {
 }
 
 func ExportFeeds(c *gin.Context) {
-	// Add country filter parameter
-	paisID := c.Query("pais_id")
-	if paisID != "" {
-		// Add pais_id filter to query
-		where += fmt.Sprintf(" AND pais_id = $%d", argNum)
-		args = append(args, paisID)
-		argNum++
-	}
-	// Add country filter parameter
-	paisID := c.Query("pais_id")
-	if paisID != "" {
-		// Add pais_id filter to query
-		where += fmt.Sprintf(" AND pais_id = $%d", argNum)
-		args = append(args, paisID)
-		argNum++
-	}
 	activo := c.Query("activo")
 	categoriaID := c.Query("categoria_id")
 	paisID := c.Query("pais_id")

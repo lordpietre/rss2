@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rss2/backend/internal/auth"
@@ -113,6 +114,10 @@ func Register(c *gin.Context) {
 	).Scan(&userID)
 
 	if err != nil {
+		if strings.Contains(err.Error(), "duplicate key") {
+			c.JSON(http.StatusConflict, models.ErrorResponse{Error: "Email or username already registered"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to create user", Message: err.Error()})
 		return
 	}

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -130,7 +129,7 @@ func fetchWikipediaInfo(valor string) (*WikiSummary, error) {
 		return nil, err
 	}
 	// Per MediaWiki API policy: https://meta.wikimedia.org/wiki/User-Agent_policy
-	req.Header.Set("User-Agent", "RSS2-WikiWorker/1.0 (pietrelinux@gmail.com)")
+	req.Header.Set("User-Agent", "RSS2-WikiWorker/1.0 (https://github.com/proyecto/rss2)")
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -162,18 +161,22 @@ func fetchWikipediaInfo(valor string) (*WikiSummary, error) {
 }
 
 func processTag(ctx context.Context, tag Tag) {
-	logger.Printf("Procesando tag %d: %s", tag.ID, tag.Valor)
+	logger.Info().Int64("tag_id", tag.ID).Str("valor", tag.Valor).Msg("Procesando tag")
 
 	summary, err := fetchWikipediaInfo(tag.Valor)
 	if err != nil {
-		logger.Printf("Error al consultar Wikipedia para %s: %v", tag.Valor, err)
+		// Marcar como revisado también ante error: si no, los tags basura
+		// (fragmentos JSON/HTML del NER) o los 403 se reintentan en cada
+		// ciclo eternamente, quemando cuota de la API.
+		_, _ = pool.Exec(ctx, "UPDATE tags SET wiki_checked = TRUE WHERE id = $1", tag.ID)
+		logger.Error().Err(err).Str("valor", tag.Valor).Msg("Error al consultar Wikipedia (marcado como revisado)")
 		return
 	}
 
 	if summary == nil || summary.Extract == "" {
 		// Not found or disambiguation
 		_, _ = pool.Exec(ctx, "UPDATE tags SET wiki_checked = TRUE WHERE id = $1", tag.ID)
-		logger.Printf("No se encontraron resultados válidos en Wikipedia para: %s", tag.Valor)
+		logger.Warn().Str("valor", tag.Valor).Msg("No se encontraron resultados válidos en Wikipedia")
 		return
 	}
 
@@ -187,7 +190,7 @@ func processTag(ctx context.Context, tag Tag) {
 		destPath := filepath.Join(imagesDir, fileName)
 
 		if err := downloadImage(summary.Thumbnail.Source, destPath); err != nil {
-			logger.Printf("Error descargando imagen para %s: %v", tag.Valor, err)
+			logger.Error().Err(err).Str("valor", tag.Valor).Msg("Error descargando imagen")
 			// Guardaremos la URL externa como fallback si falla la descarga
 			src := summary.Thumbnail.Source
 			localImagePath = &src
@@ -209,13 +212,13 @@ func processTag(ctx context.Context, tag Tag) {
 	`, summary.Extract, wikiURL, localImagePath, tag.ID)
 
 	if err != nil {
-		logger.Printf("Error al actualizar la base de datos para tag %d: %v", tag.ID, err)
+		logger.Error().Err(err).Int64("tag_id", tag.ID).Msg("Error al actualizar la base de datos")
 	} else {
-		logger.Printf("Actualizado con éxito: %s (Imagen: %v)", tag.Valor, localImagePath != nil)
+		logger.Info().Str("valor", tag.Valor).Bool("imagen", localImagePath != nil).Msg("Actualizado con éxito")
 	}
 }
 
-func main() {
+func Main() {
 	var sleepVal, batchVal int
 	if val := os.Getenv("WIKI_SLEEP"); val != "" {
 		if _, err := fmt.Sscanf(val, "%d", &sleepVal); err == nil && sleepVal > 0 {
@@ -313,4 +316,8 @@ func main() {
 			}
 		}
 	}
+}
+
+func main() {
+	Main()
 }

@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -300,7 +299,7 @@ func processBatch(ctx context.Context, topics []Topic, countries []Country) (int
 				ON CONFLICT (noticia_id, topic_id) DO UPDATE SET score = EXCLUDED.score
 			`, strings.Join(values, ","))
 			if _, err := dbPool.Exec(ctx, query, args...); err != nil {
-				logger.Printf("Error batch inserting topics: %v", err)
+				logger.Error().Err(err).Msg("Error batch inserting topics")
 			}
 		}
 	}
@@ -318,7 +317,7 @@ func processBatch(ctx context.Context, topics []Topic, countries []Country) (int
 			FROM unnest($1::int[], $2::varchar[]) AS u(pais, noticia_id)
 			WHERE n.id = u.noticia_id
 		`, paisSlice, idSlice); err != nil {
-			logger.Printf("Error bulk updating countries: %v", err)
+			logger.Error().Err(err).Msg("Error bulk updating countries")
 		}
 	}
 
@@ -335,7 +334,7 @@ func processBatch(ctx context.Context, topics []Topic, countries []Country) (int
 	return len(items), nil
 }
 
-func main() {
+func Main() {
 	loadConfig()
 	logger.Info().Msg("Starting Topics Worker")
 
@@ -422,4 +421,8 @@ func main() {
 			}
 		}
 	}
+}
+
+func main() {
+	Main()
 }

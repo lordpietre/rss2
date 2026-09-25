@@ -12,7 +12,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --no-cache-dir psycopg2-binary langdetect
 
-COPY workers/translation_scheduler.py ./workers/
+COPY workers/ ./workers/
 
 ENV DB_HOST=db
 ENV DB_PORT=5432

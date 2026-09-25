@@ -112,7 +112,17 @@ GENERIC_BAD_TAGS = {
     "hoy", "ayer", "mañana", "servicio", "servicios", "el presidente",
     "presidente", "el ministro", "ministro", "la guerra", "guerra",
     "seguridad", "wp-content", "internal_photos", "/internal_photos",
-    "https", "http", "src"
+    "https", "http", "src",
+    # Días de semana sueltos: el NER los etiqueta como tema/persona y
+    # contaminan Populares/Evolución/Alertas ("domingo" ratio ×75).
+    # Un apellido/nombre real ("Plácido Domingo") no matchea exacto.
+    "lunes", "martes", "miércoles", "miercoles", "jueves", "viernes",
+    "sábado", "sabado", "domingo",
+    "este lunes", "este martes", "este jueves", "este viernes",
+    "este sábado", "este sabado", "este domingo",
+    "el lunes", "el martes", "el jueves", "el viernes",
+    "el sábado", "el sabado", "el domingo",
+    "la próxima semana", "la proxima semana", "esta semana",
 }
 
 STOPWORDS = set()
@@ -132,6 +142,18 @@ TOPIC_MAX_PER_DOC = 15
 # ==========================================================
 def get_conn():
     return psycopg2.connect(**DB)
+
+
+def _is_markup_garbage(text: str) -> bool:
+    """Basura JSON/HTML/JS que cuela el NER en entidades Y topics
+    (una sola regla compartida para no repetir el bug de la vía topics)."""
+    if len(text) > 80:
+        return True
+    if re.search(r"[<>/\\\[\]{}]", text):
+        return True
+    if '"' in text or "`" in text:
+        return True
+    return False
 
 
 def _looks_like_attr_or_path(text_lower: str) -> bool:
@@ -182,7 +204,7 @@ def clean_tag_text(text: str) -> str | None:
 
     if len(text) < 3:
         return None
-    if re.search(r"[<>/\\]", text):
+    if _is_markup_garbage(text):
         return None
 
     if is_blacklisted(text):
@@ -221,6 +243,8 @@ def clean_topic_text(text: str) -> str | None:
     text = text.strip(string.punctuation + " ")
 
     if len(text) < TOPIC_MIN_CHARS:
+        return None
+    if _is_markup_garbage(text):
         return None
 
     if is_blacklisted(text):

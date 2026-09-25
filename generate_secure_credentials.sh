@@ -173,13 +173,6 @@ NER_BATCH=64
 # Flask / Gunicorn
 GUNICORN_WORKERS=8
 FLASK_DEBUG=0
-
-# Qdrant Configuration
-QDRANT_HOST=qdrant
-QDRANT_PORT=6333
-QDRANT_COLLECTION_NAME=news_vectors
-QDRANT_BATCH_SIZE=100
-QDRANT_SLEEP_IDLE=30
 EOF
 
 echo -e "${GREEN}✅ Archivo generado: $ENV_FILE${NC}\n"

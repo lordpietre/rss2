@@ -123,8 +123,124 @@ func extractLastName(valor string) string {
 	return ""
 }
 
-func ExportAliases(c *gin.Context) {
-	rows, err := db.GetPool().Query(c.Request.Context(),
+func ListAliases(c *gin.Context) {
+	tipo := strings.TrimSpace(c.Query("tipo"))
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "100"))
+	if page < 1 {
+		page = 1
+	}
+	if perPage < 1 || perPage > 500 {
+		perPage = 100
+	}
+
+	var rows interface {
+	}
+	_ = rows
+
+	query := "SELECT id, alias, canonical_name, tipo, created_at FROM entity_aliases"
+	args := []interface{}{}
+	if tipo != "" {
+		query += " WHERE tipo = $1"
+		args = append(args, tipo)
+	}
+	query += " ORDER BY created_at DESC LIMIT $" + strconv.Itoa(len(args)+1) + " OFFSET $" + strconv.Itoa(len(args)+2)
+	args = append(args, perPage, (page-1)*perPage)
+
+	qrows, err := db.GetPool().Query(c.Request.Context(), query, args...)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list aliases", "message": err.Error()})
+		return
+	}
+	defer qrows.Close()
+
+	aliases := []models.EntityAlias{}
+	for qrows.Next() {
+		var a models.EntityAlias
+		if err := qrows.Scan(&a.ID, &a.Alias, &a.CanonicalName, &a.Tipo, &a.CreatedAt); err != nil {
+			log.Printf("ListAliases: scan error: %v", err)
+			continue
+		}
+		aliases = append(aliases, a)
+	}
+	if aliases == nil {
+		aliases = []models.EntityAlias{}
+	}
+	c.JSON(http.StatusOK, gin.H{"aliases": aliases, "page": page, "per_page": perPage, "total": len(aliases)})
+}
+
+func UpdateAlias(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid alias ID"})
+		return
+	}
+	var req struct {
+		Alias         string `json:"alias" binding:"required"`
+		CanonicalName string `json:"canonical_name" binding:"required"`
+		Tipo          string `json:"tipo" binding:"required,oneof=persona organizacion lugar tema"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request", "message": err.Error()})
+		return
+	}
+	res, err := db.GetPool().Exec(c.Request.Context(),
+		"UPDATE entity_aliases SET alias = $1, canonical_name = $2, tipo = $3 WHERE id = $4",
+		strings.TrimSpace(req.Alias), strings.TrimSpace(req.CanonicalName), req.Tipo, id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update alias", "message": err.Error()})
+		return
+	}
+	if res.RowsAffected() == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Alias not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Alias updated", "id": id})
+}
+
+func DeleteAlias(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid alias ID"})
+		return
+	}
+	res, err := db.GetPool().Exec(c.Request.Context(), "DELETE FROM entity_aliases WHERE id = $1", id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete alias", "message": err.Error()})
+		return
+	}
+	if res.RowsAffected() == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Alias not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Alias deleted", "id": id})
+}
+
+func GetIngestStats(c *gin.Context) {
+	ctx := c.Request.Context()
+	var total, activos, fallidos, noticiasTotal, noticias7d, feedsConNoticias7d int
+	db.GetPool().QueryRow(ctx, "SELECT COUNT(*) FROM feeds").Scan(&total)
+	db.GetPool().QueryRow(ctx, "SELECT COUNT(*) FROM feeds WHERE activo").Scan(&activos)
+	db.GetPool().QueryRow(ctx, "SELECT COUNT(*) FROM feeds WHERE COALESCE(fallos,0) > 0").Scan(&fallidos)
+	db.GetPool().QueryRow(ctx, "SELECT COUNT(*) FROM noticias").Scan(&noticiasTotal)
+	db.GetPool().QueryRow(ctx, "SELECT COUNT(*) FROM noticias WHERE fecha >= NOW() - INTERVAL '7 days'").Scan(&noticias7d)
+	db.GetPool().QueryRow(ctx, `SELECT COUNT(DISTINCT f.id) FROM feeds f JOIN noticias n ON n.fuente_nombre = f.nombre WHERE n.fecha >= NOW() - INTERVAL '7 days' AND f.activo`).Scan(&feedsConNoticias7d)
+	coverage := 0.0
+	if activos > 0 {
+		coverage = math.Round(float64(feedsConNoticias7d)/float64(activos)*10000) / 100
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"feeds_total":          total,
+		"feeds_activos":        activos,
+		"feeds_con_fallos":     fallidos,
+		"noticias_total":       noticiasTotal,
+		"noticias_ultimos_7d":  noticias7d,
+		"feeds_con_noticias_7d": feedsConNoticias7d,
+		"cobertura_7d_pct":     coverage,
+	})
+}
+
+func ExportAliases(c *gin.Context) {	rows, err := db.GetPool().Query(c.Request.Context(),
 		"SELECT alias, canonical_name, tipo FROM entity_aliases ORDER BY tipo, canonical_name")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get aliases", "message": err.Error()})

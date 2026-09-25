@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -146,7 +147,35 @@ type clientLimiter struct {
 var (
 	clientLimiters = make(map[string]*clientLimiter)
 	limitersMu     sync.Mutex
+	// Observabilidad del rate limit (Fase 3): conteo de 429 totales y por
+	// configuración (requestsPerMinute). Sin IPs: solo agregados.
+	rateLimitHitsTotal atomic.Int64
+	rateLimitHitsByCfg = make(map[int]*atomic.Int64)
+	rateLimitHitsMu    sync.Mutex
 )
+
+// RateLimitStats devuelve los 429 observados desde el arranque.
+func RateLimitStats() (int64, map[int]int64) {
+	byCfg := make(map[int]int64)
+	rateLimitHitsMu.Lock()
+	for k, v := range rateLimitHitsByCfg {
+		byCfg[k] = v.Load()
+	}
+	rateLimitHitsMu.Unlock()
+	return rateLimitHitsTotal.Load(), byCfg
+}
+
+func bumpRateLimitHit(requestsPerMinute int) {
+	rateLimitHitsTotal.Add(1)
+	rateLimitHitsMu.Lock()
+	ctr, ok := rateLimitHitsByCfg[requestsPerMinute]
+	if !ok {
+		ctr = &atomic.Int64{}
+		rateLimitHitsByCfg[requestsPerMinute] = ctr
+	}
+	rateLimitHitsMu.Unlock()
+	ctr.Add(1)
+}
 
 func RateLimitMiddleware(requestsPerMinute int) gin.HandlerFunc {
 	limit := rate.Limit(requestsPerMinute) / 60
@@ -154,31 +183,28 @@ func RateLimitMiddleware(requestsPerMinute int) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		ip := c.ClientIP()
+		// Cada configuración (requestsPerMinute) tiene su propio bucket por IP.
+		// Antes se compartía un único bucket global y el limitador estricto
+		// de /auth (10 req/min) secuestraba a toda la API causando 429s
+		// espurios en /api/news con navegación normal.
+		key := fmt.Sprintf("%s|%d", ip, requestsPerMinute)
 
 		limitersMu.Lock()
-		cl, exists := clientLimiters[ip]
-		if !exists {
+		cl, exists := clientLimiters[key]
+		if !exists || time.Since(cl.lastSeen) > 10*time.Minute {
 			cl = &clientLimiter{limiter: rate.NewLimiter(limit, burst)}
-			clientLimiters[ip] = cl
+			clientLimiters[key] = cl
 		}
 		cl.lastSeen = time.Now()
 		limiter := cl.limiter
 		limitersMu.Unlock()
 
 		if !limiter.Allow() {
+			bumpRateLimitHit(requestsPerMinute)
 			c.JSON(http.StatusTooManyRequests, gin.H{"error": "Rate limit exceeded"})
 			c.Abort()
 			return
 		}
-
-		go func() {
-			time.Sleep(10 * time.Minute)
-			limitersMu.Lock()
-			if cl, ok := clientLimiters[ip]; ok && time.Since(cl.lastSeen) > 10*time.Minute {
-				delete(clientLimiters, ip)
-			}
-			limitersMu.Unlock()
-		}()
 
 		c.Next()
 	}

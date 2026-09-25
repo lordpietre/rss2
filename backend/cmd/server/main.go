@@ -164,7 +164,7 @@ func initDB() {
 	}
 }
 
-func main() {
+func Main() {
 	cfg := config.Load()
 
 	// Initialize structured logger
@@ -192,6 +192,14 @@ func main() {
 
 	r := gin.Default()
 
+	// Trust Docker networks + loopback so ClientIP() returns the real client
+	// IP from X-Forwarded-For (set by nginx). Without this, every request
+	// appears to come from the Docker gateway and all clients share a single
+	// rate-limit bucket, causing spurious 429s under normal browsing.
+	if err := r.SetTrustedProxies([]string{"127.0.0.1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"}); err != nil {
+		log.Warn().Err(err).Msg("Failed to set trusted proxies")
+	}
+
 	r.Use(middleware.RequestIDMiddleware())
 	r.Use(middleware.CORSMiddleware())
 	r.Use(middleware.LoggerMiddleware())
@@ -208,13 +216,15 @@ func main() {
 		// Serve static images downloaded by wiki_worker
 		api.StaticFS("/wiki-images", gin.Dir(cfg.WikiImagesPath, false))
 
-		// Stricter rate limiting for auth endpoints
+		// Stricter rate limiting for auth endpoints (login/register are
+		// brute-force sensitive; check-first-user is a harmless public GET
+		// called on every page load, so it uses the general limiter).
+		api.GET("/auth/check-first-user", handlers.CheckFirstUser)
 		authGroup := api.Group("/auth")
 		authGroup.Use(middleware.RateLimitMiddleware(10)) // 10 req/min for auth
 		{
 			authGroup.POST("/login", handlers.Login)
 			authGroup.POST("/register", handlers.Register)
-			authGroup.GET("/check-first-user", handlers.CheckFirstUser)
 		}
 
 		// General rate limiting for API
@@ -244,16 +254,17 @@ func main() {
 		api.GET("/search/suggestions", middleware.AuthRequired(), handlers.SearchSuggestions)
 		api.POST("/searchlog", middleware.AuthRequired(), handlers.LogSearch)
 
-api.GET("/entities", handlers.GetEntities)
-	api.GET("/entities/news", handlers.GetEntityNews)
-	api.GET("/entities/mentions", handlers.GetEntityMentions)
-	api.GET("/last-names", handlers.GetLastNames)
+		api.GET("/entities", handlers.GetEntities)
+		api.GET("/entities/news", handlers.GetEntityNews)
+		api.GET("/entities/mentions", handlers.GetEntityMentions)
+		api.GET("/last-names", handlers.GetLastNames)
 
 		api.GET("/alerts", handlers.GetAlertas)
 		api.POST("/alerts/:id/read", middleware.AuthRequired(), handlers.MarkAlertaRead)
 		api.POST("/alerts/read-all", middleware.AuthRequired(), handlers.MarkAllAlertasRead)
 
 		api.GET("/stats", handlers.GetStats)
+		api.GET("/stats/ratelimit", handlers.GetRateLimitStats)
 
 		api.GET("/categories", handlers.GetCategories)
 		api.GET("/countries", handlers.GetCountries)
@@ -262,8 +273,12 @@ api.GET("/entities", handlers.GetEntities)
 		admin.Use(middleware.AuthRequired(), middleware.AdminRequired())
 		{
 			admin.POST("/aliases", handlers.CreateAlias)
+			admin.GET("/aliases", handlers.ListAliases)
+			admin.PUT("/aliases/:id", handlers.UpdateAlias)
+			admin.DELETE("/aliases/:id", handlers.DeleteAlias)
 			admin.GET("/aliases/export", handlers.ExportAliases)
 			admin.POST("/aliases/import", handlers.ImportAliases)
+			admin.GET("/ingest/stats", handlers.GetIngestStats)
 			admin.POST("/entities/retype", handlers.PatchEntityTipo)
 			admin.GET("/backup", handlers.BackupDatabase)
 			admin.GET("/backup/news", handlers.BackupNewsZipped)
@@ -316,4 +331,8 @@ api.GET("/entities", handlers.GetEntities)
 	<-quit
 
 	log.Info().Msg("Shutting down server...")
+}
+
+func main() {
+	Main()
 }

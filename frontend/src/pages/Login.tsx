@@ -41,7 +41,12 @@ export function Login() {
       }
       navigate('/')
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Error al iniciar sesión')
+      const apiError: string = err.response?.data?.error || ''
+      if (err.response?.status === 409 || /already registered|duplicate/i.test(apiError)) {
+        setError('Ese email o usuario ya está registrado. Inicia sesión en lugar de registrarte.')
+      } else {
+        setError(apiError || 'Error al iniciar sesión')
+      }
     }
   }
 

@@ -19,7 +19,7 @@ type News struct {
 }
 
 type NewsWithTranslations struct {
-	ID                int64     `json:"id"`
+	ID                string     `json:"id"`
 	Titulo            string    `json:"titulo"`
 	Resumen           string    `json:"resumen"`
 	Contenido         string    `json:"contenido"`
@@ -208,4 +208,9 @@ type LastNameListResponse struct {
 
 type SuccessResponse struct {
 	Message string `json:"message"`
+}
+
+type ErrorResponse struct {
+	Error   string `json:"error"`
+	Message string `json:"message,omitempty"`
 }

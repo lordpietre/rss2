@@ -82,13 +82,11 @@ check "Contenedor DB corriendo" "docker ps | grep rss2_db" "pass"
 check "Contenedor Redis corriendo" "docker ps | grep rss2_redis" "pass"
 check "Contenedor Web corriendo" "docker ps | grep rss2_web" "pass"
 check "Contenedor Nginx corriendo" "docker ps | grep rss2_nginx" "pass"
-check "Contenedor Qdrant corriendo" "docker ps | grep rss2_qdrant" "pass"
 
 echo ""
 echo -e "${YELLOW}📋 Verificando exposición de puertos...${NC}\n"
 
 # Verificar que puertos internos NO están expuestos
-check "Qdrant NO expuesto públicamente" "! docker ps | grep '0.0.0.0:6333'" "pass"
 check "Prometheus NO expuesto públicamente" "! docker ps | grep '0.0.0.0:9090'" "pass"
 check "cAdvisor NO expuesto públicamente" "! docker ps | grep '0.0.0.0:8081'" "pass"
 

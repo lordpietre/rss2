@@ -47,6 +47,41 @@ func GetLogger() zerolog.Logger {
 	return Logger
 }
 
+// Package-level event constructors delegating to the global Logger.
+// These allow call sites to use logger.Info().Msg(...), logger.Error().Err(err).Msg(...), etc.
+// They must be called after Init(); before Init they return disabled events.
+func Trace() *zerolog.Event {
+	return Logger.Trace()
+}
+
+func Debug() *zerolog.Event {
+	return Logger.Debug()
+}
+
+func Info() *zerolog.Event {
+	return Logger.Info()
+}
+
+func Warn() *zerolog.Event {
+	return Logger.Warn()
+}
+
+func Error() *zerolog.Event {
+	return Logger.Error()
+}
+
+func Fatal() *zerolog.Event {
+	return Logger.Fatal()
+}
+
+func Panic() *zerolog.Event {
+	return Logger.Panic()
+}
+
+func Log() *zerolog.Event {
+	return Logger.Log()
+}
+
 func WithRequestID(requestID string) zerolog.Logger {
 	return Logger.With().Str("request_id", requestID).Logger()
 }

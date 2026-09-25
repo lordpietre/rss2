@@ -44,6 +44,7 @@ Thumbs.db
 # ==================================================================================
 .env
 .env.backup
+.env.backup.*
 .env.backup2
 .env.generated
 .env.local
@@ -80,10 +81,6 @@ pgdata-replica.old.*/
 data/redis-data/
 redis-data/
 
-# Qdrant vector storage
-data/qdrant_storage/
-qdrant_storage/
-
 # HuggingFace cache (downloaded models)
 hf_cache/
 
@@ -99,7 +96,6 @@ monitoring/data/
 backup_*.sql
 *.rdb
 redis_backup_*.rdb
-qdrant_backup_*.tar.gz
 
 # ==================================================================================
 # Temporary files
@@ -117,4 +113,7 @@ docker-compose.override.yml
 # ==================================================================================
 # Keep directory structure (optional - uncomment if needed)
 # models/.gitkeep
-# data/.gitkeepPM/
+# data/.gitkeep
+
+# PM - documentos/activos locales
+PM/

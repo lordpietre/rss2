@@ -1,0 +1,19 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+ENV PYTHONUNBUFFERED=1
+
+RUN pip install --no-cache-dir --upgrade pip
+RUN pip install --no-cache-dir spacy psycopg2-binary beautifulsoup4
+RUN python -m spacy download es_core_news_lg
+
+COPY workers/ ./workers/
+
+ENV DB_HOST=db
+ENV DB_PORT=5432
+ENV DB_NAME=rss
+ENV DB_USER=rss
+ENV DB_PASS=x
+
+CMD ["python", "workers/ner_worker.py"]

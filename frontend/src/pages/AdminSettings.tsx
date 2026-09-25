@@ -1,12 +1,35 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { apiService } from '../services/api'
-import { AlertTriangle, Database, RefreshCw, Download, FileArchive, Upload } from 'lucide-react'
+import type { Country } from '../services/api'
+import { AlertTriangle, Database, RefreshCw, Download, FileArchive, Rss, Upload } from 'lucide-react'
 
 export function AdminSettings() {
   const [resetting, setResetting] = useState(false)
   const [restoring, setRestoring] = useState(false)
   const [restoreFile, setRestoreFile] = useState<File | null>(null)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [paisFilter, setPaisFilter] = useState('')
+  const [paises, setPaises] = useState<Country[]>([])
+
+  useEffect(() => {
+    apiService.getCountries().then(setPaises).catch(() => setPaises([]))
+  }, [])
+
+  const handleExportFeeds = async () => {
+    try {
+      const blob = await apiService.exportFeeds({ pais_id: paisFilter || undefined })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'feeds_export.csv'
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch {
+      setMessage({ type: 'error', text: 'Error al exportar feeds' })
+    }
+  }
 
   const handleReset = async () => {
     const confirmMsg = '¿Estás seguro de que quieres BORRAR TODA LA BASE DE DATOS?\n\nEsta acción eliminará:\n- Todas las noticias\n- Todos los feeds\n- Todas las traducciones\n- Todos los favoritos\n- Todos los alias\n\nEsta acción NO se puede deshacer.'
@@ -122,35 +145,6 @@ export function AdminSettings() {
           </h2>
 
           <div className="space-y-4">
-<div className="p-4 border border-gray-100 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900/50">
-				<h3 className="font-medium mb-1 flex items-center gap-2">
-					<Rss className="h-4 w-4 text-blue-600" />
-					Feeds (CSV por país)
-				</h3>
-				<p className="text-sm text-gray-500 mb-4">
-					Descarga un archivo CSV con feeds filtrados por país. Ideal para respaldar fuentes específicas.
-				</p>
-				<div className="flex items-center gap-3 flex-wrap">
-					<select
-						value={paisFilter}
-						onChange={(e) => setPaisFilter(e.target.value)}
-						className="input w-auto"
-					>
-						<option value="">Todos los países</option>
-						{paises?.map((pais) => (
-							<option key={pais.id} value={pais.id}>{pais.nombre}</option>
-						))}
-					</select>
-					<button
-						onClick={() => apiService.exportFeeds({ pais_id: paisFilter })}
-						className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-					>
-						<Download className="h-4 w-4" />
-						Descargar Backup Feeds
-					</button>
-				</div>
-			</div>
-
               <div className="p-4 border border-gray-100 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                 <h3 className="font-medium mb-1 flex items-center gap-2">
                   <Rss className="h-4 w-4 text-blue-600" />
@@ -171,7 +165,7 @@ export function AdminSettings() {
                     ))}
                   </select>
                   <button
-                    onClick={() => apiService.exportFeeds({ pais_id: paisFilter })}
+                    onClick={handleExportFeeds}
                     className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                   >
                     <Download className="h-4 w-4" />

@@ -1,15 +1,16 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rss2/backend/internal/auth"
 	"github.com/rss2/backend/internal/cache"
 	"github.com/rss2/backend/internal/db"
+	"github.com/rss2/backend/internal/middleware"
 	"github.com/rss2/backend/internal/models"
 	"github.com/rss2/backend/internal/services"
 )
@@ -146,8 +147,11 @@ func SearchNews(c *gin.Context) {
 	whereClause := "WHERE 1=1"
 
 	if query != "" {
-		whereClause += " AND (n.titulo ILIKE $" + strconv.Itoa(argNum) + " OR n.resumen ILIKE $" + strconv.Itoa(argNum) + ")"
-		args = append(args, "%"+query+"%")
+		// Full-text sobre search_vector_es (índice GIN, 100% poblado):
+		// ~50 ms frente a ~4 s del ILIKE con seq scan. plainto_tsquery
+		// aplica stemming español ("elecciones" ⊃ "elección").
+		whereClause += " AND n.search_vector_es @@ plainto_tsquery('spanish', $" + strconv.Itoa(argNum) + ")"
+		args = append(args, query)
 		argNum++
 	}
 
@@ -168,7 +172,7 @@ func SearchNews(c *gin.Context) {
 	}
 
 	sqlQuery := `
-		SELECT n.id, n.titulo, COALESCE(n.resumen, ''), n.contenido, n.url, n.fecha, n.imagen_url,
+		SELECT n.id, COALESCE(n.titulo, ''), COALESCE(n.resumen, ''), COALESCE(n.resumen, '') AS contenido, n.url, n.fecha, n.imagen_url,
 		       n.categoria_id, n.pais_id, n.fuente_nombre, n.lang,
 		       t.titulo_trad,
 		       t.resumen_trad,
@@ -191,17 +195,27 @@ func SearchNews(c *gin.Context) {
 	var newsList []models.NewsWithTranslations
 	for rows.Next() {
 		var n models.NewsWithTranslations
-		var imagenURL, fuenteNombre *string
+		var id, titulo, resumen, contenido, url string
+		var fecha *time.Time
+		var imagenURL, fuenteNombre, langRaw *string
 		var categoriaIDp, paisIDp *int64
-		var lang string
 
 		err := rows.Scan(
-			&n.ID, &n.Titulo, &n.Resumen, &n.Contenido, &n.URL, &n.Fecha, &imagenURL,
-			&categoriaIDp, &paisIDp, &fuenteNombre, &lang,
+			&id, &titulo, &resumen, &contenido, &url, &fecha, &imagenURL,
+			&categoriaIDp, &paisIDp, &fuenteNombre, &langRaw,
 			&n.TitleTranslated, &n.SummaryTranslated, &n.LangTranslated,
 		)
 		if err != nil {
 			continue
+		}
+		n.ID = id
+		n.Titulo = titulo
+		n.Resumen = resumen
+		n.Contenido = contenido
+		n.URL = url
+		if fecha != nil {
+			f := fecha.Format(time.RFC3339)
+			n.Fecha = &f
 		}
 		if imagenURL != nil {
 			n.ImagenURL = imagenURL
@@ -211,7 +225,9 @@ func SearchNews(c *gin.Context) {
 		}
 		n.CategoryID = categoriaIDp
 		n.CountryID = paisIDp
-		n.Lang = lang
+		if langRaw != nil {
+			n.Lang = strings.TrimSpace(*langRaw)
+		}
 		newsList = append(newsList, n)
 	}
 
@@ -237,10 +253,8 @@ func SearchNews(c *gin.Context) {
 		"total_pages": totalPages,
 	}
 
-	// Cache the response
-	if data, err := json.Marshal(response); err == nil {
-		cache.Set(ctx, cacheKey, string(data), cache.TTLShort)
-	}
+	// Cache the response (pass the struct; cache.Set marshals once)
+	cache.Set(ctx, cacheKey, response, cache.TTLShort)
 
 c.JSON(http.StatusOK, response)
 }
@@ -317,9 +331,7 @@ func GetStats(c *gin.Context) {
 		}
 	}
 
-	if data, err := json.Marshal(stats); err == nil {
-		cache.Set(ctx, cacheKey, string(data), cache.TTLMedium)
-	}
+	cache.Set(ctx, cacheKey, stats, cache.TTLMedium)
 
 	c.JSON(http.StatusOK, stats)
 }
@@ -348,9 +360,7 @@ func GetCategories(c *gin.Context) {
 		categories = append(categories, cat)
 	}
 
-	if data, err := json.Marshal(categories); err == nil {
-		cache.Set(ctx, cacheKey, string(data), cache.TTLLong)
-	}
+	cache.Set(ctx, cacheKey, categories, cache.TTLLong)
 
 	c.JSON(http.StatusOK, categories)
 }
@@ -382,9 +392,22 @@ func GetCountries(c *gin.Context) {
 		countries = append(countries, country)
 	}
 
-	if data, err := json.Marshal(countries); err == nil {
-		cache.Set(ctx, cacheKey, string(data), cache.TTLLong)
-	}
+	cache.Set(ctx, cacheKey, countries, cache.TTLLong)
+
 
 	c.JSON(http.StatusOK, countries)
+}
+
+// GetRateLimitStats expone la observabilidad del rate limit (429s desde el
+// arranque, totales y por configuración). Sin caché: son contadores live.
+func GetRateLimitStats(c *gin.Context) {
+	total, byCfg := middleware.RateLimitStats()
+	byCfgJSON := gin.H{}
+	for k, v := range byCfg {
+		byCfgJSON[strconv.Itoa(k)] = v
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"rate_limit_429_total":  total,
+		"rate_limit_429_by_cfg": byCfgJSON,
+	})
 }

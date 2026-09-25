@@ -401,7 +401,7 @@ func insertNoticiasWithConflict(noticias []Noticia) int {
 		query := fmt.Sprintf(`
 			INSERT INTO noticias (id, titulo, resumen, url, fecha, imagen_url, fuente_nombre, categoria_id, pais_id)
 			VALUES %s
-			ON CONFLICT (url) DO NOTHING
+			ON CONFLICT DO NOTHING
 		`, strings.Join(placeholders, ","))
 
 		res, err := db.Exec(query, vals...)

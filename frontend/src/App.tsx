@@ -18,6 +18,7 @@ import { AdminUsers } from './pages/AdminUsers'
 import { AdminSettings } from './pages/AdminSettings'
 import { AdminWorkers } from './pages/AdminWorkers'
 import { WelcomeWizard } from './pages/WelcomeWizard'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { api } from './services/api'
 
 function App() {
@@ -56,6 +57,7 @@ function App() {
   }
 
   return (
+    <ErrorBoundary>
     <Routes>
       <Route path="/" element={<Layout />}>
         <Route index element={<Home />} />
@@ -87,6 +89,7 @@ function App() {
         />
       </Route>
     </Routes>
+    </ErrorBoundary>
   )
 }
 

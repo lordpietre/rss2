@@ -281,14 +281,14 @@ export function Populares() {
             {allExpanded ? '← Contraer todas' : '→ Expandir todas'}
           </button>
           <button
-            onClick={() => setExpandedEntities(p => p.clear())}
+            onClick={() => setExpandedEntities(new Set<string>())}
             className="px-3 py-1.5 text-sm border rounded hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600 transition-colors"
             title="Contraer todas"
           >
             ← Contraer
           </button>
           <button
-            onClick={() => setExpandedEntities(p => p.add('all'))}
+            onClick={() => setExpandedEntities(prev => new Set(prev).add('all'))}
             className="px-3 py-1.5 text-sm border rounded hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600 transition-colors"
             title="Expandir todas"
           >
@@ -396,14 +396,14 @@ export function Populares() {
               <span className="text-sm font-medium text-gray-700 dark:text-gray-200">📊 {entities.length} entidades populares</span>
               <div className="flex gap-1">
                 <button
-                  onClick={() => setExpandedEntities(p => p.clear())}
+                  onClick={() => setExpandedEntities(new Set<string>())}
                   className="px-2 py-1 text-[10px] text-gray-500 hover:text-blue-600 dark:hover:text-blue-300 rounded"
                   title="Contraer todas"
                 >
                   ←
                 </button>
                 <button
-                  onClick={() => setExpandedEntities(p => p.add('all'))}
+                  onClick={() => setExpandedEntities(prev => new Set(prev).add('all'))}
                   className="px-2 py-1 text-[10px] text-gray-500 hover:text-blue-600 dark:hover:text-blue-300 rounded"
                   title="Expandir todas"
                 >
@@ -419,23 +419,48 @@ export function Populares() {
               return (
                 <div
                   key={entity.valor}
-                  className={`collapse ${isExpanded ? 'in' : ''} transition-colors duration-300 ease-in-out`}
+                  className={`rounded-lg ${isExpanded ? 'bg-gray-50 dark:bg-gray-700/50' : ''} transition-colors duration-300 ease-in-out`}
                 >
                   <div className="flex items-center justify-between px-2 py-2 border-b dark:border-gray-700 last:border-0">
-                    <div className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" onClick={() => setExpandedEntities(p => p.toggle(entity.valor))}>
-                      <WikiTooltip
-                        name={entity.valor}
-                        summary={entity.wiki_summary}
-                        imagePath={entity.image_path}
-                        wikiUrl={entity.wiki_url}
-                      >
-                        <span className="font-medium text-blue-600 dark:text-blue-300 hover:underline transition-colors">
-                          {entity.valor}
-                        </span>
-                      </WikiTooltip>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        #{entity.count} menciones
-                      </span>
+                    <div className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors min-w-0" onClick={() => setExpandedEntities(prev => {
+                        const next = new Set(prev)
+                        if (next.has(entity.valor)) {
+                          next.delete(entity.valor)
+                        } else {
+                          next.add(entity.valor)
+                        }
+                        return next
+                      })}>
+                      {entity.image_path && (
+                        <img
+                          src={entity.image_path}
+                          alt={entity.valor}
+                          className="w-10 h-10 object-cover rounded-lg shrink-0 bg-gray-100 dark:bg-gray-700"
+                          onError={(e) => (e.currentTarget.style.display = 'none')}
+                        />
+                      )}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <WikiTooltip
+                            name={entity.valor}
+                            summary={entity.wiki_summary}
+                            imagePath={entity.image_path}
+                            wikiUrl={entity.wiki_url}
+                          >
+                            <span className="font-medium text-blue-600 dark:text-blue-300 hover:underline transition-colors">
+                              {entity.valor}
+                            </span>
+                          </WikiTooltip>
+                          <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">
+                            #{entity.count} menciones
+                          </span>
+                        </div>
+                        {entity.wiki_summary && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">
+                            {entity.wiki_summary}
+                          </p>
+                        )}
+                      </div>
                     </div>
                     <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${tipoInfo.color}`}>

@@ -14,6 +14,12 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
+  // For FormData uploads the browser must set the multipart boundary itself.
+  // The instance default 'application/json' (or a manual 'multipart/form-data'
+  // without boundary) would prevent that and the backend would see no file.
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type']
+  }
   return config
 })
 
@@ -128,6 +134,9 @@ export interface Alerta {
   ratio: number
   status: string
   created_at: string
+  wiki_summary?: string | null
+  wiki_url?: string | null
+  image_path?: string | null
 }
 
 export interface Stats {

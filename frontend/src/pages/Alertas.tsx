@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { apiService, api, Alerta, News } from '../services/api'
 import { Bell, CheckCheck, ChevronDown, ChevronUp, FileText } from 'lucide-react'
+import { WikiTooltip } from '../components/ui/WikiTooltip'
 
 const TIPO_LABEL: Record<string, string> = {
   persona: 'Persona',
@@ -114,7 +115,33 @@ export function Alertas() {
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {alertas.map((a) => (
                 <tr key={a.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                  <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{a.valor}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-start gap-3 min-w-0">
+                      {a.image_path && (
+                        <img
+                          src={a.image_path}
+                          alt={a.valor}
+                          className="w-12 h-12 object-cover rounded-lg shrink-0 bg-gray-100 dark:bg-gray-700"
+                          onError={(e) => (e.currentTarget.style.display = 'none')}
+                        />
+                      )}
+                      <div className="min-w-0">
+                        <WikiTooltip
+                          name={a.valor}
+                          summary={a.wiki_summary || undefined}
+                          imagePath={a.image_path || undefined}
+                          wikiUrl={a.wiki_url || undefined}
+                        >
+                          <span className="font-medium">{a.valor}</span>
+                        </WikiTooltip>
+                        {a.wiki_summary && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2 max-w-xs">
+                            {a.wiki_summary}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </td>
                   <td className="px-4 py-3">
                     <span className="text-xs px-2 py-1 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
                       {TIPO_LABEL[a.tipo] || a.tipo}

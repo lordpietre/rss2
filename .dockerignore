@@ -5,9 +5,19 @@ pgdata-replica.old.*
 pgdata.failed_restore
 redis-data
 hf_cache
-qdrant_storage
+data/
+models/
+hf_cache/
+backups/
 
 venv
 __pycache__
 *.pyc
 *.log
+
+# Deps frontend (119M): no las necesita ningún build con contexto raíz
+node_modules
+frontend/node_modules
+
+# Documentación/activos fuera del runtime
+PM/

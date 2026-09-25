@@ -102,7 +102,7 @@ func GetNews(c *gin.Context) {
 	}
 
 	sqlQuery := `
-		SELECT n.id, n.titulo, COALESCE(n.resumen, ''), n.contenido, n.url, n.fecha, n.imagen_url, 
+		SELECT n.id, COALESCE(n.titulo, ''), COALESCE(n.resumen, ''), COALESCE(n.resumen, '') AS contenido, n.url, n.fecha, n.imagen_url, 
 		       n.categoria_id, n.pais_id, n.fuente_nombre, n.lang,
 		       t.titulo_trad,
 		       t.resumen_trad,
@@ -112,7 +112,7 @@ func GetNews(c *gin.Context) {
 		WHERE ` + where + `
 		ORDER BY n.fecha DESC LIMIT $` + strconv.Itoa(argNum+1) + ` OFFSET $` + strconv.Itoa(argNum+2)
 
-	args = append(args, targetLang, perPage, offset)
+	args = append(args, perPage, offset)
 
 	rows, err := db.GetPool().Query(c.Request.Context(), sqlQuery, args...)
 	if err != nil {
@@ -124,17 +124,27 @@ func GetNews(c *gin.Context) {
 	var newsList []models.NewsWithTranslations
 	for rows.Next() {
 		var n models.NewsWithTranslations
-		var imagenURL, fuenteNombre *string
+		var id, titulo, resumen, contenido, url string
+		var fecha *time.Time
+		var imagenURL, fuenteNombre, langRaw *string
 		var categoriaID, paisID *int32
-		var lang string
 
 		err := rows.Scan(
-			&n.ID, &n.Titulo, &n.Resumen, &n.Contenido, &n.URL, &n.Fecha, &imagenURL,
-			&categoriaID, &paisID, &fuenteNombre, &lang,
+			&id, &titulo, &resumen, &contenido, &url, &fecha, &imagenURL,
+			&categoriaID, &paisID, &fuenteNombre, &langRaw,
 			&n.TitleTranslated, &n.SummaryTranslated, &n.LangTranslated,
 		)
 		if err != nil {
 			continue
+		}
+		n.ID = id
+		n.Titulo = titulo
+		n.Resumen = resumen
+		n.Contenido = contenido
+		n.URL = url
+		if fecha != nil {
+			f := fecha.Format(time.RFC3339)
+			n.Fecha = &f
 		}
 		if imagenURL != nil {
 			n.ImagenURL = imagenURL
@@ -150,7 +160,9 @@ func GetNews(c *gin.Context) {
 			pID := int64(*paisID)
 			n.CountryID = &pID
 		}
-		n.Lang = lang
+		if langRaw != nil {
+			n.Lang = strings.TrimSpace(*langRaw)
+		}
 		newsList = append(newsList, n)
 	}
 
@@ -228,7 +240,7 @@ func GetEntityNews(c *gin.Context) {
 	}
 
 	query := fmt.Sprintf(`
-		SELECT DISTINCT n.id, n.titulo, COALESCE(n.resumen,''), n.contenido, n.url, n.fecha, n.imagen_url,
+		SELECT DISTINCT n.id, COALESCE(n.titulo, ''), COALESCE(n.resumen,''), COALESCE(n.resumen, '') AS contenido, n.url, n.fecha, n.imagen_url,
 		       n.fuente_nombre, n.lang, tr.titulo_trad, tr.resumen_trad
 		%s
 		ORDER BY n.fecha DESC
@@ -244,13 +256,30 @@ func GetEntityNews(c *gin.Context) {
 	var news []models.NewsWithTranslations
 	for rows.Next() {
 		var n models.NewsWithTranslations
-		var img *string
-		if err := rows.Scan(&n.ID, &n.Titulo, &n.Resumen, &n.Contenido, &n.URL, &n.Fecha, &img,
-			&n.FuenteNombre, &n.Lang, &n.TitleTranslated, &n.SummaryTranslated); err != nil {
+		var id, titulo, resumen, contenido, url string
+		var fecha *time.Time
+		var img, fuenteNombre, langRaw *string
+		if err := rows.Scan(&id, &titulo, &resumen, &contenido, &url, &fecha, &img,
+			&fuenteNombre, &langRaw, &n.TitleTranslated, &n.SummaryTranslated); err != nil {
 			continue
+		}
+		n.ID = id
+		n.Titulo = titulo
+		n.Resumen = resumen
+		n.Contenido = contenido
+		n.URL = url
+		if fecha != nil {
+			f := fecha.Format(time.RFC3339)
+			n.Fecha = &f
 		}
 		if img != nil {
 			n.ImagenURL = img
+		}
+		if fuenteNombre != nil {
+			n.FuenteNombre = *fuenteNombre
+		}
+		if langRaw != nil {
+			n.Lang = strings.TrimSpace(*langRaw)
 		}
 		news = append(news, n)
 	}
@@ -287,7 +316,7 @@ func GetNewsByID(c *gin.Context) {
 	// Combined query to fetch news with entities in one round trip
 	sqlQuery := `
 		SELECT 
-			n.id, n.titulo, COALESCE(n.resumen, ''), n.contenido, n.url, n.fecha, n.imagen_url, 
+			n.id, COALESCE(n.titulo, ''), COALESCE(n.resumen, ''), COALESCE(n.resumen, '') AS contenido, n.url, n.fecha, n.imagen_url, 
 		       n.categoria_id, n.pais_id, n.fuente_nombre, n.lang,
 		       t.titulo_trad,
 		       t.resumen_trad,
@@ -312,23 +341,38 @@ func GetNewsByID(c *gin.Context) {
 			WHERE t.tipo IN ('persona', 'organizacion')
 		) ent ON ent.noticia_id = n.id
 		WHERE n.id = $2
-		GROUP BY n.id, n.titulo, n.resumen, n.contenido, n.url, n.fecha, n.imagen_url, 
+		GROUP BY n.id, n.titulo, n.resumen, n.url, n.fecha, n.imagen_url, 
 		         n.categoria_id, n.pais_id, n.fuente_nombre, n.lang,
 		         t.titulo_trad, t.resumen_trad, t.lang_to
 	`
 
 	var n models.NewsWithTranslations
-	var imagenURL, fuenteNombre *string
+	var titulo, resumen, contenido, url string
+	var fecha *time.Time
+	var imagenURL, fuenteNombre, langRaw *string
 	var categoriaID, paisID *int32
-	var lang string
 	var entitiesJSON *string
 
 	err := db.GetPool().QueryRow(c.Request.Context(), sqlQuery, targetLang, id).Scan(
-		&n.ID, &n.Titulo, &n.Resumen, &n.Contenido, &n.URL, &n.Fecha, &imagenURL,
-		&categoriaID, &paisID, &fuenteNombre, &lang,
+		&id, &titulo, &resumen, &contenido, &url, &fecha, &imagenURL,
+		&categoriaID, &paisID, &fuenteNombre, &langRaw,
 		&n.TitleTranslated, &n.SummaryTranslated, &n.LangTranslated,
 		&entitiesJSON,
 	)
+	if err != nil {
+		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: "News not found"})
+		return
+	}
+
+	n.ID = id
+	n.Titulo = titulo
+	n.Resumen = resumen
+	n.Contenido = contenido
+	n.URL = url
+	if fecha != nil {
+		f := fecha.Format(time.RFC3339)
+		n.Fecha = &f
+	}
 	if err != nil {
 		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: "News not found"})
 		return
@@ -348,7 +392,9 @@ func GetNewsByID(c *gin.Context) {
 		pID := int64(*paisID)
 		n.CountryID = &pID
 	}
-	n.Lang = lang
+	if langRaw != nil {
+		n.Lang = strings.TrimSpace(*langRaw)
+	}
 
 	// Parse entities from JSON
 	if entitiesJSON != nil && *entitiesJSON != "null" {
@@ -430,9 +476,11 @@ func GetEntities(c *gin.Context) {
 		args = append(args, "%"+apellido+"%")
 	}
 
-	// 1. Get the total count of distinct canonical entities matching the filter
+	// 1. Get the total count of distinct canonical entities matching the filter.
+	// Agrupación case-insensitive: "Donald Trump" y "Donald trump" son la
+	// misma entidad a efectos de Populares (el NER genera ambas variantes).
 	countQuery := fmt.Sprintf(`
-		SELECT COUNT(DISTINCT COALESCE(ea.canonical_name, t.valor))
+		SELECT COUNT(DISTINCT LOWER(COALESCE(ea.canonical_name, t.valor)))
 		FROM tags_noticia tn
 		JOIN tags t ON tn.tag_id = t.id
 		JOIN traducciones tr ON tn.traduccion_id = tr.id
@@ -459,10 +507,12 @@ func GetEntities(c *gin.Context) {
 		return
 	}
 
-	// 2. Fetch the paginated entities
+	// 2. Fetch the paginated entities. Forma visible = variante exacta más
+	// frecuente (mode): evita que un variant TODO-MAYÚSCULAS gane por orden
+	// ASCII a MIN(). MAX() en wiki_* ignora NULLs (gana el tag con wiki).
 	args = append(args, perPage, offset)
 	query := fmt.Sprintf(`
-		SELECT COALESCE(ea.canonical_name, t.valor) as valor, t.tipo, t.apellido, COUNT(*)::int as cnt,
+		SELECT mode() WITHIN GROUP (ORDER BY COALESCE(ea.canonical_name, t.valor)) as valor, t.tipo, MAX(t.apellido), COUNT(*)::int as cnt,
 		       MAX(t.wiki_summary), MAX(t.wiki_url), MAX(t.image_path)
 		FROM tags_noticia tn
 		JOIN tags t ON tn.tag_id = t.id
@@ -470,7 +520,7 @@ func GetEntities(c *gin.Context) {
 		JOIN noticias n ON tr.noticia_id = n.id
 		LEFT JOIN entity_aliases ea ON LOWER(ea.alias) = LOWER(t.valor) AND ea.tipo = t.tipo
 		WHERE %s
-		GROUP BY COALESCE(ea.canonical_name, t.valor), t.tipo, t.apellido
+		GROUP BY LOWER(COALESCE(ea.canonical_name, t.valor)), t.tipo
 		ORDER BY cnt DESC
 		LIMIT $%d OFFSET $%d
 	`, where, len(args)-1, len(args))
@@ -484,13 +534,15 @@ func GetEntities(c *gin.Context) {
 
 	var entities []models.Entity
 	for rows.Next() {
-var e models.Entity
-	apellido := ""
-	if err := rows.Scan(&e.Valor, &e.Tipo, &e.Count, &apellido, &e.WikiSummary, &e.WikiURL, &e.ImagePath); err != nil {
+		var e models.Entity
+		var apellido *string
+		if err := rows.Scan(&e.Valor, &e.Tipo, &apellido, &e.Count, &e.WikiSummary, &e.WikiURL, &e.ImagePath); err != nil {
 			continue
 		}
+		if apellido != nil {
+			e.Apellido = *apellido
+		}
 		entities = append(entities, e)
-		e.Apellido = apellido
 	}
 
 	if entities == nil {
@@ -506,6 +558,7 @@ var e models.Entity
 		PerPage:    perPage,
 		TotalPages: totalPages,
 	})
+}
 
 func GetLastNames(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -515,7 +568,7 @@ func GetLastNames(c *gin.Context) {
 		SELECT DISTINCT apellido 
 		FROM tags 
 		WHERE tipo = 'persona' AND apellido IS NOT NULL AND apellido != ''
-		ORDER BY apellido COLLATE "C"
+		ORDER BY apellido
 	`)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to get last names", Message: err.Error()})
