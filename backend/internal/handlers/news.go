@@ -163,6 +163,12 @@ func GetNews(c *gin.Context) {
 		if langRaw != nil {
 			n.Lang = strings.TrimSpace(*langRaw)
 		}
+		// lang_to es CHAR(5): Postgres rellena con espacios ("es   ") y el
+		// frontend lo pinta tal cual (Search.tsx). Mismo trato que n.Lang.
+		if n.LangTranslated != nil {
+			t := strings.TrimSpace(*n.LangTranslated)
+			n.LangTranslated = &t
+		}
 		newsList = append(newsList, n)
 	}
 
@@ -394,6 +400,11 @@ func GetNewsByID(c *gin.Context) {
 	}
 	if langRaw != nil {
 		n.Lang = strings.TrimSpace(*langRaw)
+	}
+	// CHAR(5) rellena con espacios ("es   "); el frontend lo muestra.
+	if n.LangTranslated != nil {
+		t := strings.TrimSpace(*n.LangTranslated)
+		n.LangTranslated = &t
 	}
 
 	// Parse entities from JSON

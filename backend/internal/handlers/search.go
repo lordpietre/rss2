@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog/log"
 	"github.com/rss2/backend/internal/auth"
 	"github.com/rss2/backend/internal/cache"
 	"github.com/rss2/backend/internal/db"
@@ -228,6 +229,11 @@ func SearchNews(c *gin.Context) {
 		if langRaw != nil {
 			n.Lang = strings.TrimSpace(*langRaw)
 		}
+		// CHAR(5) rellena con espacios ("es  "); el frontend lo muestra.
+		if n.LangTranslated != nil {
+			t := strings.TrimSpace(*n.LangTranslated)
+			n.LangTranslated = &t
+		}
 		newsList = append(newsList, n)
 	}
 
@@ -314,11 +320,14 @@ func GetStats(c *gin.Context) {
 		}
 	}
 
+	// paises no tiene columna flag_emoji (esquema init-db/ manda): se agrupa
+	// solo por id+nombre y se loguea el error, que antes quedaba silenciado
+	// por el `if err == nil` y devolvía top_countries en null.
 	rows, err = db.GetPool().Query(ctx, `
-		SELECT p.id, p.nombre, p.flag_emoji, COUNT(n.id) as count
+		SELECT p.id, p.nombre, COUNT(n.id) as count
 		FROM paises p
 		LEFT JOIN noticias n ON n.pais_id = p.id
-		GROUP BY p.id, p.nombre, p.flag_emoji
+		GROUP BY p.id, p.nombre
 		ORDER BY count DESC
 		LIMIT 10
 	`)
@@ -326,9 +335,14 @@ func GetStats(c *gin.Context) {
 		defer rows.Close()
 		for rows.Next() {
 			var cs models.CountryStat
-			rows.Scan(&cs.PaisID, &cs.PaisName, &cs.FlagEmoji, &cs.Count)
+			if err := rows.Scan(&cs.PaisID, &cs.PaisName, &cs.Count); err != nil {
+				log.Error().Err(err).Msg("GetStats: scan top_countries")
+				break
+			}
 			stats.TopCountries = append(stats.TopCountries, cs)
 		}
+	} else {
+		log.Error().Err(err).Msg("GetStats: query top_countries")
 	}
 
 	cache.Set(ctx, cacheKey, stats, cache.TTLMedium)

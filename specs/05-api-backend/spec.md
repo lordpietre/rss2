@@ -43,6 +43,20 @@ users, reset-db, alerts/scan, workers/* (+ remote), WS `/ws/worker`
    agrupa por `LOWER(...)`, suma counts, muestra la variante exacta más
    frecuente (`mode()`) y `MAX(wiki_*)`. "Donald Trump/TRUMP/trump" →
    una fila (1945). `GetEntityNews` ya era case-insensitive (1772).
+9. **`paises` no tiene `flag_emoji`** (2026-09-25): `GetStats` seleccionaba
+   `p.flag_emoji` (columna inexistente; `init-db/` manda). El `err` se
+   tragaba un `if err == nil` → `top_countries` salía **null** sin log.
+   Query reducida a `p.id, p.nombre, COUNT(n.id)`, `rows.Scan` con error
+   logueado y también el de la query. `flag_emoji` sigue en el contrato
+   del JSON (string vacío, igual que `GET /api/countries`, que nunca lo
+   selecciona). Tras un fix que toca respuestas cacheadas: `FLUSHDB`
+   (la clave `stats` TTL 30 min devolvía el null viejo).
+10. **`lang_to` es `CHAR(5)`** (2026-09-25): Postgres rellena con
+    espacios → `lang_translated` salía `"es   "` y el frontend lo pinta
+    en `Search.tsx` (`lang_translated || fuente_nombre`). `Lang` ya hacía
+    `TrimSpace` pero `LangTranslated` no. Ahora en los 3 scan que lo
+    traen (`GetNews`, `GetNewsByID`, `SearchNews`); `GetEntityNews` no lo
+    selecciona. Verificado en vivo: `len=2`.
 
 ## Criterios de aceptación
 
