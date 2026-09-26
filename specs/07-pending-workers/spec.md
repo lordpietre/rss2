@@ -41,6 +41,13 @@ Decisiones tomadas (ya no bloquean):
   discovery/topics/translator*/remote-worker`) eliminados 2026-09-14
   (nadie los referenciaba; el target `docker-build` del Makefile, roto,
   ahora usa compose).
+- **Orden de bloqueo** (2026-09-25): `UPDATE noticias SET
+  topics_processed=TRUE WHERE id=ANY($1)` colisionaba con los `UPDATE
+  lang` fila a fila de `langdetect` (orden `fecha DESC`) dentro de
+  transacciones solapadas → `deadlock detected (SQLSTATE 40P01)` (1 vez
+  en el arranque de 30k noticias, pero deja el batch a medias). Ahora
+  `sort.Strings(processedIDs)` antes del UPDATE: ambos lockean id
+  ascendente. No regressar a orden de llegada.
 
 ## Tasks
 

@@ -63,6 +63,9 @@ services:
       CT2_DEVICE: cpu
       CT2_COMPUTE_TYPE: int8
       CT2_INTRA_THREADS: 2
+      # Tope de memoria: 128 secuencias por llamada medía 4383 MB de pico
+      # y superaba el límite de 4G → OOM del cgroup (39 kills). 32 → 1901 MB.
+      MAX_SEQ_PER_CALL: ${MAX_SEQ_PER_CALL:-32}
       TRANSLATOR_ID: "0"
       TRANSLATOR_TOTAL: "2"
       PORT: 8000
@@ -83,7 +86,9 @@ services:
       resources:
         limits:
           cpus: '2'
-          memory: 4G
+          # Pico medido con MAX_SEQ_PER_CALL=32: ~2.0 GiB (4G provocaba OOM
+          # al llegar a 4383 MB con el valor anterior de 128).
+          memory: 3G
 
   # Réplicas 2-3 del translator (paso 1 velocidad): reutilizan la imagen
   # ya construida; se reparten el trabajo por SKIP LOCKED en SQL.
@@ -101,6 +106,7 @@ services:
       CT2_DEVICE: cpu
       CT2_COMPUTE_TYPE: int8
       CT2_INTRA_THREADS: 2
+      MAX_SEQ_PER_CALL: ${MAX_SEQ_PER_CALL:-32}
       TRANSLATOR_ID: "1"
       TRANSLATOR_TOTAL: "2"
       PORT: 8000
@@ -124,7 +130,9 @@ services:
       resources:
         limits:
           cpus: '2'
-          memory: 4G
+          # Pico medido con MAX_SEQ_PER_CALL=32: ~2.0 GiB (4G provocaba OOM
+          # al llegar a 4383 MB con el valor anterior de 128).
+          memory: 3G
 
   # Traductor GPU (opcional, solo con --profile gpu y NVIDIA + nvidia-container-toolkit)
   translator-gpu:
@@ -138,6 +146,7 @@ services:
       CT2_DEVICE: cuda
       CT2_COMPUTE_TYPE: float16
       CT2_INTRA_THREADS: 4
+      MAX_SEQ_PER_CALL: ${MAX_SEQ_PER_CALL:-32}
       PORT: 8000
       TARGET_LANGS: ${TARGET_LANGS:-es}
       TRANSLATOR_BATCH: ${TRANSLATOR_BATCH:-32}
@@ -363,7 +372,7 @@ services:
       resources:
         limits:
           cpus: '2'
-          memory: 4G
+          memory: 2G
     healthcheck:
       test: ["CMD-SHELL", "grep -q embeddings_worker /proc/1/cmdline"]
       interval: 30s
@@ -493,7 +502,7 @@ services:
       resources:
         limits:
           cpus: '4'
-          memory: 4G
+          memory: 512M
 
   # ------------------------------------------------------------------------------
   # FRONTEND (React + Vite)

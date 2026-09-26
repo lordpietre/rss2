@@ -59,6 +59,11 @@ def process_batch(conn):
     if not rows:
         return 0
     
+    # Lock en orden id ascendente: topics hace un UPDATE masivo sobre la misma
+    # tabla en otra transacción; con orden distinto (fecha DESC) se solapaban
+    # y Postgres abortaba una de las dos con deadlock (SQLSTATE 40P01).
+    rows.sort(key=lambda r: r['id'])
+
     updated = 0
     lang_stats = Counter()
     

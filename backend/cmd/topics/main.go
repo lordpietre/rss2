@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sort"
 	"strconv"
 	"strings"
 	"syscall"
@@ -323,6 +324,10 @@ func processBatch(ctx context.Context, topics []Topic, countries []Country) (int
 
 	// Mark as processed
 	if len(processedIDs) > 0 {
+		// Mismo criterio de bloqueo que langdetect (id ascendente): ambos
+		// transaccionan UPDATEs sobre `noticias` y, en orden distinto,
+		// Postgres abortaba uno con deadlock (SQLSTATE 40P01).
+		sort.Strings(processedIDs)
 		_, err := dbPool.Exec(ctx, `
 			UPDATE noticias SET topics_processed = TRUE WHERE id = ANY($1)
 		`, processedIDs)

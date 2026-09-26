@@ -46,6 +46,24 @@ DB_* reales en los tres servicios; `TARGET_LANGS=es`, `SCHEDULER_BATCH/SLEEP`,
 - [x] Servicio scheduler + langdetect + imagen compartida.
 - [x] `Dockerfile.scheduler` con `COPY workers/`.
 - [x] Verificar ciclo lang → pending → done con contenido real.
+- [x] **Orden de bloqueo** (2026-09-25): `process_batch` hacía los
+      `UPDATE noticias SET lang=...` en orden `fecha DESC`, solapándose
+      con el UPDATE masivo de `topics` → Postgres abortaba uno con
+      `deadlock detected (SQLSTATE 40P01)`. Ahora `rows.sort(key=id)`
+      antes del bucle (id ascendente, igual que topics).
+- [x] **OOM de los traductores** (2026-09-26): 41 `Memory cgroup out of
+      memory` en el kernel, solo en `translator`/`translator_2` (límite
+      4G), acelerando de 5/h a 14/h. Causa medida con test empírico, no
+      supuesta: el modelo NLLB son 916 MB fijos y `translate_batch` añade
+      ~28 MB por secuencia, así que `MAX_SEQ_PER_CALL=128` picaba en
+      **4383 MB** y volaba el límite; con **32** el pico baja a
+      **1940 MB**. Fijado en `docker-compose.yml` (los tres bloques
+      `translator*`), `.env` y `.env.example`; límites de memoria
+      ajustados a lo medido (`translator*` 4G→3G, `embeddings` 4G→2G,
+      `backend` 4G→512M). Verificado: recreados 01:06 UTC,
+      `restarts=0` y ningún OOM posterior. Ojo: `docker inspect
+      .State.OOMKilled` se resetea a `false` al reiniciar, la evidencia
+      autoritativa es `dmesg -T | grep "Memory cgroup out of memory"`.
 - [ ] Decidir GPU (`--profile gpu` en máquina NVIDIA) o más réplicas CPU si
       el backlog no drena.
 - [ ] Añadir `TRANSLATOR_*`/`SCHEDULER_*` a `.env.example` si se estabilizan.
