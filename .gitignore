@@ -81,8 +81,13 @@ pgdata-replica.old.*/
 data/redis-data/
 redis-data/
 
+# Monitoring data en runtime (la config de provisioning SÍ se versiona)
+data/prometheus/
+data/grafana/
+
 # HuggingFace cache (downloaded models)
 hf_cache/
+.hf-cache/
 
 # Monitoring data
 monitoring/data/

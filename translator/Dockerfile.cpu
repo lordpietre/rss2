@@ -31,8 +31,6 @@ RUN find /usr/local/lib/python3.11/site-packages/ctranslate2* \
     xargs -I {} patchelf --clear-execstack {} || true
 
 COPY workers/ ./workers/
-COPY init-db/ ./init-db/
-COPY migrations/ ./migrations/
 
 ENV DB_HOST=db
 ENV DB_PORT=5432
