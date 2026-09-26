@@ -86,7 +86,7 @@ func initDB() {
 			id SERIAL PRIMARY KEY,
 			valor VARCHAR(255) NOT NULL,
 			tipo VARCHAR(32) NOT NULL,
-			periodo DATE NOT NULL,
+			periodo TIMESTAMP NOT NULL,
 			hits INT NOT NULL,
 			baseline DOUBLE PRECISION NOT NULL,
 			ratio DOUBLE PRECISION NOT NULL,
@@ -99,6 +99,26 @@ func initDB() {
 		log.Printf("Warning: Could not create alertas table: %v", err)
 	} else {
 		log.Println("Table alertas ready")
+	}
+
+	// Migración: alertas pasó de una referencia diaria a horaria, y DATE no
+	// admite la hora. Idempotente (solo actúa si la columna sigue en DATE).
+	_, err = db.GetPool().Exec(ctx, `
+		DO $$
+		BEGIN
+			IF EXISTS (
+				SELECT 1 FROM information_schema.columns
+				WHERE table_name = 'alertas'
+				  AND column_name = 'periodo'
+				  AND data_type = 'date'
+			) THEN
+				ALTER TABLE alertas ALTER COLUMN periodo TYPE TIMESTAMP USING periodo::timestamp;
+				RAISE NOTICE 'alertas.periodo migrado de DATE a TIMESTAMP';
+			END IF;
+		END $$;
+	`)
+	if err != nil {
+		log.Printf("Warning: Could not migrate alertas.periodo: %v", err)
 	}
 
 	// Crear tabla de remote_workers si no existe

@@ -53,8 +53,9 @@ ner (spaCy es_core_news_lg sobre traducciones done)
   ▼
 Consumidores de lectura:
   - API news/search/entities (JOIN noticias+traducciones+tags)
-  - AlertScanner (en proceso server, cada 120 min): picos vs media 8 días
-    → alertas (hace falta >1 día de historia para disparar)
+  - AlertScanner (en proceso server, cada 120 min): picos por HORA vs
+    media de las 24 h previas con datos, ajustada al volumen de la hora
+    → alertas (hace falta ≥2 buckets de historia para disparar)
   - Pendientes de activar: topics, related, qdrant-worker, wiki-worker,
     scraper/discovery (ver spec 07)
 ```

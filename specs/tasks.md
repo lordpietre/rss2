@@ -40,6 +40,17 @@ Estado global. El detalle y la evidencia están en cada `specs/NN-*/spec.md`.
 - [x] Fix scanner alertas: comparaba el día en curso (incompleto) y nunca
       disparaba. Ahora usa el último día completo (`fecha < CURRENT_DATE`).
       Verificado: 1044 alertas del periodo 2026-09-13.
+- [x] Fix alertas por HORA (2026-09-26): la petición fue pasar de día a
+      hora. Con la base reconstruida solo había 1 día completo, así que
+      `AVG(COALESCE(cnt,0))` sobre la serie de 8 días daba `baseline=0`
+      en las 67 430 entidades y `baseline≥2` las descartaba todas → 0
+      alertas en silencio. Ahora detecta picos **por hora** (9 buckets
+      activos vs 1), el baseline solo promedia buckets con datos (no
+      cuenta huecos como 0 menciones) y se ajusta al volumen de la hora
+      ref, donde sin ajustar el ratio máximo medido era 1.8 y nada
+      llegaba a umbral. `alertas.periodo` DATE→TIMESTAMP (migración
+      idempotente en el arranque). Verificado: 29 alertas, `ratio`
+      coherente con `hits/baseline`.
 - [x] Activados `wiki` y `topics` (reutilizan imagen `rss2-backend`, sin
       build extra; `Dockerfile.wiki` queda legacy por contexto raíz pesado).
       Wiki enriquece (`Putin` ya tiene `wiki_summary`); topics procesa

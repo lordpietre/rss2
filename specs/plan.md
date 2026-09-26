@@ -13,7 +13,8 @@ fase está marcado [x] en los specs 01–08.
 3. [x] Healthchecks en todos los workers.
 4. [x] Backup pre-rotación: retención 30 días + `pipefail` + descarta fallidos.
 5. [x] `GET /api/admin/ingest/stats` + poda de 5320 feeds muertos.
-6. [x] `alertas` funcionando (fix día completo; 1000+ por periodo).
+6. [x] `alertas` funcionando (fix por hora + baseline ajustado al
+   volumen; ver spec 04).
 
 ## Fase 2 — Activaciones (completada 2026-09-14/15)
 

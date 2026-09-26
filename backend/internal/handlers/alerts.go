@@ -39,7 +39,9 @@ func GetAlertas(c *gin.Context) {
 	}
 
 	query := `
-		SELECT a.id, a.valor, a.tipo, a.periodo::text, a.hits, a.baseline,
+		SELECT a.id, a.valor, a.tipo,
+		       to_char(a.periodo, 'YYYY-MM-DD HH24:MI') AS periodo,
+		       a.hits, a.baseline,
 		       a.ratio, a.status, to_char(a.created_at, 'YYYY-MM-DD HH24:MI'),
 		       t.wiki_summary, t.wiki_url, t.image_path
 		FROM alertas a
@@ -116,19 +118,40 @@ func ScanAlertasAdmin(c *gin.Context) {
 }
 
 // RunAlertScan busca conceptos (persona, lugar, organizacion, tema) cuya
-// actividad supera significativamente su media de los días anteriores.
+// actividad en la hora de referencia supera con holgura su media de las horas
+// anteriores.
 //
-// En lugar de comparar siempre contra CURRENT_DATE (que se queda vacío si la
-// cadena de traducción/NER va por detrás de la ingesta), se toma como día de
-// referencia el último día COMPLETO (dia < CURRENT_DATE) que tenga datos de
-// tags etiquetados: el día en curso está incompleto y comparar contra él
-// impide que el scan dispare nunca. Se compara contra la media de los
-// ALERTS_LOOKBACK_DAYS días previos, contando los días sin actividad como 0.
+// Decisiones de diseño (2026-09-26):
+//
+//  1. Granularidad HORARIA, no diaria. Con la base reconstruida solo había
+//     un día completo etiquetado, de modo que la serie de 8 días previos
+//     venía vacía y el baseline salía 0 en las 67 430 entidades: el filtro
+//     baseline >= umbral descartaba absolutamente todo y el scan devolvía 0
+//     sin explicación.
+//
+//  2. El baseline solo promedia buckets CON datos. Antes se cruzaba la serie
+//     de calendario con COALESCE(cnt, 0), confundiendo "ese tramo no había
+//     datos etiquetados" con "cero menciones": o bien rebañaba el baseline a
+//     0, o bien, con historia parcial, lo dividía por el número total de
+//     huecos y falseaba el ratio hacia arriba.
+//
+//  3. El baseline se ajusta al volumen de la hora de referencia, es decir
+//     menciones por noticia de la base por las noticias de la hora ref. La
+//     ingesta es irregular y el NER va por detrás, así que cada hora tiene
+//     distinto número de noticias; sin ajustar, el ratio máximo medido en
+//     producción era 1.8 y ninguna alerta alcanzaba el umbral. Al
+//     normalizar, el ratio vuelve a ser hits/baseline puro cuando las horas
+//     igualan volumen, así que la regla se degrada a la comparación
+//     absoluta de siempre.
+//
+//  4. Se descarta la hora en curso (incompleta) y se exige un mínimo de
+//     buckets de baseline para no derivar un ratio de una sola hora.
 func RunAlertScan(ctx context.Context) (int, error) {
-	minHits := 5
+	minHits := 3
 	minRatio := 5.0
-	minBaseline := 2.0
-	lookbackDays := 8
+	minBaseline := 0.5
+	lookbackHours := 24
+	minBuckets := 2
 	if v := os.Getenv("ALERTS_MIN_HITS"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			minHits = n
@@ -144,63 +167,91 @@ func RunAlertScan(ctx context.Context) (int, error) {
 			minBaseline = f
 		}
 	}
-	if v := os.Getenv("ALERTS_LOOKBACK_DAYS"); v != "" {
+	if v := os.Getenv("ALERTS_LOOKBACK_HOURS"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			lookbackDays = n
+			lookbackHours = n
+		}
+	}
+	if v := os.Getenv("ALERTS_MIN_BASELINE_BUCKETS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			minBuckets = n
 		}
 	}
 
+	// Diagnóstico previo: deja rastro de por qué un scan no dispara en vez
+	// de un "0 new alerts" sin contexto.
+	var refHour, refInfo string
+	var active, baseBuckets int
+	if err := db.GetPool().QueryRow(ctx, `
+		WITH hourly AS (`+hourlyCTE+`),
+		ref AS (SELECT MAX(hora) AS h FROM hourly)
+		SELECT COALESCE((SELECT h FROM ref)::text, '') AS ref_hora,
+		       (SELECT count(DISTINCT hora) FROM hourly) AS activas,
+		       (SELECT count(DISTINCT hora) FROM hourly
+		         WHERE hora < (SELECT h FROM ref)
+		           AND hora >= (SELECT h FROM ref) - ($1::int * interval '1 hour')) AS baseline
+	`, lookbackHours).Scan(&refHour, &active, &baseBuckets); err != nil {
+		return 0, fmt.Errorf("diagnóstico de alertas: %w", err)
+	}
+	refInfo = fmt.Sprintf("ref=%s buckets_activos=%d baseline=%d", refHour, active, baseBuckets)
+	if refHour == "" {
+		log.Printf("alerts: sin datos etiquetados, scan omitido")
+		return 0, nil
+	}
+
 	query := `
-		WITH daily AS (
-			SELECT t.id AS tag_id, t.valor, t.tipo, n.fecha::date AS dia,
-			       COUNT(DISTINCT n.id) AS cnt
+		WITH hourly AS (` + hourlyCTE + `),
+		vol AS (
+			SELECT date_trunc('hour', n.fecha) AS hora,
+			       COUNT(DISTINCT n.id) AS noticias
 			FROM tags_noticia tn
-			JOIN tags t ON tn.tag_id = t.id
-			JOIN traducciones tr ON tn.traduccion_id = tr.id
-			JOIN noticias n ON tr.noticia_id = n.id
+			JOIN noticias n ON tn.noticia_id = n.id
 			WHERE n.fecha >= CURRENT_DATE - 30
-			  AND n.fecha < CURRENT_DATE
-			  AND t.tipo IN ('persona', 'lugar', 'organizacion', 'tema')
-			GROUP BY t.id, t.valor, t.tipo, n.fecha::date
+			  AND n.fecha < date_trunc('hour', CURRENT_TIMESTAMP)
+			GROUP BY 1
 		),
 		ref AS (
-			SELECT MAX(dia) AS ref_date FROM daily
+			SELECT MAX(hora) AS ref_hora FROM hourly
 		),
-		prev_series AS (
-			SELECT generate_series((SELECT ref_date - $3::int FROM ref),
-			                       (SELECT ref_date - 1 FROM ref), '1 day')::date AS dia
-		),
-		today AS (
-			SELECT tag_id, valor, tipo, SUM(cnt)::int AS hits
-			FROM daily
-			WHERE dia = (SELECT ref_date FROM ref)
-			GROUP BY tag_id, valor, tipo
+		current_h AS (
+			SELECT h.tag_id, h.valor, h.tipo, SUM(h.cnt)::int AS hits
+			FROM hourly h
+			WHERE h.hora = (SELECT ref_hora FROM ref)
+			GROUP BY h.tag_id, h.valor, h.tipo
 		),
 		base AS (
-			SELECT t.tag_id, t.valor, t.tipo,
-			       AVG(COALESCE(d.cnt, 0))::float AS baseline
-			FROM today t
-			CROSS JOIN prev_series s
-			LEFT JOIN daily d ON d.tag_id = t.tag_id AND d.dia = s.dia
-			GROUP BY t.tag_id, t.valor, t.tipo
+			SELECT c.tag_id,
+			       AVG(h.cnt::float / v.noticias) * r.noticias AS baseline,
+			       COUNT(DISTINCT h.hora) AS n_buckets
+			FROM current_h c
+			JOIN hourly h ON h.tag_id = c.tag_id
+			JOIN vol v ON v.hora = h.hora
+			CROSS JOIN (
+				SELECT noticias FROM vol WHERE hora = (SELECT ref_hora FROM ref)
+			) r
+			WHERE h.hora <  (SELECT ref_hora FROM ref)
+			  AND h.hora >= (SELECT ref_hora FROM ref) - ($3::int * interval '1 hour')
+			GROUP BY c.tag_id, r.noticias
 		)
-		SELECT t.valor, t.tipo, t.hits, b.baseline,
-		       (t.hits::float / b.baseline) AS ratio,
-		       (SELECT ref_date FROM ref)::date AS periodo
-		FROM today t
+		SELECT h.valor, h.tipo, h.hits, b.baseline,
+		       (h.hits::float / b.baseline) AS ratio,
+		       (SELECT ref_hora FROM ref) AS periodo
+		FROM current_h h
 		JOIN base b USING (tag_id)
-		WHERE t.hits >= $1
+		WHERE h.hits >= $1
+		  AND b.n_buckets >= $5
 		  AND b.baseline >= $4
-		  AND (t.hits::float / b.baseline) >= $2
+		  AND (h.hits::float / b.baseline) >= $2
 	`
 
-	rows, err := db.GetPool().Query(ctx, query, minHits, minRatio, lookbackDays, minBaseline)
+	rows, err := db.GetPool().Query(ctx, query, minHits, minRatio, lookbackHours, minBaseline, minBuckets)
 	if err != nil {
 		return 0, err
 	}
 	defer rows.Close()
 
 	inserted := 0
+	candidates := 0
 	for rows.Next() {
 		var valor, tipo string
 		var hits int
@@ -210,6 +261,7 @@ func RunAlertScan(ctx context.Context) (int, error) {
 			log.Printf("alerts: scan row error: %v", err)
 			continue
 		}
+		candidates++
 		res, err := db.GetPool().Exec(ctx, `
 			INSERT INTO alertas (valor, tipo, periodo, hits, baseline, ratio)
 			VALUES ($1, $2, $3, $4, $5, $6)
@@ -224,8 +276,28 @@ func RunAlertScan(ctx context.Context) (int, error) {
 		}
 	}
 
+	log.Printf("alerts: %s candidatos=%d nuevas=%d (hits>=%d ratio>=%.1f baseline>=%.1f buckets>=%d)",
+		refInfo, candidates, inserted, minHits, minRatio, minBaseline, minBuckets)
+
 	return inserted, nil
 }
+
+// hourlyCTE agrega menciones por HORA de publicación (no por día) dentro de
+// la ventana deslizante, excluyendo la hora en curso. Se comparte con la
+// consulta de diagnóstico para que ambos midan exactamente lo mismo.
+const hourlyCTE = `
+	SELECT t.id AS tag_id, t.valor, t.tipo,
+	       date_trunc('hour', n.fecha) AS hora,
+	       COUNT(DISTINCT n.id) AS cnt
+	FROM tags_noticia tn
+	JOIN tags t ON tn.tag_id = t.id
+	JOIN traducciones tr ON tn.traduccion_id = tr.id
+	JOIN noticias n ON tr.noticia_id = n.id
+	WHERE n.fecha >= CURRENT_DATE - 30
+	  AND n.fecha < date_trunc('hour', CURRENT_TIMESTAMP)
+	  AND t.tipo IN ('persona', 'lugar', 'organizacion', 'tema')
+	GROUP BY t.id, t.valor, t.tipo, date_trunc('hour', n.fecha)
+`
 
 // StartAlertScanner lanza una goroutine que revisa picos de actividad
 // periódicamente (cada ALERTS_SCAN_INTERVAL_MIN, por defecto 120 min).
