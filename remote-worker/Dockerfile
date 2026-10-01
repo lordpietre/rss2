@@ -30,7 +30,10 @@ RUN find /usr/local/lib/python3.11/site-packages/ctranslate2* \
 
 COPY worker.py /app/worker.py
 
-ENV CT2_DEVICE=cuda
-ENV CT2_COMPUTE_TYPE=float16
+# CT2_DEVICE y CT2_COMPUTE_TYPE se configuran via variables de entorno
+# Valores por defecto: cuda + float16 (requiere GPU NVIDIA con 6GB+ VRAM)
+# Para CPU: CT2_DEVICE=cpu CT2_COMPUTE_TYPE=int8
+ENV CT2_DEVICE=${CT2_DEVICE:-cuda}
+ENV CT2_COMPUTE_TYPE=${CT2_COMPUTE_TYPE:-float16}
 
 CMD ["python", "/app/worker.py"]

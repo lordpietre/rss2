@@ -5,3 +5,8 @@ __pycache__/
 models/
 hf_cache/
 *.egg-info/
+
+# Environment files (contain secrets)
+.env
+.env.local
+.env.production
