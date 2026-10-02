@@ -123,8 +123,8 @@ def _env_str(name: str, default=None):
 
 TARGET_LANGS = _env_list("TARGET_LANGS")
 BATCH_SIZE = _env_int("TRANSLATOR_BATCH", 128)
-MAX_SRC_TOKENS = _env_int("MAX_SRC_TOKENS", 256)
-MAX_NEW_TOKENS = _env_int("MAX_NEW_TOKENS", 256)
+MAX_SRC_TOKENS = _env_int("MAX_SRC_TOKENS", 512)
+MAX_NEW_TOKENS = _env_int("MAX_NEW_TOKENS", 512)
 MAX_SEQ_PER_CALL = _env_int("MAX_SEQ_PER_CALL", 128)
 
 CT2_MODEL_PATH = _env_str("CT2_MODEL_PATH", "/app/models/nllb-ct2")
@@ -405,9 +405,13 @@ def process_batch(conn, rows):
 
     for r in rows:
         lang_to = normalize_lang(r.get("lang_to"), "es") or "es"
-        lang_from = normalize_lang(r.get("lang_from")) or detect_lang(
-            r.get("titulo") or ""
-        )
+        # lang_from llega a NULL cuando el cuerpo ha sido rehecho (sanitize
+        # -requeue): en ese caso se detecta sobre el texto YA limpio, que es
+        # lo que importa (antes se detectaba sobre un resumen con chrome de
+        # página y salía el idioma equivocado).
+        lang_from = normalize_lang(r.get("lang_from"), default=None) or detect_lang(
+            f"{r.get('titulo') or ''} {r.get('resumen') or ''}".strip()[:1000]
+        ) or "es"
 
         titulo = (r.get("titulo") or "").strip()
         resumen = (r.get("resumen") or "").strip()
@@ -587,7 +591,9 @@ def fetch_pending_translations(conn):
                    n.titulo, n.resumen, n.id as noticia_id
             FROM traducciones t
             JOIN noticias n ON n.id = t.noticia_id
-            WHERE t.lang_to = %s 
+            WHERE t.lang_to = %s
+              AND t.status = 'pending'
+              AND t.worker_id IS NULL
               AND (t.titulo_trad IS NULL OR t.resumen_trad IS NULL)
               AND (t.locked_at IS NULL OR t.locked_at < NOW() - INTERVAL '10 minutes')
             ORDER BY n.fecha DESC

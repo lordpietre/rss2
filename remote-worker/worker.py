@@ -40,8 +40,8 @@ LANG_CODE_MAP = {
     "ko": "kor_Hang", "vi": "vie_Latn",
 }
 
-MAX_SRC_TOKENS = 512
-MAX_NEW_TOKENS = 512
+MAX_SRC_TOKENS = 1024
+MAX_NEW_TOKENS = 1024
 BODY_CHARS_CHUNK = 900
 
 _tokenizer = None

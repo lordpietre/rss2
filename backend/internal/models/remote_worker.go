@@ -14,7 +14,7 @@ type RemoteWorker struct {
 
 type TranslationJob struct {
 	ID        int64  `json:"id"`
-	NewsID    int64  `json:"noticia_id"`
+	NewsID    string `json:"noticia_id"`
 	LangFrom  string `json:"lang_from"`
 	LangTo    string `json:"lang_to"`
 	Title     string `json:"title"`

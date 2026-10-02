@@ -380,8 +380,8 @@ services:
   # ==================================================================================
   remote-translator:
     build:
-      context: .
-      dockerfile: Dockerfile.remote-worker
+      context: ./remote-worker
+      dockerfile: Dockerfile
     container_name: rss2_remote_translator
     environment:
       WORKER_NAME: ${WORKER_NAME:-remote-worker-1}

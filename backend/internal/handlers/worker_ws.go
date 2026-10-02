@@ -247,7 +247,7 @@ func AssignJobToWorker(workerID int) *models.TranslationJob {
 		FROM traducciones t
 		JOIN noticias n ON n.id = t.noticia_id
 		WHERE t.status = 'pending' 
-		  AND (t.worker_id IS NULL OR t.status = 'assigned' AND t.assigned_at < NOW() - INTERVAL '5 minutes')
+		  AND t.worker_id IS NULL
 		  AND t.lang_to = 'es'
 		  AND (t.titulo_trad IS NULL OR t.resumen_trad IS NULL)
 		ORDER BY n.fecha DESC
@@ -256,6 +256,7 @@ func AssignJobToWorker(workerID int) *models.TranslationJob {
 	`).Scan(&job.ID, &job.NewsID, &job.LangFrom, &job.LangTo, &job.Title, &job.Summary)
 
 	if err != nil {
+		log.Printf("[AssignJobToWorker] No job found for worker %d: %v", workerID, err)
 		return nil
 	}
 
@@ -282,9 +283,20 @@ func StartJobAssigner() {
 			select {
 			case <-ticker.C:
 				workersMu.RLock()
+				workerCount := len(workers)
+				workersMu.RUnlock()
+
+				if workerCount > 0 {
+					log.Printf("[JobAssigner] Found %d online workers", workerCount)
+				}
+
+				workersMu.RLock()
 				for workerID := range workers {
 					workersMu.RUnlock()
-					AssignJobToWorker(workerID)
+					job := AssignJobToWorker(workerID)
+					if job != nil {
+						log.Printf("[JobAssigner] Assigned job %d to worker %d", job.ID, workerID)
+					}
 					workersMu.RLock()
 				}
 				workersMu.RUnlock()
