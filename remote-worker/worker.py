@@ -43,6 +43,7 @@ LANG_CODE_MAP = {
 MAX_SRC_TOKENS = 1024
 MAX_NEW_TOKENS = 1024
 BODY_CHARS_CHUNK = 900
+MAX_BODY_CHARS = 12000  # Truncar resúmenes largos para evitar timeouts
 
 _tokenizer = None
 _translator = None
@@ -215,6 +216,10 @@ def translate_body_long(src: str, tgt: str, body: str) -> str:
     body = (body or "").strip()
     if not body:
         return ""
+    
+    # Truncar cuerpos muy largos para evitar timeouts (igual que worker local)
+    if len(body) > MAX_BODY_CHARS:
+        body = body[:MAX_BODY_CHARS]
     
     chunks = split_body_into_chunks(body)
     if len(chunks) == 1:
