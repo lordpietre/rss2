@@ -256,16 +256,23 @@ def process_job(job: dict) -> dict:
         
         summary_tr = ""
         if summary:
-            LOG.info(f"Job {job_id}: summary length={len(summary)}, first 100 chars: {summary[:100]}")
-            summary_tr = translate_body_long(lang_from, lang_to, summary)
-            LOG.info(f"Job {job_id}: raw translated summary length={len(summary_tr)}, first 100 chars: {summary_tr[:100]}")
-            summary_tr = clean_text(summary_tr)
-            LOG.info(f"Job {job_id}: cleaned summary length={len(summary_tr)}")
-            if not summary_tr:
-                LOG.warning(f"Job {job_id}: summary_tr is empty after cleaning, using original")
-                summary_tr = summary
-            else:
-                summary_tr = summary_tr
+            try:
+                LOG.info(f"Job {job_id}: summary length={len(summary)}, lang={lang_from}")
+                summary_tr = translate_body_long(lang_from, lang_to, summary)
+                LOG.info(f"Job {job_id}: translated summary length={len(summary_tr)}")
+                summary_tr_clean = clean_text(summary_tr)
+                LOG.info(f"Job {job_id}: cleaned summary length={len(summary_tr_clean)}")
+                if summary_tr_clean:
+                    summary_tr = summary_tr_clean
+                    LOG.info(f"Job {job_id}: using cleaned translation")
+                elif summary_tr:
+                    LOG.warning(f"Job {job_id}: cleaned is empty but raw is not, using raw")
+                else:
+                    LOG.warning(f"Job {job_id}: both cleaned and raw are empty, using original")
+                    summary_tr = summary
+            except Exception as e:
+                LOG.error(f"Job {job_id}: summary translation failed: {e}")
+                summary_tr = ""
         
         return {
             "job_id": job_id,
