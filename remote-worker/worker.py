@@ -256,8 +256,16 @@ def process_job(job: dict) -> dict:
         
         summary_tr = ""
         if summary:
+            LOG.info(f"Job {job_id}: summary length={len(summary)}, first 100 chars: {summary[:100]}")
             summary_tr = translate_body_long(lang_from, lang_to, summary)
-            summary_tr = clean_text(summary_tr) or summary
+            LOG.info(f"Job {job_id}: raw translated summary length={len(summary_tr)}, first 100 chars: {summary_tr[:100]}")
+            summary_tr = clean_text(summary_tr)
+            LOG.info(f"Job {job_id}: cleaned summary length={len(summary_tr)}")
+            if not summary_tr:
+                LOG.warning(f"Job {job_id}: summary_tr is empty after cleaning, using original")
+                summary_tr = summary
+            else:
+                summary_tr = summary_tr
         
         return {
             "job_id": job_id,
