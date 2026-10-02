@@ -259,8 +259,6 @@ def process_job(job: dict) -> dict:
             summary_tr = translate_body_long(lang_from, lang_to, summary)
             summary_tr = clean_text(summary_tr) or summary
         
-        _stats["jobs_completed"] += 1
-        
         return {
             "job_id": job_id,
             "title_trad": title_tr,
@@ -269,7 +267,6 @@ def process_job(job: dict) -> dict:
         }
     except Exception as e:
         LOG.error(f"Translation error for job {job_id}: {e}")
-        _stats["jobs_failed"] += 1
         return {
             "job_id": job_id,
             "title_trad": "",
@@ -278,12 +275,32 @@ def process_job(job: dict) -> dict:
         }
 
 
-def send_message(msg: dict):
-    if _ws and _ws.sock and _ws.sock.connected:
-        try:
-            _ws.send(json.dumps(msg))
-        except Exception as e:
-            LOG.error(f"Send error: {e}")
+def send_message(msg: dict) -> bool:
+    """Send a message via WebSocket. Returns True if successful, False otherwise."""
+    if not _ws or not _ws.sock or not _ws.sock.connected:
+        LOG.error("Cannot send: WebSocket not connected")
+        return False
+    try:
+        _ws.send(json.dumps(msg))
+        return True
+    except Exception as e:
+        LOG.error(f"Send error: {e}")
+        return False
+
+
+MAX_RETRIES = 3
+RETRY_DELAY = 2
+
+
+def send_message_with_retry(msg: dict) -> bool:
+    """Send a message with retry logic. Returns True only if eventually successful."""
+    for attempt in range(MAX_RETRIES):
+        if send_message(msg):
+            return True
+        if attempt < MAX_RETRIES - 1:
+            LOG.warning(f"Retry {attempt + 2}/{MAX_RETRIES} in {RETRY_DELAY}s...")
+            time.sleep(RETRY_DELAY)
+    return False
 
 
 def on_message(ws, message):
@@ -298,11 +315,18 @@ def on_message(ws, message):
     if msg_type == "job":
         job = msg.get("job", {})
         result = process_job(job)
-        send_message({
-            "type": "result",
-            "result": result
-        })
-        LOG.info(f"Sent result for job {result['job_id']}")
+        
+        # Only mark as completed after successful send
+        if send_message_with_retry({"type": "result", "result": result}):
+            LOG.info(f"Sent result for job {result['job_id']}")
+            # Count as completed only if translation was successful
+            if result.get("error") == "":
+                _stats["jobs_completed"] += 1
+            else:
+                _stats["jobs_failed"] += 1
+        else:
+            LOG.error(f"Failed to send result for job {result['job_id']} after {MAX_RETRIES} attempts")
+            _stats["jobs_failed"] += 1
     
     elif msg_type == "ping":
         send_message({"type": "heartbeat"})
