@@ -153,7 +153,8 @@ func heartbeatLoop(wsWorker *WSWorker) {
 			elapsed := time.Since(wsWorker.lastHeartbeat)
 			wsWorker.mu.Unlock()
 
-			if elapsed > 60*time.Second {
+			// Give workers 180s to process long translations (model can take 30-60s per job)
+			if elapsed > 180*time.Second {
 				log.Printf("Worker %d heartbeat timeout", wsWorker.workerID)
 				wsWorker.conn.Close()
 				return
