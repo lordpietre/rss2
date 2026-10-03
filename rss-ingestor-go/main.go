@@ -17,6 +17,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	_ "github.com/lib/pq"
 	"github.com/mmcdole/gofeed"
+	"rss-ingestor-go/textclean"
 )
 
 // Config holds the configuration loaded from environment variables
@@ -179,15 +180,11 @@ func generateID(link string) string {
 	return hex.EncodeToString(hash[:])
 }
 
+// cleanHTML deja el texto del feed listo para guardar: quita HTML, separa los
+// bloques (evita palabras pegadas), descodifica entidades y descarta el chrome
+// de la página (menús, pies, código JS). Es idempotente y está acotado.
 func cleanHTML(input string) string {
-	if input == "" {
-		return ""
-	}
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(input))
-	if err == nil {
-		return strings.TrimSpace(doc.Text())
-	}
-	return strings.TrimSpace(input)
+	return textclean.Clean(input)
 }
 
 func extractImage(item *gofeed.Item) string {
@@ -323,7 +320,7 @@ func processFeed(fp *gofeed.Parser, feed Feed, results chan<- int) {
 		if item.Link == "" {
 			continue
 		}
-		
+
 		pubDate := time.Now()
 		if item.PublishedParsed != nil {
 			pubDate = *item.PublishedParsed
@@ -336,10 +333,10 @@ func processFeed(fp *gofeed.Parser, feed Feed, results chan<- int) {
 		if resumen == "" {
 			resumen = item.Content
 		}
-		
+
 		noticia := Noticia{
 			ID:           generateID(item.Link),
-			Titulo:       item.Title,
+			Titulo:       textclean.CleanTitle(item.Title),
 			Resumen:      cleanHTML(resumen),
 			URL:          item.Link,
 			Fecha:        pubDate,
@@ -352,13 +349,13 @@ func processFeed(fp *gofeed.Parser, feed Feed, results chan<- int) {
 	}
 
 	inserted := insertNoticias(noticias)
-	
+
 	// Get new headers
 	newEtag := resp.Header.Get("ETag")
 	newModified := resp.Header.Get("Last-Modified")
 
 	updateFeedStatus(feed.ID, newEtag, newModified, true, "")
-	
+
 	if inserted > 0 {
 		log.Printf("[Feed %d] Inserted %d new items", feed.ID, inserted)
 	}
@@ -376,7 +373,7 @@ func insertNoticias(noticias []Noticia) int {
 func insertNoticiasWithConflict(noticias []Noticia) int {
 	// Efficient bulk insert for Postgres using unnest
 	// Or standard multi-value insert.
-	
+
 	count := 0
 	// Chunking to avoid parameter limit (65535)
 	chunkSize := 500
@@ -386,18 +383,18 @@ func insertNoticiasWithConflict(noticias []Noticia) int {
 			end = len(noticias)
 		}
 		chunk := noticias[i:end]
-		
+
 		placeholders := []string{}
 		vals := []interface{}{}
-		
+
 		for j, n := range chunk {
 			offset := j * 9
-			placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)", 
+			placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)",
 				offset+1, offset+2, offset+3, offset+4, offset+5, offset+6, offset+7, offset+8, offset+9))
-			
+
 			vals = append(vals, n.ID, n.Titulo, n.Resumen, n.URL, n.Fecha, n.ImagenURL, n.FuenteNombre, n.CategoriaID, n.PaisID)
 		}
-		
+
 		query := fmt.Sprintf(`
 			INSERT INTO noticias (id, titulo, resumen, url, fecha, imagen_url, fuente_nombre, categoria_id, pais_id)
 			VALUES %s
@@ -409,7 +406,7 @@ func insertNoticiasWithConflict(noticias []Noticia) int {
 			log.Printf("Batch insert error: %v", err)
 			continue
 		}
-		
+
 		rowsAff, _ := res.RowsAffected()
 		count += int(rowsAff)
 	}
@@ -433,7 +430,7 @@ func updateFeedStatus(id int, etag, modified string, success bool, lastError str
 			WHERE id = $3`
 		args = []interface{}{lastError, config.MaxFailures, id}
 	}
-	
+
 	_, err := db.Exec(query, args...)
 	if err != nil {
 		log.Printf("Error updating feed %d status: %v", id, err)
@@ -499,7 +496,7 @@ func main() {
 	loadConfig()
 	initHTTPClient()
 	initDB()
-	
+
 	// Run immediately on start
 	ingestCycle()
 

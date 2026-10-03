@@ -231,13 +231,17 @@ export const apiService = {
     return data
   },
 
-  getAlertas: async (params?: { status?: string; limit?: number }): Promise<{ alertas: Alerta[]; total: number; nuevas: number }> => {
+  getAlertas: async (params?: { status?: string; tipo?: string; limit?: number }): Promise<{ alertas: Alerta[]; total: number; nuevas: number }> => {
     const { data } = await api.get('/alerts', { params })
     return data
   },
 
   markAlertaRead: async (id: number): Promise<void> => {
     await api.post(`/alerts/${id}/read`)
+  },
+
+  dismissAlerta: async (id: number): Promise<void> => {
+    await api.post(`/alerts/${id}/dismiss`)
   },
 
   markAllAlertasRead: async (): Promise<void> => {

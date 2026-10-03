@@ -1,10 +1,23 @@
+#!/usr/bin/env python3
+"""
+CTranslate2 Translation Worker para RSS2.
+
+Traduce títulos, resúmenes y contenido completo de noticias.
+Soporta ejecución local (docker-compose) y remota (WebSocket).
+
+Límites configurables via environment:
+- MAX_SRC_TOKENS: Tokens máximos del texto origen (default: 2048)
+- MAX_NEW_TOKENS: Tokens máximos de la traducción (default: 2048)
+- MAX_BODY_CHARS: Caracteres máximos del cuerpo a traducir (default: 80000)
+- BODY_CHARS_CHUNK: Tamaño de chunks para contenido largo (default: 2000)
+"""
+
 import os
 import re
 import time
 import logging
-import fcntl
 import hashlib
-from typing import List, Optional
+from typing import List, defaultdict
 
 import psycopg2
 import psycopg2.extras
@@ -18,15 +31,61 @@ DetectorFactory.seed = 0
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
 LOG = logging.getLogger("translator_ct2")
 
+# =============================================================================
+# CONFIGURACIÓN
+# =============================================================================
+
 TRANSLATOR_ID = os.environ.get("TRANSLATOR_ID", "")
 TRANSLATOR_TOTAL = int(os.environ.get("TRANSLATOR_TOTAL", "1"))
-
 CACHE_TTL = int(os.environ.get("TRANSLATION_CACHE_TTL", str(30 * 24 * 3600)))
+
+# Límites de traducción - aumentados para contenido completo
+MAX_SRC_TOKENS = int(os.environ.get("MAX_SRC_TOKENS", "2048"))
+MAX_NEW_TOKENS = int(os.environ.get("MAX_NEW_TOKENS", "2048"))
+MAX_BODY_CHARS = int(os.environ.get("MAX_BODY_CHARS", "80000"))  # 80k para artículos completos
+BODY_CHARS_CHUNK = int(os.environ.get("BODY_CHARS_CHUNK", "2000"))  # 2k por chunk
+
+# CTranslate2
+CT2_MODEL_PATH = os.environ.get("CT2_MODEL_PATH", "/app/models/nllb-ct2")
+CT2_DEVICE = os.environ.get("CT2_DEVICE", "cpu")
+CT2_COMPUTE_TYPE = os.environ.get("CT2_COMPUTE_TYPE", "int8")
+CT2_INTRA_THREADS = int(os.environ.get("CT2_INTRA_THREADS", "2"))
+CT2_INTER_THREADS = int(os.environ.get("CT2_INTER_THREADS", "1"))
+MAX_SEQ_PER_CALL = int(os.environ.get("MAX_SEQ_PER_CALL", "32"))
+
+UNIVERSAL_MODEL = os.environ.get("UNIVERSAL_MODEL", "facebook/nllb-200-distilled-600M")
+
+# Base de datos
+DB_CONFIG = {
+    "host": os.environ.get("DB_HOST", "localhost"),
+    "port": int(os.environ.get("DB_PORT", 5432)),
+    "dbname": os.environ.get("DB_NAME", "rss"),
+    "user": os.environ.get("DB_USER", "rss"),
+    "password": os.environ.get("DB_PASS", "x"),
+}
+
+# Idiomas soportados
+LANG_CODE_MAP = {
+    "en": "eng_Latn", "es": "spa_Latn", "fr": "fra_Latn", "de": "deu_Latn",
+    "it": "ita_Latn", "pt": "por_Latn", "nl": "nld_Latn", "sv": "swe_Latn",
+    "da": "dan_Latn", "fi": "fin_Latn", "no": "nob_Latn", "pl": "pol_Latn",
+    "cs": "ces_Latn", "sk": "slk_Latn", "sl": "slv_Latn", "hu": "hun_Latn",
+    "ro": "ron_Latn", "el": "ell_Grek", "ru": "rus_Cyrl", "uk": "ukr_Cyrl",
+    "tr": "tur_Latn", "ar": "arb_Arab", "fa": "pes_Arab", "he": "heb_Hebr",
+    "zh": "zho_Hans", "ja": "jpn_Jpan", "ko": "kor_Hang", "vi": "vie_Latn",
+}
+
+# Puntuación de fin de oración
+SENTENCE_END_CHARS = set(".!?;؟؛।။॥।")
+
+# =============================================================================
+# REDIS CACHE
+# =============================================================================
+
 _redis_client = None
 
 
 def get_redis():
-    """Return a Redis client or None. Cache is best-effort: never blocks translation."""
     global _redis_client
     if _redis_client is not None:
         return _redis_client if _redis_client is not False else None
@@ -42,7 +101,7 @@ def get_redis():
         LOG.info("Redis translation cache enabled")
         return client
     except Exception as e:
-        LOG.warning(f"Redis cache unavailable, translating without cache: {e}")
+        LOG.warning(f"Redis cache unavailable: {e}")
         _redis_client = False
         return None
 
@@ -78,94 +137,24 @@ def store_cache(pairs, ttl: int = CACHE_TTL):
         LOG.warning(f"Redis cache store error: {e}")
 
 
+# =============================================================================
+# LIMPIEZA DE TEXTO
+# =============================================================================
+
 def clean_text(text: str) -> str:
     if not text:
         return ""
     text = re.sub(r"<[^>]+>", "", text)
-    text = text.replace("<unk>", "")
-    text = text.replace("&nbsp;", " ")
-    text = text.replace("&amp;", "&")
-    text = text.replace("&lt;", "<")
-    text = text.replace("&gt;", ">")
+    text = text.replace("<unk>", "").replace("&nbsp;", " ")
+    text = text.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
     text = text.replace("&quot;", '"')
     text = re.sub(r"\s+", " ", text)
     return text.strip()
 
 
-DB_CONFIG = {
-    "host": os.environ.get("DB_HOST", "localhost"),
-    "port": int(os.environ.get("DB_PORT", 5432)),
-    "dbname": os.environ.get("DB_NAME", "rss"),
-    "user": os.environ.get("DB_USER", "rss"),
-    "password": os.environ.get("DB_PASS", "x"),
-}
-
-
-def _env_list(name: str, default="es"):
-    raw = os.environ.get(name)
-    if raw:
-        return [s.strip() for s in raw.split(",") if s.strip()]
-    return [default]
-
-
-def _env_int(name: str, default: int = 8):
-    v = os.environ.get(name)
-    try:
-        return int(v)
-    except Exception:
-        return default
-
-
-def _env_str(name: str, default=None):
-    v = os.environ.get(name)
-    return v if v else default
-
-
-TARGET_LANGS = _env_list("TARGET_LANGS")
-BATCH_SIZE = _env_int("TRANSLATOR_BATCH", 128)
-MAX_SRC_TOKENS = _env_int("MAX_SRC_TOKENS", 256)
-MAX_NEW_TOKENS = _env_int("MAX_NEW_TOKENS", 256)
-MAX_SEQ_PER_CALL = _env_int("MAX_SEQ_PER_CALL", 128)
-
-CT2_MODEL_PATH = _env_str("CT2_MODEL_PATH", "/app/models/nllb-ct2")
-CT2_DEVICE = _env_str("CT2_DEVICE", "cpu")
-CT2_COMPUTE_TYPE = _env_str("CT2_COMPUTE_TYPE", "int8")
-UNIVERSAL_MODEL = _env_str("UNIVERSAL_MODEL", "facebook/nllb-200-distilled-600M")
-CT2_INTRA_THREADS = _env_int("CT2_INTRA_THREADS", 0)
-CT2_INTER_THREADS = _env_int("CT2_INTER_THREADS", 1)
-BODY_CHARS_CHUNK = _env_int("BODY_CHARS_CHUNK", 900)
-MAX_BODY_CHARS = _env_int("MAX_BODY_CHARS", 12000)
-
-LANG_CODE_MAP = {
-    "en": "eng_Latn",
-    "es": "spa_Latn",
-    "fr": "fra_Latn",
-    "de": "deu_Latn",
-    "it": "ita_Latn",
-    "pt": "por_Latn",
-    "nl": "nld_Latn",
-    "sv": "swe_Latn",
-    "da": "dan_Latn",
-    "fi": "fin_Latn",
-    "no": "nob_Latn",
-    "pl": "pol_Latn",
-    "cs": "ces_Latn",
-    "sk": "slk_Latn",
-    "sl": "slv_Latn",
-    "hu": "hun_Latn",
-    "ro": "ron_Latn",
-    "el": "ell_Grek",
-    "ru": "rus_Cyrl",
-    "uk": "ukr_Cyrl",
-    "tr": "tur_Latn",
-    "ar": "arb_Arab",
-    "fa": "pes_Arab",
-    "he": "heb_Hebr",
-    "zh": "zho_Hans",
-    "ja": "jpn_Jpan",
-    "ko": "kor_Hang",
-    "vi": "vie_Latn",
-}
+# =============================================================================
+# MODELO CTRANSLATE2
+# =============================================================================
 
 _tokenizer = None
 _translator = None
@@ -173,112 +162,45 @@ _translator = None
 
 def ensure_model():
     global _tokenizer, _translator
-
     if _translator:
         return
 
-    model_path = CT2_MODEL_PATH
-    model_bin = os.path.join(model_path, "model.bin")
-
-    # Check if model exists AND is complete (all required files present and non-empty)
-    required_files = ["model.bin", "config.json", "shared_vocabulary.json"]
-    model_exists = os.path.exists(model_bin)
-
-    if model_exists:
-        # Verify all files exist and have reasonable size
-        all_files_ok = True
-        for f in required_files:
-            fpath = os.path.join(model_path, f)
-            if not os.path.exists(fpath) or os.path.getsize(fpath) < 100:
-                all_files_ok = False
-                break
-
-        if not all_files_ok:
-            LOG.info(f"Model files incomplete or corrupted, re-converting...")
-            # Clean up corrupted files
-            for f in required_files:
-                try:
-                    fpath = os.path.join(model_path, f)
-                    if os.path.exists(fpath):
-                        os.remove(fpath)
-                except:
-                    pass
-            model_exists = False
-
-    if not model_exists:
-        LOG.info(
-            f"CTranslate2 model not found at {model_path}, converting from {UNIVERSAL_MODEL}..."
-        )
+    model_bin = os.path.join(CT2_MODEL_PATH, "model.bin")
+    if not os.path.exists(model_bin):
+        LOG.info(f"Model not found at {CT2_MODEL_PATH}, converting...")
         convert_model()
 
-    device = os.environ.get("CT2_DEVICE", "cpu")
-    LOG.info(f"Loading CTranslate2 model from {model_path} on {device}")
-
+    LOG.info(f"Loading CTranslate2 model from {CT2_MODEL_PATH} on {CT2_DEVICE}")
     _translator = ctranslate2.Translator(
-        model_path,
-        device=device,
-        compute_type=CT2_COMPUTE_TYPE,
-        inter_threads=CT2_INTER_THREADS,
-        intra_threads=CT2_INTRA_THREADS,
+        CT2_MODEL_PATH, device=CT2_DEVICE, compute_type=CT2_COMPUTE_TYPE,
+        inter_threads=CT2_INTER_THREADS, intra_threads=CT2_INTRA_THREADS,
     )
-
     _tokenizer = AutoTokenizer.from_pretrained(UNIVERSAL_MODEL)
     LOG.info("CTranslate2 model loaded successfully")
 
 
 def convert_model():
     import subprocess
+    os.makedirs(CT2_MODEL_PATH, exist_ok=True)
+    cmd = [
+        "ct2-transformers-converter", "--model", UNIVERSAL_MODEL,
+        "--output_dir", CT2_MODEL_PATH, "--quantization", CT2_COMPUTE_TYPE, "--force",
+    ]
+    LOG.info(f"Running: {' '.join(cmd)}")
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
+    if result.returncode != 0:
+        LOG.error(f"Model conversion failed: {result.stderr}")
+        raise RuntimeError("Failed to convert model")
 
-    model_path = CT2_MODEL_PATH
-    lock_file = os.path.join(model_path, ".converting.lock")
 
-    # Clean up any corrupted files from previous failed conversions
-    if os.path.exists(model_path):
-        for f in os.listdir(model_path):
-            if f.endswith(".lock") or f.startswith("."):
-                try:
-                    os.remove(os.path.join(model_path, f))
-                except:
-                    pass
-
-    os.makedirs(model_path, exist_ok=True)
-
-    # Use lock file to prevent multiple workers from converting simultaneously
-    lock_fd = os.open(lock_file, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-    try:
-        quantization = CT2_COMPUTE_TYPE if CT2_COMPUTE_TYPE != "auto" else "float16"
-
-        cmd = [
-            "ct2-transformers-converter",
-            "--model",
-            UNIVERSAL_MODEL,
-            "--output_dir",
-            model_path,
-            "--quantization",
-            quantization,
-            "--force",
-        ]
-
-        LOG.info(f"Running: {' '.join(cmd)}")
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
-
-        if result.returncode != 0:
-            LOG.error(f"Model conversion failed: {result.stderr}")
-            raise RuntimeError("Failed to convert model")
-
-        LOG.info("Model conversion completed")
-    finally:
-        os.close(lock_fd)
-        try:
-            os.remove(lock_file)
-        except:
-            pass
-
+# =============================================================================
+# TRADUCCIÓN
+# =============================================================================
 
 def translate_texts(src: str, tgt: str, texts: List[str]) -> List[str]:
+    """Traduce una lista de textos."""
     if not texts:
         return []
-
     ensure_model()
 
     clean = [(t or "").strip() for t in texts]
@@ -303,20 +225,15 @@ def translate_texts(src: str, tgt: str, texts: List[str]) -> List[str]:
             sources.append([])
 
     target_prefix = [[tgt_code]] * len(sources)
-
     translated = []
-    # Bounded sub-batches: a big batch of long chunks translated in one call
-    # bloats RAM (several GB) on CPU and pushes the process into swap.
+
     for i in range(0, len(sources), MAX_SEQ_PER_CALL):
         results = _translator.translate_batch(
-            sources[i : i + MAX_SEQ_PER_CALL],
-            target_prefix=target_prefix[i : i + MAX_SEQ_PER_CALL],
-            beam_size=1,
-            max_decoding_length=MAX_NEW_TOKENS,
-            repetition_penalty=1.2,
-            no_repeat_ngram_size=2,
+            sources[i:i + MAX_SEQ_PER_CALL],
+            target_prefix=target_prefix[i:i + MAX_SEQ_PER_CALL],
+            beam_size=1, max_decoding_length=MAX_NEW_TOKENS,
+            repetition_penalty=1.2, no_repeat_ngram_size=2,
         )
-
         for result in results:
             try:
                 if result.hypotheses and len(result.hypotheses) > 0:
@@ -336,25 +253,41 @@ def translate_texts(src: str, tgt: str, texts: List[str]) -> List[str]:
                                 translated.append("")
                         else:
                             translated.append("")
-                    else:
-                        translated.append("")
                 else:
                     translated.append("")
             except Exception as e:
                 LOG.error(f"Error processing result: {e}")
                 translated.append("")
-
     return translated
 
 
-def split_body_into_chunks(text: str) -> List[str]:
+# =============================================================================
+# TRUNCAMIENTO Y CHUNKING
+# =============================================================================
+
+def truncate_at_sentence_boundary(text: str, max_len: int) -> str:
+    """Trunca texto en frontera de oración."""
+    if len(text) <= max_len:
+        return text
+    search_end = min(len(text), max_len)
+    for i in range(search_end - 1, max(0, search_end - 200), -1):
+        if text[i] in SENTENCE_END_CHARS:
+            return text[:i + 1]
+    cutoff = int(max_len * 0.9)
+    last_space = text.rfind(" ", cutoff, max_len)
+    if last_space > 0:
+        return text[:last_space]
+    return text[:max_len]
+
+
+def split_into_chunks(text: str) -> List[str]:
+    """Divide texto en chunks por fronteras de oración."""
     text = (text or "").strip()
     if len(text) <= BODY_CHARS_CHUNK:
         return [text] if text else []
 
-    parts = re.split(r"(\n\n+|(?<=[\.\!\?؛؟。])\s+)", text)
-    chunks = []
-    current = ""
+    parts = re.split(r"(\n\n+|(?<=[\.\!\?؛؟।။॥。])\s+)", text)
+    chunks, current = [], ""
 
     for part in parts:
         if not part:
@@ -371,18 +304,50 @@ def split_body_into_chunks(text: str) -> List[str]:
     return chunks if chunks else [text]
 
 
-def translate_body_long(src: str, tgt: str, body: str) -> str:
+def translate_long_text(src: str, tgt: str, body: str) -> str:
+    """Traduce texto largo dividiendo en chunks."""
     body = (body or "").strip()
     if not body:
         return ""
 
-    chunks = split_body_into_chunks(body)
+    # Truncar si es muy largo
+    if len(body) > MAX_BODY_CHARS:
+        body = truncate_at_sentence_boundary(body, MAX_BODY_CHARS)
+
+    chunks = split_into_chunks(body)
     if len(chunks) == 1:
         return translate_texts(src, tgt, [body])[0]
 
     translated_chunks = translate_texts(src, tgt, chunks)
-    return " ".join(translated_chunks)
+    return join_chunks(translated_chunks)
 
+
+def join_chunks(chunks: List[str]) -> str:
+    """Une chunks traducidos."""
+    if not chunks:
+        return ""
+    if len(chunks) == 1:
+        return chunks[0]
+
+    result = chunks[0]
+    for chunk in chunks[1:]:
+        if not chunk:
+            continue
+        starts_lower = chunk and chunk[0].islower()
+        prev_ends_lower = result and result[-1].islower() if result else False
+
+        if prev_ends_lower and starts_lower:
+            result += " " + chunk
+        elif result and result[-1] in SENTENCE_END_CHARS:
+            result += " " + chunk
+        else:
+            result += " " + chunk
+    return result
+
+
+# =============================================================================
+# UTILIDADES
+# =============================================================================
 
 def normalize_lang(lang: Optional[str], default: str = "es") -> Optional[str]:
     if not lang:
@@ -400,62 +365,58 @@ def detect_lang(text: str) -> str:
         return "en"
 
 
+# =============================================================================
+# PROCESAMIENTO DE BATCH
+# =============================================================================
+
 def process_batch(conn, rows):
+    """Procesa un batch de traducciones."""
     todo = []
 
     for r in rows:
         lang_to = normalize_lang(r.get("lang_to"), "es") or "es"
-        lang_from = normalize_lang(r.get("lang_from")) or detect_lang(
-            r.get("titulo") or ""
-        )
+        lang_from = normalize_lang(r.get("lang_from"), default=None) or detect_lang(
+            f"{r.get('titulo') or ''} {r.get('resumen') or ''} {r.get('contenido') or ''}"[:1000]
+        ) or "es"
 
         titulo = (r.get("titulo") or "").strip()
         resumen = (r.get("resumen") or "").strip()
+        contenido = (r.get("contenido") or "").strip()
 
         if lang_from == lang_to:
-            # Mark as done and copy original text if languages match
             cursor = conn.cursor()
-            cursor.execute(
-                """
+            cursor.execute("""
                 UPDATE traducciones 
-                SET titulo_trad = %s, resumen_trad = %s, status = 'done' 
+                SET titulo_trad = %s, resumen_trad = %s, contenido_trad = %s, status = 'done' 
                 WHERE id = %s
-            """,
-                (titulo, resumen, r.get("tr_id")),
-            )
+            """, (titulo, resumen, contenido, r.get("tr_id")))
             conn.commit()
             cursor.close()
             continue
 
-        todo.append(
-            {
-                "tr_id": r.get("tr_id"),
-                "lang_from": lang_from,
-                "lang_to": lang_to,
-                "titulo": titulo,
-                "resumen": resumen,
-            }
-        )
+        todo.append({
+            "tr_id": r.get("tr_id"),
+            "lang_from": lang_from,
+            "lang_to": lang_to,
+            "titulo": titulo,
+            "resumen": resumen,
+            "contenido": contenido,
+        })
 
     if not todo:
         return
 
-    # 1. FAST LOCKING: Commit locked_at immediately to inform other workers
+    # Bloquear registros
     cursor = conn.cursor()
     tr_ids = [item["tr_id"] for item in todo]
-    cursor.execute(
-        f"""
-        UPDATE traducciones 
-        SET locked_at = NOW()
+    cursor.execute(f"""
+        UPDATE traducciones SET locked_at = NOW()
         WHERE id = ANY(ARRAY[{",".join(["%s"] * len(tr_ids))}])
-    """,
-        tr_ids,
-    )
+    """, tr_ids)
     conn.commit()
     cursor.close()
 
-    from collections import defaultdict
-
+    # Agrupar por idioma
     groups = defaultdict(list)
     for item in todo:
         key = (item["lang_from"], item["lang_to"])
@@ -463,139 +424,154 @@ def process_batch(conn, rows):
 
     for (lang_from, lang_to), items in groups.items():
         LOG.info(f"Translating {lang_from} -> {lang_to} ({len(items)} items)")
+        process_group(conn, lang_from, lang_to, items)
 
+
+def process_group(conn, lang_from: str, lang_to: str, items: List[dict]):
+    """Procesa un grupo de items del mismo par de idiomas."""
+    try:
+        # --- TÍTULOS ---
+        titles = [i["titulo"] for i in items]
+        title_keys = [cache_key(lang_from, lang_to, t) for t in titles]
+        title_cache = lookup_cache(title_keys)
+
+        translated_titles = [title_cache.get(k) for k in title_keys]
+        title_miss = [i for i, k in enumerate(title_keys) if k not in title_cache]
+
+        if title_miss:
+            miss_texts = [titles[i] for i in title_miss]
+            miss_translated = translate_texts(lang_from, lang_to, miss_texts)
+            store_cache([(title_keys[i], tr) for i, tr in zip(title_miss, miss_translated)])
+            for i, tr in zip(title_miss, miss_translated):
+                translated_titles[i] = tr
+
+        # --- RESÚMENES ---
+        resumen_parts = translate_field(items, "resumen", lang_from, lang_to)
+
+        # --- CONTENIDOS ---
+        contenido_parts = translate_field(items, "contenido", lang_from, lang_to)
+
+        # --- GUARDAR ---
+        updates = []
+        for idx, item in enumerate(items):
+            tt = clean_text((translated_titles[idx] or "").strip())
+            rp = resumen_parts.get(item["tr_id"])
+            tb = clean_text(" ".join(rp).strip()) if rp else ""
+            cp = contenido_parts.get(item["tr_id"])
+            tc = clean_text(" ".join(cp).strip()) if cp else ""
+
+            if not tt:
+                tt = item["titulo"]
+            if not tb:
+                tb = item["resumen"]
+
+            updates.append((tt, tb, tc, item["tr_id"]))
+
+        if updates:
+            cursor = conn.cursor()
+            cursor.executemany("""
+                UPDATE traducciones 
+                SET titulo_trad = %s, resumen_trad = %s, contenido_trad = %s, 
+                    status = 'done', locked_at = NULL
+                WHERE id = %s
+            """, updates)
+            conn.commit()
+            cursor.close()
+
+        LOG.info(f"Finished group {lang_from} -> {lang_to}")
+
+    except Exception as e:
+        LOG.error(f"Batch group error {lang_from} -> {lang_to}: {e}")
         try:
-            # --- TITLES (served from Redis cache when possible) ---
-            titles = [i["titulo"] for i in items]
-            title_keys = [cache_key(lang_from, lang_to, t) for t in titles]
-            title_cache = lookup_cache(title_keys)
-            if title_cache:
-                LOG.info(f"Title cache hits: {len(title_cache)}/{len(titles)}")
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE traducciones SET status = 'error', locked_at = NULL 
+                WHERE id = ANY(ARRAY[{','.join(['%s'] * len(items))}])
+            """, [i["tr_id"] for i in items])
+            conn.commit()
+            cursor.close()
+        except:
+            conn.rollback()
 
-            translated_titles = [title_cache.get(k) for k in title_keys]
-            title_miss = [i for i, k in enumerate(title_keys) if k not in title_cache]
-            if title_miss:
-                miss_texts = [titles[i] for i in title_miss]
-                miss_translated = translate_texts(lang_from, lang_to, miss_texts)
-                store_cache([(title_keys[i], tr) for i, tr in zip(title_miss, miss_translated)])
-                for i, tr in zip(title_miss, miss_translated):
-                    translated_titles[i] = tr
 
-            # --- BODY chunks (single batched call for cache misses) ---
-            flat_chunks = []
-            flat_keys = []
-            flat_ck = []
-            for item in items:
-                body = (item["resumen"] or "").strip()
-                if len(body) > MAX_BODY_CHARS:
-                    body = body[:MAX_BODY_CHARS]
-                if body:
-                    chunks = split_body_into_chunks(body)
-                    flat_chunks.extend(chunks)
-                    flat_keys.extend([(item["tr_id"], i) for i in range(len(chunks))])
-                    flat_ck.extend([cache_key(lang_from, lang_to, c) for c in chunks])
+def translate_field(items: List[dict], field: str, lang_from: str, lang_to: str) -> dict:
+    """Traduce un campo (resumen o contenido) para todos los items."""
+    flat_chunks, flat_keys, flat_ck = [], [], []
+    item_chunks = {}
 
-            chunk_cache = lookup_cache(flat_ck)
-            if chunk_cache:
-                LOG.info(f"Body cache hits: {len(chunk_cache)}/{len(flat_ck)}")
+    for item in items:
+        body = (item[field] or "").strip()
+        if len(body) > MAX_BODY_CHARS:
+            body = truncate_at_sentence_boundary(body, MAX_BODY_CHARS)
+        if body:
+            chunks = split_into_chunks(body)
+            flat_chunks.extend(chunks)
+            flat_keys.extend([(item["tr_id"], i) for i in range(len(chunks))])
+            flat_ck.extend([cache_key(lang_from, lang_to, c) for c in chunks])
+            item_chunks[item["tr_id"]] = chunks
 
-            body_parts = defaultdict(list)
-            miss_idx = []
-            miss_texts = []
-            miss_keys = []
-            for idx, ck in enumerate(flat_ck):
-                tr_id, _ = flat_keys[idx]
-                if ck in chunk_cache:
-                    body_parts[tr_id].append(chunk_cache[ck])
-                else:
-                    miss_idx.append(idx)
-                    miss_texts.append(flat_chunks[idx])
-                    miss_keys.append(ck)
+    if not flat_chunks:
+        return {}
 
-            if miss_texts:
-                try:
-                    miss_translated = translate_texts(lang_from, lang_to, miss_texts)
-                    store_cache(list(zip(miss_keys, miss_translated)))
-                except Exception as e:
-                    LOG.error(f"Batch body translation error: {e}")
-                    miss_translated = miss_texts
-                for j, tr in enumerate(miss_translated):
-                    if tr:
-                        body_parts[flat_keys[miss_idx[j]][0]].append(tr)
+    chunk_cache = lookup_cache(flat_ck)
 
-            # --- BATCH COMMIT: single transaction per group ---
-            updates = []
-            for idx, item in enumerate(items):
-                tt = clean_text((translated_titles[idx] or "").strip())
-                parts = body_parts.get(item["tr_id"])
-                tb = clean_text(" ".join(parts).strip()) if parts else ""
+    result_parts = defaultdict(list)
+    miss_idx, miss_texts, miss_keys = [], [], []
 
-                if not tt:
-                    tt = item["titulo"]
-                if not tb:
-                    tb = item["resumen"]
+    for idx, ck in enumerate(flat_ck):
+        tr_id, _ = flat_keys[idx]
+        if ck in chunk_cache:
+            result_parts[tr_id].append(chunk_cache[ck])
+        else:
+            miss_idx.append(idx)
+            miss_texts.append(flat_chunks[idx])
+            miss_keys.append(ck)
 
-                updates.append((tt, tb, item["tr_id"]))
-
-            if updates:
-                try:
-                    cursor = conn.cursor()
-                    cursor.executemany(
-                        """
-                        UPDATE traducciones 
-                        SET titulo_trad = %s, resumen_trad = %s, status = 'done', locked_at = NULL
-                        WHERE id = %s
-                    """,
-                        updates,
-                    )
-                    conn.commit()
-                    cursor.close()
-                except Exception as e:
-                    LOG.error(f"Batch update error (items stay pending for retry): {e}")
-                    conn.rollback()
-
-            LOG.info(f"Finished group {lang_from} -> {lang_to}")
-
+    if miss_texts:
+        try:
+            miss_translated = translate_texts(lang_from, lang_to, miss_texts)
+            store_cache(list(zip(miss_keys, miss_translated)))
         except Exception as e:
-            LOG.error(f"Batch group error {lang_from} -> {lang_to}: {e}")
-            # Mark these as error to avoid infinite loop if it's a model crash
-            try:
-                cursor = conn.cursor()
-                cursor.execute(
-                    """
-                    UPDATE traducciones SET status = 'error', locked_at = NULL 
-                    WHERE id = ANY(ARRAY[{','.join(['%s'] * len(items))}])
-                """,
-                    [i["tr_id"] for i in items],
-                )
-                conn.commit()
-                cursor.close()
-            except:
-                conn.rollback()
+            LOG.error(f"Batch {field} translation error: {e}")
+            miss_translated = miss_texts
+        for j, tr in enumerate(miss_translated):
+            if tr:
+                result_parts[flat_keys[miss_idx[j]][0]].append(tr)
 
+    return result_parts
+
+
+# =============================================================================
+# FETCH Y MAIN
+# =============================================================================
 
 def fetch_pending_translations(conn):
+    """Obtiene traducciones pendientes y las procesa."""
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-
     worker_id = os.environ.get("HOSTNAME", f"worker-{os.getpid()}")
     total_found = 0
 
-    for lang in TARGET_LANGS:
-        cursor.execute(
-            """
+    target_langs = os.environ.get("TARGET_LANGS", "es").split(",")
+
+    for lang in target_langs:
+        lang = lang.strip()
+        if not lang:
+            continue
+
+        cursor.execute("""
             SELECT t.id as tr_id, t.lang_from, t.lang_to,
-                   n.titulo, n.resumen, n.id as noticia_id
+                   n.titulo, n.resumen, n.contenido, n.id as noticia_id
             FROM traducciones t
             JOIN noticias n ON n.id = t.noticia_id
-            WHERE t.lang_to = %s 
-              AND (t.titulo_trad IS NULL OR t.resumen_trad IS NULL)
+            WHERE t.lang_to = %s
+              AND t.status = 'pending'
+              AND t.worker_id IS NULL
+              AND (t.titulo_trad IS NULL OR t.resumen_trad IS NULL OR t.contenido_trad IS NULL)
               AND (t.locked_at IS NULL OR t.locked_at < NOW() - INTERVAL '10 minutes')
             ORDER BY n.fecha DESC
-            LIMIT %s
+            LIMIT 128
             FOR UPDATE SKIP LOCKED
-        """,
-            (lang, BATCH_SIZE),
-        )
+        """, (lang,))
 
         rows = cursor.fetchall()
         if rows:
@@ -603,20 +579,19 @@ def fetch_pending_translations(conn):
             start_ts = time.time()
             process_batch(conn, rows)
             elapsed_ms = int((time.time() - start_ts) * 1000)
+
             try:
                 metrics_cur = conn.cursor()
-                metrics_cur.execute(
-                    """
+                metrics_cur.execute("""
                     INSERT INTO translation_stats (lang_to, items_translated, elapsed_ms, hostname)
                     VALUES (%s, %s, %s, %s)
-                    """,
-                    (lang, len(rows), elapsed_ms, worker_id),
-                )
+                """, (lang, len(rows), elapsed_ms, worker_id))
                 conn.commit()
                 metrics_cur.close()
             except Exception as e:
-                LOG.error(f"Error recording translation stats: {e}")
+                LOG.error(f"Error recording stats: {e}")
                 conn.rollback()
+
             total_found += len(rows)
 
     cursor.close()
@@ -628,9 +603,7 @@ def connect_db():
 
 
 def main():
-    LOG.info(
-        f"CTranslate2 translator worker started (device={CT2_DEVICE}, instances={TRANSLATOR_TOTAL})"
-    )
+    LOG.info(f"CTranslate2 translator worker started (id={TRANSLATOR_ID}, total={TRANSLATOR_TOTAL})")
     ensure_model()
 
     while True:

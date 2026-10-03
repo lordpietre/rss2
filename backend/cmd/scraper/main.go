@@ -17,16 +17,17 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rss2/backend/internal/logger"
+	"github.com/rss2/backend/internal/textclean"
 	"github.com/rss2/backend/internal/workers"
 )
 
 var (
-	pool          *pgxpool.Pool
-	sleepInterval = 60
-	batchSize     = 10
-	enrichLimit   = 20
+	pool           *pgxpool.Pool
+	sleepInterval  = 60
+	batchSize      = 10
+	enrichLimit    = 20
 	scraperWorkers = 5
-	maxBodyBytes  = int64(512 << 10)
+	maxBodyBytes   = int64(512 << 10)
 )
 
 type URLSource struct {
@@ -43,6 +44,7 @@ type Noticia struct {
 	ID           string
 	Titulo       string
 	Resumen      string
+	Contenido    string
 	URL          string
 	FuenteNombre string
 }
@@ -130,9 +132,9 @@ func updateSourceStatus(ctx context.Context, sourceID int64, status, message str
 
 func getNoticiasToEnrich(ctx context.Context, limit int) ([]Noticia, error) {
 	rows, err := pool.Query(ctx, `
-	SELECT id, titulo, COALESCE(resumen, ''), url, fuente_nombre
+	SELECT id, titulo, COALESCE(resumen, ''), COALESCE(contenido, ''), url, fuente_nombre
 	FROM noticias
-	WHERE (resumen IS NULL OR LENGTH(resumen) < 200)
+	WHERE contenido IS NULL
 	ORDER BY fecha DESC
 	LIMIT $1
 	`, limit)
@@ -144,7 +146,7 @@ func getNoticiasToEnrich(ctx context.Context, limit int) ([]Noticia, error) {
 	var noticias []Noticia
 	for rows.Next() {
 		var n Noticia
-		if err := rows.Scan(&n.ID, &n.Titulo, &n.Resumen, &n.URL, &n.FuenteNombre); err != nil {
+		if err := rows.Scan(&n.ID, &n.Titulo, &n.Resumen, &n.Contenido, &n.URL, &n.FuenteNombre); err != nil {
 			continue
 		}
 		noticias = append(noticias, n)
@@ -158,6 +160,15 @@ func updateNoticiaResumen(ctx context.Context, noticiaID, newResumen string) err
 	SET resumen = $1
 	WHERE id = $2
 	`, newResumen, noticiaID)
+	return err
+}
+
+func updateNoticiaContenido(ctx context.Context, noticiaID, newContenido string) error {
+	_, err := pool.Exec(ctx, `
+	UPDATE noticias
+	SET contenido = $1
+	WHERE id = $2
+	`, newContenido, noticiaID)
 	return err
 }
 
@@ -235,15 +246,11 @@ func extractArticle(source URLSource) (*Article, error) {
 		}
 	}
 
-	// Clean up
-	article.Title = strings.TrimSpace(article.Title)
-	article.Summary = strings.TrimSpace(article.Summary)
-	article.Content = strings.TrimSpace(article.Content)
-
-	// Truncate summary if too long
-	if len(article.Summary) > 500 {
-		article.Summary = article.Summary[:500]
-	}
+	// Clean up: sin etiquetas, sin entidades rotas y con tope seguro (la
+	// versión anterior cortaba por bytes y podía partir un rune).
+	article.Title = textclean.CleanTitle(article.Title)
+	article.Summary = textclean.CleanTitle(article.Summary)
+	article.Content = textclean.Clean(article.Content)
 
 	return article, nil
 }
@@ -310,7 +317,7 @@ func extractContentFromURL(url string) (string, error) {
 		content = strings.Join(paragraphs, "\n\n")
 	}
 
-	return strings.TrimSpace(content), nil
+	return textclean.Clean(content), nil
 }
 
 func processEnrichment(ctx context.Context, noticia Noticia) bool {
@@ -327,8 +334,9 @@ func processEnrichment(ctx context.Context, noticia Noticia) bool {
 		return false
 	}
 
-	if err := updateNoticiaResumen(ctx, noticia.ID, content); err != nil {
-		logger.Error().Err(err).Str("id", noticia.ID).Msg("Error updating resumen")
+	// Guardar contenido completo en la columna contenido (no sobrescribir resumen)
+	if err := updateNoticiaContenido(ctx, noticia.ID, content); err != nil {
+		logger.Error().Err(err).Str("id", noticia.ID).Msg("Error updating contenido")
 		return false
 	}
 
@@ -360,12 +368,11 @@ func saveArticle(ctx context.Context, source URLSource, article *Article) (bool,
 		title = "Sin título"
 	}
 
-	summary := article.Summary
+	// Tope de 500 en frontera de frase y seguro con UTF-8 (antes era
+	// summary[:500], que cortaba por bytes y podía partir un rune).
+	summary := textclean.Truncate(article.Summary, 500)
 	if summary == "" && article.Content != "" {
-		summary = article.Content
-		if len(summary) > 500 {
-			summary = summary[:500]
-		}
+		summary = textclean.Truncate(article.Content, 500)
 	}
 
 	pubDate := time.Now()

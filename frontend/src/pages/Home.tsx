@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link, useSearchParams } from 'react-router-dom'
-import { formatDistanceToNow } from 'date-fns'
-import { es } from 'date-fns/locale'
+import { useSearchParams } from 'react-router-dom'
 import { apiService, api } from '../services/api'
-import { Search, Globe, Newspaper, Filter } from 'lucide-react'
+import { News } from '../services/api'
+import { Search, Globe } from 'lucide-react'
 import { SkeletonNewsList, NoResultsFound } from '../components/ui'
+import { NewsCard } from '../components/ui/NewsCard'
+import { CreateListModal } from '../components/CreateListModal'
+import { useApiFavorites, useApiLists } from '../hooks/useApiFavorites'
 
 export function Home() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -15,6 +17,12 @@ export function Home() {
   const countryId = searchParams.get('country_id') || ''
   const translatedOnly = searchParams.get('translated_only') === 'true'
   const [suggestions, setSuggestions] = useState<string[]>([])
+
+  // List modal state
+  const [showListModal, setShowListModal] = useState(false)
+  const [selectedNewsForList, setSelectedNewsForList] = useState<News | null>(null)
+  const { favorites, toggleFavorite, isFavorite } = useApiFavorites()
+  const { lists, createList, addToList } = useApiLists()
 
   // Load the user's most frequent search terms (dynamic tags) when logged in
   useEffect(() => {
@@ -31,7 +39,7 @@ export function Home() {
 
   const { data: countries } = useQuery({
     queryKey: ['countries'],
-    queryFn: () => apiService.getCountries(),
+    queryFn: apiService.getCountries,
   })
 
   const { data, isLoading, error } = useQuery({
@@ -49,7 +57,6 @@ export function Home() {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
     const query = formData.get('q')
-    // Record the search for frequency-based suggestions (only when logged in)
     if (localStorage.getItem('token') && query) {
       api.post('/searchlog', { q: String(query) }).catch(() => {})
     }
@@ -82,6 +89,31 @@ export function Home() {
     }
     newParams.page = '1'
     setSearchParams(newParams)
+  }
+
+  const handleAddToList = (news: News) => {
+    setSelectedNewsForList(news)
+    setShowListModal(true)
+  }
+
+  const handleSelectList = async (listId: number) => {
+    if (selectedNewsForList) {
+      await addToList(listId, selectedNewsForList.id)
+    }
+    setShowListModal(false)
+    setSelectedNewsForList(null)
+  }
+
+  const handleCreateAndAdd = async (name: string) => {
+    console.log('Home: handleCreateAndAdd called with:', name)
+    const newListId = await createList(name)
+    console.log('Home: createList returned:', newListId)
+    if (selectedNewsForList) {
+      console.log('Home: adding to list:', newListId, selectedNewsForList.id)
+      await addToList(newListId, selectedNewsForList.id)
+    }
+    setShowListModal(false)
+    setSelectedNewsForList(null)
   }
 
   return (
@@ -182,42 +214,13 @@ export function Home() {
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {data?.news?.map((news) => (
-              <Link key={news.id} to={`/news/${news.id}`} className="card hover:shadow-md transition-shadow">
-                {news.imagen_url && news.imagen_url.trim() && (
-                  <img
-                    src={news.imagen_url}
-                    alt={news.title_translated || news.titulo}
-                    className="w-full h-48 object-cover rounded-t-xl"
-                  />
-                )}
-                <div className="p-4">
-                  <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-                    {news.fuente_nombre && (
-                      <span className="flex items-center gap-1">
-                        <Newspaper className="h-4 w-4" />
-                        {news.fuente_nombre}
-                      </span>
-                    )}
-                    {news.fuente_nombre && news.fecha && <span>•</span>}
-                    {news.fecha && (
-                      <span className="text-xs">
-                        {formatDistanceToNow(new Date(news.fecha), { addSuffix: true, locale: es })}
-                      </span>
-                    )}
-                    {news.title_translated && (
-                      <span className="ml-auto text-xs bg-primary-100 text-primary-700 px-2 py-0.5 rounded">
-                        ES
-                      </span>
-                    )}
-                  </div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
-                    {news.title_translated || news.titulo}
-                  </h2>
-                  <p className="text-gray-600 text-sm line-clamp-3">
-                    {news.summary_translated || news.resumen}
-                  </p>
-                </div>
-              </Link>
+              <NewsCard
+                key={news.id}
+                news={news}
+                isFavorite={isFavorite(news.id)}
+                onToggleFavorite={toggleFavorite}
+                onAddToList={handleAddToList}
+              />
             ))}
           </div>
 
@@ -244,6 +247,15 @@ export function Home() {
           )}
         </>
       )}
+
+      <CreateListModal
+        isOpen={showListModal}
+        onClose={() => { setShowListModal(false); setSelectedNewsForList(null) }}
+        onCreate={handleCreateAndAdd}
+        mode="add-to"
+        existingLists={lists.map((l) => ({ id: l.id, name: l.name }))}
+        onSelectList={handleSelectList}
+      />
     </div>
   )
 }

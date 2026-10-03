@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/gin-gonic/gin"
+	_ "github.com/rss2/backend/docs"
 	"github.com/rss2/backend/internal/auth"
 	"github.com/rss2/backend/internal/cache"
 	"github.com/rss2/backend/internal/config"
@@ -18,7 +19,6 @@ import (
 	"github.com/rss2/backend/internal/services"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
-	_ "github.com/rss2/backend/docs"
 )
 
 func initDB() {
@@ -137,6 +137,68 @@ func initDB() {
 		log.Printf("Warning: Could not create remote_workers table: %v", err)
 	} else {
 		log.Println("Table remote_workers ready")
+	}
+
+	// Crear tablas de favoritos, listas y búsquedas guardadas
+	_, err = db.GetPool().Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS user_favorites (
+			id SERIAL PRIMARY KEY,
+			user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			noticia_id VARCHAR(32) NOT NULL,
+			created_at TIMESTAMP DEFAULT NOW(),
+			UNIQUE(user_id, noticia_id)
+		)
+	`)
+	if err != nil {
+		log.Printf("Warning: Could not create user_favorites table: %v", err)
+	} else {
+		log.Println("Table user_favorites ready")
+	}
+
+	_, err = db.GetPool().Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS user_lists (
+			id SERIAL PRIMARY KEY,
+			user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			name VARCHAR(255) NOT NULL,
+			created_at TIMESTAMP DEFAULT NOW(),
+			updated_at TIMESTAMP DEFAULT NOW()
+		)
+	`)
+	if err != nil {
+		log.Printf("Warning: Could not create user_lists table: %v", err)
+	} else {
+		log.Println("Table user_lists ready")
+	}
+
+	_, err = db.GetPool().Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS user_list_items (
+			id SERIAL PRIMARY KEY,
+			list_id INTEGER NOT NULL REFERENCES user_lists(id) ON DELETE CASCADE,
+			noticia_id VARCHAR(32) NOT NULL,
+			created_at TIMESTAMP DEFAULT NOW(),
+			UNIQUE(list_id, noticia_id)
+		)
+	`)
+	if err != nil {
+		log.Printf("Warning: Could not create user_list_items table: %v", err)
+	} else {
+		log.Println("Table user_list_items ready")
+	}
+
+	_, err = db.GetPool().Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS user_saved_searches (
+			id SERIAL PRIMARY KEY,
+			user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			type VARCHAR(20) NOT NULL,
+			label VARCHAR(255) NOT NULL,
+			params JSONB NOT NULL,
+			created_at TIMESTAMP DEFAULT NOW()
+		)
+	`)
+	if err != nil {
+		log.Printf("Warning: Could not create user_saved_searches table: %v", err)
+	} else {
+		log.Println("Table user_saved_searches ready")
 	}
 
 	// Añadir columnas a traducciones para workers remotos
@@ -281,6 +343,7 @@ func Main() {
 
 		api.GET("/alerts", handlers.GetAlertas)
 		api.POST("/alerts/:id/read", middleware.AuthRequired(), handlers.MarkAlertaRead)
+		api.POST("/alerts/:id/dismiss", middleware.AuthRequired(), handlers.MarkAlertaDismiss)
 		api.POST("/alerts/read-all", middleware.AuthRequired(), handlers.MarkAllAlertasRead)
 
 		api.GET("/stats", handlers.GetStats)
@@ -288,6 +351,27 @@ func Main() {
 
 		api.GET("/categories", handlers.GetCategories)
 		api.GET("/countries", handlers.GetCountries)
+
+		// Favorites
+		api.GET("/favorites", middleware.AuthRequired(), handlers.GetFavorites)
+		api.POST("/favorites/:noticiaId", middleware.AuthRequired(), handlers.AddFavorite)
+		api.DELETE("/favorites/:noticiaId", middleware.AuthRequired(), handlers.RemoveFavorite)
+		api.GET("/favorites/:noticiaId/check", middleware.AuthRequired(), handlers.IsFavorite)
+
+		// Lists
+		api.GET("/lists", middleware.AuthRequired(), handlers.GetLists)
+		api.POST("/lists", middleware.AuthRequired(), handlers.CreateList)
+		api.PUT("/lists/:id", middleware.AuthRequired(), handlers.UpdateList)
+		api.DELETE("/lists/:id", middleware.AuthRequired(), handlers.DeleteList)
+		api.GET("/lists/:id/items", middleware.AuthRequired(), handlers.GetListItems)
+		api.POST("/lists/:id/items/:noticiaId", middleware.AuthRequired(), handlers.AddToList)
+		api.DELETE("/lists/:id/items/:noticiaId", middleware.AuthRequired(), handlers.RemoveFromList)
+
+		// Saved Searches
+		api.GET("/saved-searches", middleware.AuthRequired(), handlers.GetSavedSearches)
+		api.POST("/saved-searches", middleware.AuthRequired(), handlers.CreateSavedSearch)
+		api.PUT("/saved-searches/:id", middleware.AuthRequired(), handlers.UpdateSavedSearch)
+		api.DELETE("/saved-searches/:id", middleware.AuthRequired(), handlers.DeleteSavedSearch)
 
 		admin := api.Group("/admin")
 		admin.Use(middleware.AuthRequired(), middleware.AdminRequired())

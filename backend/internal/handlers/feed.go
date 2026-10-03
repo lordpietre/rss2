@@ -637,6 +637,9 @@ func ImportFeeds(c *gin.Context) {
 	}
 	committed = true
 
+	// Invalidate feed list cache after import
+	cache.InvalidateFeedList(context.Background())
+
 	c.JSON(http.StatusOK, gin.H{
 		"imported": imported,
 		"skipped":  skipped,

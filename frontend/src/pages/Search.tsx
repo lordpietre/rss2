@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams, Link } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { apiService, api, News, Category, Country } from '../services/api'
-import { Search as SearchIcon, Filter } from 'lucide-react'
+import { apiService, api, News } from '../services/api'
+import { Search as SearchIcon, Bookmark } from 'lucide-react'
 import { SkeletonNewsList, NoResultsFound, NoSearchResults } from '../components/ui'
+import { SaveSearchModal } from '../components/SaveSearchModal'
+import { NewsCard } from '../components/ui/NewsCard'
+import { CreateListModal } from '../components/CreateListModal'
+import { useApiFavorites, useApiLists, useApiSavedSearches } from '../hooks/useApiFavorites'
 
 export function Search() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -12,6 +16,14 @@ export function Search() {
   const categoria = searchParams.get('categoria') || ''
   const pais = searchParams.get('pais') || ''
   const [suggestions, setSuggestions] = useState<string[]>([])
+  const [showSaveModal, setShowSaveModal] = useState(false)
+  const [showListModal, setShowListModal] = useState(false)
+  const [selectedNewsForList, setSelectedNewsForList] = useState<News | null>(null)
+  const { favorites, toggleFavorite, isFavorite } = useApiFavorites()
+  const { lists, createList, addToList } = useApiLists()
+  const { createSearch } = useApiSavedSearches()
+
+  const hasFilters = !!(q || lang || categoria || pais)
 
   useEffect(() => {
     if (!localStorage.getItem('token')) return
@@ -58,6 +70,28 @@ export function Search() {
   const clearFilters = () => {
     const q = searchParams.get('q') || ''
     setSearchParams(q ? { q } : {})
+  }
+
+  const handleAddToList = (news: News) => {
+    setSelectedNewsForList(news)
+    setShowListModal(true)
+  }
+
+  const handleSelectList = async (listId: number) => {
+    if (selectedNewsForList) {
+      await addToList(listId, selectedNewsForList.id)
+    }
+    setShowListModal(false)
+    setSelectedNewsForList(null)
+  }
+
+  const handleCreateAndAdd = async (name: string) => {
+    const newListId = await createList(name)
+    if (selectedNewsForList) {
+      await addToList(newListId, selectedNewsForList.id)
+    }
+    setShowListModal(false)
+    setSelectedNewsForList(null)
   }
 
   return (
@@ -126,6 +160,16 @@ export function Search() {
               Limpiar
             </button>
           )}
+          {hasFilters && (
+            <button
+              type="button"
+              onClick={() => setShowSaveModal(true)}
+              className="btn-secondary"
+              title="Guardar esta búsqueda"
+            >
+              <Bookmark className="h-5 w-5" />
+            </button>
+          )}
         </div>
       </form>
 
@@ -141,21 +185,43 @@ export function Search() {
           onClearFilters={clearFilters}
         />
       ) : data?.news && data.news.length > 0 ? (
-        <div className="space-y-4">
+        <div className="grid gap-6 md:grid-cols-2">
           {data.news.map((news: News) => (
-            <Link key={news.id} to={`/news/${news.id}`} className="card p-4 block hover:shadow-md transition-shadow">
-              <h3 className="font-semibold text-gray-900">{news.title_translated || news.titulo}</h3>
-              <p className="text-gray-600 text-sm mt-1">{news.summary_translated || news.resumen}</p>
-              <div className="flex gap-4 mt-2 text-xs text-gray-500">
-                <span>{news.lang_translated || news.fuente_nombre}</span>
-                <span>{new Date(news.fecha).toLocaleDateString()}</span>
-              </div>
-            </Link>
+            <NewsCard
+              key={news.id}
+              news={news}
+              isFavorite={isFavorite(news.id)}
+              onToggleFavorite={toggleFavorite}
+              onAddToList={handleAddToList}
+            />
           ))}
         </div>
       ) : (
         <NoSearchResults query={q} onSearch={clearFilters} />
       )}
+
+      <SaveSearchModal
+        isOpen={showSaveModal}
+        onClose={() => setShowSaveModal(false)}
+        onSave={(label) => {
+          const params: Record<string, string> = {}
+          if (q) params.q = q
+          if (lang) params.lang = lang
+          if (categoria) params.categoria = categoria
+          if (pais) params.pais = pais
+          createSearch('news', label, params)
+        }}
+        typeLabel="búsqueda de noticias"
+      />
+
+      <CreateListModal
+        isOpen={showListModal}
+        onClose={() => { setShowListModal(false); setSelectedNewsForList(null) }}
+        onCreate={handleCreateAndAdd}
+        mode="add-to"
+        existingLists={lists.map((l) => ({ id: l.id, name: l.name }))}
+        onSelectList={handleSelectList}
+      />
     </div>
   )
 }

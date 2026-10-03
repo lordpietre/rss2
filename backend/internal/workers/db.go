@@ -30,6 +30,18 @@ func LoadDBConfig() *Config {
 }
 
 func Connect(cfg *Config) error {
+	// El contenedor backend solo recibe DATABASE_URL (ver docker-compose.yml);
+	// los demás workers reciben DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASS. Si no
+	// hay DB_HOST se usa la URL tal cual, para que las tools de un solo uso
+	// (p.ej. /sanitize) funcionen dentro de esa misma imagen.
+	if os.Getenv("DB_HOST") == "" {
+		if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
+			if err := db.Connect(databaseURL); err != nil {
+				return err
+			}
+			return db.HealthCheck(context.Background())
+		}
+	}
 	if cfg == nil {
 		cfg = LoadDBConfig()
 	}

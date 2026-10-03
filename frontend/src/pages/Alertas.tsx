@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { apiService, api, Alerta, News } from '../services/api'
-import { Bell, CheckCheck, ChevronDown, ChevronUp, FileText } from 'lucide-react'
+import { Bell, CheckCheck, ChevronDown, ChevronUp, FileText, XCircle } from 'lucide-react'
 import { WikiTooltip } from '../components/ui/WikiTooltip'
 
 const TIPO_LABEL: Record<string, string> = {
@@ -15,7 +15,10 @@ export function Alertas() {
   const [alertas, setAlertas] = useState<Alerta[]>([])
   const [loading, setLoading] = useState(true)
   const [nuevas, setNuevas] = useState(0)
+  const [total, setTotal] = useState(0)
   const [limit, setLimit] = useState(50)
+  const [tipoFiltro, setTipoFiltro] = useState('')
+  const [estadoFiltro, setEstadoFiltro] = useState('')
 
   const [newsModal, setNewsModal] = useState<Alerta | null>(null)
   const [entityNews, setEntityNews] = useState<News[]>([])
@@ -25,9 +28,10 @@ export function Alertas() {
   const load = async () => {
     setLoading(true)
     try {
-      const r = await apiService.getAlertas({ limit })
+      const r = await apiService.getAlertas({ limit, tipo: tipoFiltro || undefined, status: estadoFiltro || undefined })
       setAlertas(r.alertas)
       setNuevas(r.nuevas)
+      setTotal(r.total)
     } catch {
       setAlertas([])
     } finally {
@@ -37,10 +41,15 @@ export function Alertas() {
 
   useEffect(() => {
     load()
-  }, [limit])
+  }, [limit, tipoFiltro, estadoFiltro])
 
   const markRead = async (id: number) => {
     await apiService.markAlertaRead(id)
+    load()
+  }
+
+  const dismiss = async (id: number) => {
+    await apiService.dismissAlerta(id)
     load()
   }
 
@@ -71,21 +80,50 @@ export function Alertas() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex justify-between items-center mb-8 flex-wrap gap-3">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
           <Bell className="h-7 w-7 text-primary-600" />
           Alertas de actividad
         </h1>
-        <button onClick={markAll} className="btn-secondary flex items-center gap-2" disabled={nuevas === 0}>
-          <CheckCheck className="h-4 w-4" />
-          Marcar todas como leídas
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <select
+            value={tipoFiltro}
+            onChange={(e) => setTipoFiltro(e.target.value)}
+            className="input w-auto text-sm"
+            aria-label="Filtrar por tipo"
+          >
+            <option value="">Todos los tipos</option>
+            <option value="persona">Personas</option>
+            <option value="organizacion">Organizaciones</option>
+            <option value="lugar">Lugares</option>
+            <option value="tema">Temas</option>
+          </select>
+          <select
+            value={estadoFiltro}
+            onChange={(e) => setEstadoFiltro(e.target.value)}
+            className="input w-auto text-sm"
+            aria-label="Filtrar por estado"
+          >
+            <option value="">Sin descartadas</option>
+            <option value="nueva">Nuevas</option>
+            <option value="leida">Leídas</option>
+            <option value="descartada">Descartadas</option>
+          </select>
+          <button onClick={markAll} className="btn-secondary flex items-center gap-2" disabled={nuevas === 0}>
+            <CheckCheck className="h-4 w-4" />
+            Marcar todas como leídas
+          </button>
+        </div>
       </div>
 
       <p className="text-gray-500 dark:text-gray-400 -mt-4 mb-6">
-        Se genera un aviso cuando un concepto supera con claridad su actividad media de días anteriores.
+        Aviso cuando un concepto aparece ≥5 veces en una hora y multiplica ×5 su media previa
+        (los temas exigen más; se revisa cada hora).
         {nuevas > 0 && (
           <span className="ml-1 text-primary-600 font-semibold">Tienes {nuevas} sin leer.</span>
+        )}
+        {total > 0 && (
+          <span className="ml-1">{total} en total.</span>
         )}
       </p>
 
@@ -95,7 +133,7 @@ export function Alertas() {
         </div>
       ) : alertas.length === 0 ? (
         <div className="card p-16 text-center text-gray-500 dark:text-gray-400">
-          No hay alertas todavía. El sistema revisa cada dos horas los picos de actividad.
+          No hay alertas todavía. El sistema revisa cada hora los picos de actividad.
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -156,8 +194,14 @@ export function Alertas() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-1 rounded ${a.status === 'nueva' ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}>
-                      {a.status === 'nueva' ? 'Nueva' : 'Leída'}
+                    <span className={`text-xs px-2 py-1 rounded ${
+                      a.status === 'nueva'
+                        ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300'
+                        : a.status === 'descartada'
+                          ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
+                          : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                    }`}>
+                      {a.status === 'nueva' ? 'Nueva' : a.status === 'descartada' ? 'Descartada' : 'Leída'}
                     </span>
                   </td>
                   <td className="px-4 py-3">
@@ -169,6 +213,16 @@ export function Alertas() {
                       {a.status === 'nueva' && (
                         <button onClick={() => markRead(a.id)} className="btn-secondary text-xs py-1 px-3">
                           Marcar leída
+                        </button>
+                      )}
+                      {a.status !== 'descartada' && (
+                        <button
+                          onClick={() => dismiss(a.id)}
+                          title="Es una falsa alerta: no volverá a mostrarse"
+                          className="btn-secondary text-xs py-1 px-3 flex items-center gap-1 text-amber-700 dark:text-amber-300"
+                        >
+                          <XCircle className="h-3.5 w-3.5" />
+                          Descartar
                         </button>
                       )}
                     </div>

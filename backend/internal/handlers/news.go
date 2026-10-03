@@ -102,10 +102,11 @@ func GetNews(c *gin.Context) {
 	}
 
 	sqlQuery := `
-		SELECT n.id, COALESCE(n.titulo, ''), COALESCE(n.resumen, ''), COALESCE(n.resumen, '') AS contenido, n.url, n.fecha, n.imagen_url, 
+		SELECT n.id, COALESCE(n.titulo, ''), COALESCE(n.resumen, ''), COALESCE(n.contenido, '') AS contenido, n.url, n.fecha, n.imagen_url, 
 		       n.categoria_id, n.pais_id, n.fuente_nombre, n.lang,
 		       t.titulo_trad,
 		       t.resumen_trad,
+		       t.contenido_trad,
 		       t.lang_to as lang_trad
 		FROM noticias n
 		LEFT JOIN traducciones t ON t.noticia_id = n.id AND t.lang_to = $` + strconv.Itoa(argNum) + `
@@ -132,7 +133,7 @@ func GetNews(c *gin.Context) {
 		err := rows.Scan(
 			&id, &titulo, &resumen, &contenido, &url, &fecha, &imagenURL,
 			&categoriaID, &paisID, &fuenteNombre, &langRaw,
-			&n.TitleTranslated, &n.SummaryTranslated, &n.LangTranslated,
+			&n.TitleTranslated, &n.SummaryTranslated, &n.ContentTranslated, &n.LangTranslated,
 		)
 		if err != nil {
 			continue
@@ -236,7 +237,10 @@ func GetEntityNews(c *gin.Context) {
 		JOIN traducciones tr ON tn.traduccion_id = tr.id AND tr.lang_to = $3
 		JOIN noticias n ON tr.noticia_id = n.id
 		LEFT JOIN entity_aliases ea ON LOWER(ea.alias) = LOWER(t.valor) AND ea.tipo = t.tipo
-		WHERE LOWER(COALESCE(ea.canonical_name, t.valor)) = LOWER($1) AND t.tipo = $2%s`, timeCond)
+		WHERE LOWER(COALESCE(ea.canonical_name, t.valor)) = LOWER($1) AND t.tipo = $2%s
+		  AND NOT EXISTS (
+			SELECT 1 FROM entity_blocklist b WHERE b.tipo = t.tipo AND b.valor_lower = LOWER(t.valor)
+		  )`, timeCond)
 
 	var total int
 	if err := db.GetPool().QueryRow(c.Request.Context(),
@@ -246,8 +250,8 @@ func GetEntityNews(c *gin.Context) {
 	}
 
 	query := fmt.Sprintf(`
-		SELECT DISTINCT n.id, COALESCE(n.titulo, ''), COALESCE(n.resumen,''), COALESCE(n.resumen, '') AS contenido, n.url, n.fecha, n.imagen_url,
-		       n.fuente_nombre, n.lang, tr.titulo_trad, tr.resumen_trad
+		SELECT DISTINCT n.id, COALESCE(n.titulo, ''), COALESCE(n.resumen,''), COALESCE(n.contenido, '') AS contenido, n.url, n.fecha, n.imagen_url,
+		       n.fuente_nombre, n.lang, tr.titulo_trad, tr.resumen_trad, tr.contenido_trad
 		%s
 		ORDER BY n.fecha DESC
 		LIMIT $%d OFFSET $%d`, base, next, next+1)
@@ -266,7 +270,7 @@ func GetEntityNews(c *gin.Context) {
 		var fecha *time.Time
 		var img, fuenteNombre, langRaw *string
 		if err := rows.Scan(&id, &titulo, &resumen, &contenido, &url, &fecha, &img,
-			&fuenteNombre, &langRaw, &n.TitleTranslated, &n.SummaryTranslated); err != nil {
+			&fuenteNombre, &langRaw, &n.TitleTranslated, &n.SummaryTranslated, &n.ContentTranslated); err != nil {
 			continue
 		}
 		n.ID = id
@@ -322,10 +326,11 @@ func GetNewsByID(c *gin.Context) {
 	// Combined query to fetch news with entities in one round trip
 	sqlQuery := `
 		SELECT 
-			n.id, COALESCE(n.titulo, ''), COALESCE(n.resumen, ''), COALESCE(n.resumen, '') AS contenido, n.url, n.fecha, n.imagen_url, 
+			n.id, COALESCE(n.titulo, ''), COALESCE(n.resumen, ''), COALESCE(n.contenido, '') AS contenido, n.url, n.fecha, n.imagen_url, 
 		       n.categoria_id, n.pais_id, n.fuente_nombre, n.lang,
 		       t.titulo_trad,
 		       t.resumen_trad,
+		       t.contenido_trad,
 		       t.lang_to as lang_trad,
 		       json_agg(
 		           json_build_object(
@@ -347,9 +352,9 @@ func GetNewsByID(c *gin.Context) {
 			WHERE t.tipo IN ('persona', 'organizacion')
 		) ent ON ent.noticia_id = n.id
 		WHERE n.id = $2
-		GROUP BY n.id, n.titulo, n.resumen, n.url, n.fecha, n.imagen_url, 
+		GROUP BY n.id, n.titulo, n.resumen, n.contenido, n.url, n.fecha, n.imagen_url, 
 		         n.categoria_id, n.pais_id, n.fuente_nombre, n.lang,
-		         t.titulo_trad, t.resumen_trad, t.lang_to
+		         t.titulo_trad, t.resumen_trad, t.contenido_trad, t.lang_to
 	`
 
 	var n models.NewsWithTranslations
@@ -362,7 +367,7 @@ func GetNewsByID(c *gin.Context) {
 	err := db.GetPool().QueryRow(c.Request.Context(), sqlQuery, targetLang, id).Scan(
 		&id, &titulo, &resumen, &contenido, &url, &fecha, &imagenURL,
 		&categoriaID, &paisID, &fuenteNombre, &langRaw,
-		&n.TitleTranslated, &n.SummaryTranslated, &n.LangTranslated,
+		&n.TitleTranslated, &n.SummaryTranslated, &n.ContentTranslated, &n.LangTranslated,
 		&entitiesJSON,
 	)
 	if err != nil {
@@ -455,9 +460,9 @@ func GetEntities(c *gin.Context) {
 	countryID := c.Query("country_id")
 	categoryID := c.Query("category_id")
 	entityType := c.DefaultQuery("tipo", "persona")
-	
+
 	q := c.Query("q")
-	
+
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "50"))
 	page, perPage = validatePageParams(page, perPage, 50, 100)
@@ -476,7 +481,7 @@ func GetEntities(c *gin.Context) {
 		where += fmt.Sprintf(" AND n.categoria_id = $%d", len(args)+1)
 		args = append(args, categoryID)
 	}
-	
+
 	if q != "" {
 		where += fmt.Sprintf(" AND COALESCE(ea.canonical_name, t.valor) ILIKE $%d", len(args)+1)
 		args = append(args, "%"+q+"%")
@@ -497,7 +502,9 @@ func GetEntities(c *gin.Context) {
 		JOIN traducciones tr ON tn.traduccion_id = tr.id
 		JOIN noticias n ON tr.noticia_id = n.id
 		LEFT JOIN entity_aliases ea ON LOWER(ea.alias) = LOWER(t.valor) AND ea.tipo = t.tipo
-		WHERE %s
+		WHERE %s AND NOT EXISTS (
+		SELECT 1 FROM entity_blocklist b WHERE b.tipo = t.tipo AND b.valor_lower = LOWER(t.valor)
+	)
 	`, where)
 
 	var total int
@@ -530,7 +537,9 @@ func GetEntities(c *gin.Context) {
 		JOIN traducciones tr ON tn.traduccion_id = tr.id
 		JOIN noticias n ON tr.noticia_id = n.id
 		LEFT JOIN entity_aliases ea ON LOWER(ea.alias) = LOWER(t.valor) AND ea.tipo = t.tipo
-		WHERE %s
+		WHERE %s AND NOT EXISTS (
+			SELECT 1 FROM entity_blocklist b WHERE b.tipo = t.tipo AND b.valor_lower = LOWER(t.valor)
+		)
 		GROUP BY LOWER(COALESCE(ea.canonical_name, t.valor)), t.tipo
 		ORDER BY cnt DESC
 		LIMIT $%d OFFSET $%d

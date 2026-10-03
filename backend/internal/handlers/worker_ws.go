@@ -208,10 +208,10 @@ func handleTranslationResult(workerID int, result *models.TranslationResult) {
 
 	_, err := db.GetPool().Exec(ctx, `
 		UPDATE traducciones 
-		SET titulo_trad = $1, resumen_trad = $2, status = 'done', 
-		    worker_id = $3, assigned_at = NULL
-		WHERE id = $4
-	`, result.TitleTr, result.SummaryTr, workerID, result.JobID)
+		SET titulo_trad = $1, resumen_trad = $2, contenido_trad = $3, status = 'done', 
+		    worker_id = $4, assigned_at = NULL
+		WHERE id = $5
+	`, result.TitleTr, result.SummaryTr, result.ContentTr, workerID, result.JobID)
 
 	if err != nil {
 		log.Printf("Error updating translation result: %v", err)
@@ -243,17 +243,17 @@ func AssignJobToWorker(workerID int) *models.TranslationJob {
 
 	var job models.TranslationJob
 	err := db.GetPool().QueryRow(ctx, `
-		SELECT t.id, t.noticia_id, t.lang_from, t.lang_to, n.titulo, n.resumen
+		SELECT t.id, t.noticia_id, t.lang_from, t.lang_to, n.titulo, n.resumen, n.contenido
 		FROM traducciones t
 		JOIN noticias n ON n.id = t.noticia_id
 		WHERE t.status = 'pending' 
 		  AND t.worker_id IS NULL
 		  AND t.lang_to = 'es'
-		  AND (t.titulo_trad IS NULL OR t.resumen_trad IS NULL)
+		  AND (t.titulo_trad IS NULL OR t.resumen_trad IS NULL OR t.contenido_trad IS NULL)
 		ORDER BY n.fecha DESC
 		LIMIT 1
 		FOR UPDATE SKIP LOCKED
-	`).Scan(&job.ID, &job.NewsID, &job.LangFrom, &job.LangTo, &job.Title, &job.Summary)
+	`).Scan(&job.ID, &job.NewsID, &job.LangFrom, &job.LangTo, &job.Title, &job.Summary, &job.Content)
 
 	if err != nil {
 		log.Printf("[AssignJobToWorker] No job found for worker %d: %v", workerID, err)

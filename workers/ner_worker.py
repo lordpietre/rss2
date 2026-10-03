@@ -53,6 +53,14 @@ ENT_LABELS = {
 ENTITY_CONFIG = {"blacklist": [], "synonyms": {}}
 REVERSE_SYNONYMS = {}
 
+# Falsos positivos ya detectados por `entitycheck` (Go) y guardados en
+# entity_blocklist por `entityscan`. Se comprueba aquí para que la basura
+# detectada una vez no vuelva a insertarse aunque el texto vuelva a pasar
+# por el NER (p. ej. al re-traducir).
+DB_BLOCKLIST = set()
+_db_blocklist_checked = False
+_db_blocklist_next = 0.0
+
 def load_entity_config():
     global ENTITY_CONFIG, REVERSE_SYNONYMS
     path = "entity_config.json"
@@ -78,10 +86,44 @@ def get_canonical_name(text: str) -> str:
     lower = text.lower()
     return REVERSE_SYNONYMS.get(lower, text)
 
+def load_db_blocklist(force: bool = False):
+    """Refresca DB_BLOCKLIST desde entity_blocklist.
+
+    Conexión propia y a lo sumo cada 10 minutos: si la tabla todavía no
+    existe (despliegue nuevo) se avisa una sola vez y el worker sigue
+    funcionando solo con el blacklist de fichero.
+    """
+    global DB_BLOCKLIST, _db_blocklist_checked, _db_blocklist_next
+    if not force and time.time() < _db_blocklist_next:
+        return
+    _db_blocklist_next = time.time() + 600
+    conn = None
+    try:
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute("SELECT valor_lower FROM entity_blocklist")
+            DB_BLOCKLIST = {r[0] for r in cur.fetchall()}
+        if not _db_blocklist_checked:
+            log.info(f"entity_blocklist: {len(DB_BLOCKLIST)} valores bloqueados")
+    except Exception as e:
+        if not _db_blocklist_checked:
+            log.warning(f"No se pudo leer entity_blocklist (¿migración pendiente?): {e}")
+    finally:
+        _db_blocklist_checked = True
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
 def is_blacklisted(text: str) -> bool:
     if not text:
         return True
     lower = text.lower()
+    # FP ya detectados (entity_blocklist) — ver load_db_blocklist.
+    if lower in DB_BLOCKLIST:
+        return True
     # Check full match
     if lower in [item.lower() for item in ENTITY_CONFIG.get("blacklist", [])]:
         return True
@@ -338,8 +380,11 @@ def main():
     # Cargar configuración de entidades
     load_entity_config()
 
+    load_db_blocklist(force=True)
+
     while True:
         try:
+            load_db_blocklist()
             with get_conn() as conn:
                 with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
                     cur.execute(

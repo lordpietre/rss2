@@ -173,10 +173,11 @@ func SearchNews(c *gin.Context) {
 	}
 
 	sqlQuery := `
-		SELECT n.id, COALESCE(n.titulo, ''), COALESCE(n.resumen, ''), COALESCE(n.resumen, '') AS contenido, n.url, n.fecha, n.imagen_url,
+		SELECT n.id, COALESCE(n.titulo, ''), COALESCE(n.resumen, ''), COALESCE(n.contenido, '') AS contenido, n.url, n.fecha, n.imagen_url,
 		       n.categoria_id, n.pais_id, n.fuente_nombre, n.lang,
 		       t.titulo_trad,
 		       t.resumen_trad,
+		       t.contenido_trad,
 		       t.lang_to as lang_trad
 		FROM noticias n
 		LEFT JOIN traducciones t ON t.noticia_id = n.id AND t.lang_to = $1
@@ -204,7 +205,7 @@ func SearchNews(c *gin.Context) {
 		err := rows.Scan(
 			&id, &titulo, &resumen, &contenido, &url, &fecha, &imagenURL,
 			&categoriaIDp, &paisIDp, &fuenteNombre, &langRaw,
-			&n.TitleTranslated, &n.SummaryTranslated, &n.LangTranslated,
+			&n.TitleTranslated, &n.SummaryTranslated, &n.ContentTranslated, &n.LangTranslated,
 		)
 		if err != nil {
 			continue

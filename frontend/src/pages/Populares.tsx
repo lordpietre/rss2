@@ -2,6 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../services/api'
 import { WikiTooltip } from '../components/ui/WikiTooltip'
+import { SaveSearchModal } from '../components/SaveSearchModal'
+import { useApiSavedSearches } from '../hooks/useApiFavorites'
+import { Bookmark } from 'lucide-react'
 
 interface Entity {
   valor: string
@@ -79,6 +82,10 @@ export function Populares() {
   const [activeTab, setActiveTab] = useState<'tipo' | 'alias'>('tipo')
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [showSaveModal, setShowSaveModal] = useState(false)
+  const { createSearch } = useApiSavedSearches()
+
+  const hasEntityFilters = !!(countryId || categoryId || activeSearch)
 
   useEffect(() => {
     api.get('/categories').then(res => setCategories(res.data)).catch(console.error)
@@ -318,6 +325,16 @@ export function Populares() {
           >
             💾 Backup BBDD
           </button>
+          {hasEntityFilters && (
+            <button
+              onClick={() => setShowSaveModal(true)}
+              className="px-3 py-1.5 text-sm border rounded hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600 transition-colors"
+              title="Guardar esta búsqueda"
+            >
+              <Bookmark className="h-4 w-4 inline mr-1" />
+              Guardar
+            </button>
+          )}
         </div>
       </div>
 
@@ -783,6 +800,19 @@ export function Populares() {
           </div>
         </div>
       )}
+
+      <SaveSearchModal
+        isOpen={showSaveModal}
+        onClose={() => setShowSaveModal(false)}
+        onSave={(label) => {
+          const params: Record<string, string> = { tipo }
+          if (countryId) params.countryId = countryId
+          if (categoryId) params.categoryId = categoryId
+          if (activeSearch) params.q = activeSearch
+          createSearch('entity', label, params)
+        }}
+        typeLabel={`búsqueda de ${getTipoInfo(tipo).label}`}
+      />
     </div>
   )
 }

@@ -19,6 +19,11 @@ services:
     volumes:
       - ./data/pgdata:/var/lib/postgresql/data
       - ./init-db:/docker-entrypoint-initdb.d:ro
+    # Docker asigna 64 MB a /dev/shm por contenedor: con consultas que usan
+    # agregación hash en paralelo Postgres falla con «could not resize shared
+    # memory segment… No space left on device» (SQLSTATE 53100) y se caen
+    # tests y consultas de la API de forma intermitente.
+    shm_size: '256m'
     networks:
       - backend
     restart: unless-stopped
@@ -300,8 +305,8 @@ services:
       DB_NAME: ${POSTGRES_DB:-rss}
       DB_USER: ${POSTGRES_USER:-rss}
       DB_PASS: ${POSTGRES_PASSWORD}
-      WIKI_SLEEP: 10
-      WIKI_BATCH: 20
+      WIKI_SLEEP: 5
+      WIKI_BATCH: 40
     volumes:
       - ./data/wiki_images:/app/data/wiki_images
     networks:
@@ -492,6 +497,8 @@ services:
     networks:
       - backend
       - frontend
+    ports:
+      - "8080:8080"   # Exposed for remote workers WebSocket connection
     depends_on:
       db:
         condition: service_healthy

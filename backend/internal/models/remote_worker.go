@@ -19,12 +19,14 @@ type TranslationJob struct {
 	LangTo    string `json:"lang_to"`
 	Title     string `json:"title"`
 	Summary   string `json:"summary"`
+	Content   string `json:"content"`
 }
 
 type TranslationResult struct {
 	JobID      int64  `json:"job_id"`
 	TitleTr   string `json:"title_trad"`
 	SummaryTr string `json:"resumen_trad"`
+	ContentTr string `json:"contenido_trad"`
 	Error     string `json:"error,omitempty"`
 }
 

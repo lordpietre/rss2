@@ -23,8 +23,44 @@ Estado global. El detalle y la evidencia están en cada `specs/NN-*/spec.md`.
 - [x] Rotación de credenciales: procedimiento `ALTER USER` + recreate.
 - [x] Reset de password admin + verificación JWT.
 - [x] Fixes TS frontend (AdminSettings duplicado/export real, Populares Set).
+- [x] Limpieza de textos (2026-09-30): paquete `textclean` (parser
+      `x/net/html` + RE2, idempotente y acotado) en ingestor y scraper,
+      backfill `backend/cmd/sanitize` (`dry-run` / `-apply` / `-requeue` /
+      `-restore`), columnas `noticias.titulo_raw|resumen_raw|cleaned_at` y
+      traducción con `lang_from=NULL` → se detecta sobre el texto limpio.
+      Detalle y métricas en `specs/02-ingestion/spec.md`.
+
+- [x] Falsos positivos de entidades (2026-09-30): reglas únicas en
+      `backend/internal/entitycheck`, blocklist global
+      (`entity_blocklist` + `cmd/entityscan`), filtro en `/api/entities`
+      (lista y total) y en `/entities/news`, `ner_worker` que no los
+      reinserta y tests de API dentro de `make test` (lo más popular de
+      España + global). 7.248 valores (2,4 %) fuera. Plan y fases
+      pendientes (alias/fragmentación, FP débiles, wiki) en
+      `specs/04-enrichment/spec.md`.
 
 ## Pendiente (prioridad)
+
+- [x] **Documentación de arquitectura** (2026-10-01): Creados 6 documentos en
+      `specs/00-architecture/`:
+      - 01-system-context.md: Contexto, usuarios, sistemas externos
+      - 02-container-view.md: Topología Docker completa
+      - 03-data-flow.md: Pipeline de datos y limpieza de texto
+      - 04-component-inventory.md: Componentes, APIs, esquemas BD
+      - 05-spec-driven-development.md: Metodología SDD
+      - 06-roadmap.md: Estado actual y roadmap Q4
+      Ver `specs/00-architecture/README.md` para índice.
+
+- [ ] **Alertas: racionalizar el algoritmo** (plan completo en
+      `specs/04-enrichment/spec.md`, sección «Alertas: revisión del
+      algoritmo (2026-09-30)»). Medido: 843 alertas en 5 días (169/día),
+      todas sin leer, 74 % con `baseline<1`, 19 % no significativas, 65 %
+      temas genéricos, 4/843 en la blocklist y `/api/alerts` sin filtrar.
+      Valores propuestos (backtest 118 h): `hits≥5`, `baseline≥1`,
+      `ratio≥5`, `buckets≥2`, `tema 6/2/6/nb3`, cooldown 6 h, filtro
+      `entity_blocklist`+`entitycheck`, scan 60 min → **21,5 alertas/día
+      y 0 % no significativas** (fases A1-A6 en la spec; A1a es solo env:
+      `ALERTS_MIN_HITS=5 ALERTS_MIN_BASELINE=1`).
 
 - [x] Gap AdminAliases → implementados `GET /admin/aliases`, `PUT/DELETE
       /admin/aliases/:id` + `GET /admin/ingest/stats` (2026-09-14, verificado

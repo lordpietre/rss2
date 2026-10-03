@@ -22,7 +22,7 @@ import (
 var (
 	pool          *pgxpool.Pool
 	sleepInterval = 30
-	batchSize     = 20
+	batchSize     = 40
 	imagesDir     = "/app/data/wiki_images"
 	maxImageBytes = int64(2 << 20)
 )
@@ -165,11 +165,21 @@ func processTag(ctx context.Context, tag Tag) {
 
 	summary, err := fetchWikipediaInfo(tag.Valor)
 	if err != nil {
-		// Marcar como revisado también ante error: si no, los tags basura
-		// (fragmentos JSON/HTML del NER) o los 403 se reintentan en cada
-		// ciclo eternamente, quemando cuota de la API.
-		_, _ = pool.Exec(ctx, "UPDATE tags SET wiki_checked = TRUE WHERE id = $1", tag.ID)
-		logger.Error().Err(err).Str("valor", tag.Valor).Msg("Error al consultar Wikipedia (marcado como revisado)")
+		// No marcar como revisado ante errores transitorios (timeouts, 503, 504)
+		// para que se reintenten en el siguiente ciclo
+		errStr := err.Error()
+		isTransient := strings.Contains(errStr, "context deadline exceeded") ||
+			strings.Contains(errStr, "503") ||
+			strings.Contains(errStr, "504") ||
+			strings.Contains(errStr, "429")
+		
+		if isTransient {
+			logger.Warn().Err(err).Str("valor", tag.Valor).Msg("Error transitorio al consultar Wikipedia, se reintentará")
+		} else {
+			// Marcar como revisado ante errores permanentes para no reintentar
+			_, _ = pool.Exec(ctx, "UPDATE tags SET wiki_checked = TRUE WHERE id = $1", tag.ID)
+			logger.Error().Err(err).Str("valor", tag.Valor).Msg("Error permanente al consultar Wikipedia (marcado como revisado)")
+		}
 		return
 	}
 
@@ -311,7 +321,7 @@ func Main() {
 				select {
 				case <-ctx.Done():
 					return
-				case <-time.After(3 * time.Second): // Increased delay to avoid Wikipedia Rate Limits (429)
+				case <-time.After(1 * time.Second): // Delay to avoid Wikipedia Rate Limits (429)
 				}
 			}
 		}

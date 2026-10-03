@@ -11,17 +11,22 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rss2/backend/internal/db"
+	"github.com/rss2/backend/internal/entitycheck"
 	"github.com/rss2/backend/internal/models"
 )
 
 type Alerta struct {
-	ID          int64   `json:"id"`
-	Valor       string  `json:"valor"`
-	Tipo        string  `json:"tipo"`
-	Periodo     string  `json:"periodo"`
-	Hits        int     `json:"hits"`
-	Baseline    float64 `json:"baseline"`
-	Ratio       float64 `json:"ratio"`
+	ID       int64   `json:"id"`
+	Valor    string  `json:"valor"`
+	Tipo     string  `json:"tipo"`
+	Periodo  string  `json:"periodo"`
+	Hits     int     `json:"hits"`
+	Baseline float64 `json:"baseline"`
+	Ratio    float64 `json:"ratio"`
+	// Score es la significación del pico ((hits-baseline)/√baseline,
+	// normal z de Poisson). A diferencia de `ratio` no se dispara con
+	// baselines minúsculos, así que sirve para ordenar dentro de una hora.
+	Score       float64 `json:"score"`
 	Status      string  `json:"status"`
 	CreatedAt   string  `json:"created_at"`
 	WikiSummary *string `json:"wiki_summary"`
@@ -29,8 +34,29 @@ type Alerta struct {
 	ImagePath   *string `json:"image_path"`
 }
 
+// envInt/envFloat leen un umbral de `ALERTS_*`; si falta o no es válido
+// devuelve el por defecto, así la configuración siempre es inspeccionable.
+func envInt(name string, def int) int {
+	if v := os.Getenv(name); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return n
+		}
+	}
+	return def
+}
+
+func envFloat(name string, def float64) float64 {
+	if v := os.Getenv(name); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
+			return f
+		}
+	}
+	return def
+}
+
 func GetAlertas(c *gin.Context) {
 	status := c.Query("status")
+	tipo := c.Query("tipo")
 	limitStr := c.DefaultQuery("limit", "100")
 
 	limit, _ := strconv.Atoi(limitStr)
@@ -38,21 +64,36 @@ func GetAlertas(c *gin.Context) {
 		limit = 100
 	}
 
+	// El filtro anti-FP es el mismo que usa Populares: una alerta sobre un
+	// valor de `entity_blocklist` es un falso positivo conocido y no se
+	// enseña (ni se cuenta en `total`).
+	where := `WHERE NOT EXISTS (SELECT 1 FROM entity_blocklist b
+	                  WHERE b.tipo = a.tipo AND b.valor_lower = LOWER(a.valor))`
+	args := []interface{}{}
+	if status != "" {
+		args = append(args, status)
+		where += fmt.Sprintf(" AND a.status = $%d", len(args))
+	} else {
+		// Por defecto las descartadas (falsas alertas del usuario) se ocultan.
+		where += ` AND a.status <> 'descartada'`
+	}
+	if tipo != "" {
+		args = append(args, tipo)
+		where += fmt.Sprintf(" AND a.tipo = $%d", len(args))
+	}
+
 	query := `
 		SELECT a.id, a.valor, a.tipo,
 		       to_char(a.periodo, 'YYYY-MM-DD HH24:MI') AS periodo,
 		       a.hits, a.baseline,
 		       a.ratio, a.status, to_char(a.created_at, 'YYYY-MM-DD HH24:MI'),
+		       ((a.hits - a.baseline) / sqrt(GREATEST(a.baseline, 0.01))) AS score,
 		       t.wiki_summary, t.wiki_url, t.image_path
 		FROM alertas a
 		LEFT JOIN tags t ON t.valor = a.valor AND t.tipo = a.tipo
-	`
-	args := []interface{}{}
-	if status != "" {
-		query += fmt.Sprintf(" WHERE a.status = $%d", len(args)+1)
-		args = append(args, status)
-	}
-	query += fmt.Sprintf(" ORDER BY a.periodo DESC, a.ratio DESC, a.id DESC LIMIT $%d", len(args)+1)
+		` + where + `
+		ORDER BY a.periodo DESC, score DESC, a.id DESC
+		LIMIT $` + strconv.Itoa(len(args)+1)
 	args = append(args, limit)
 
 	rows, err := db.GetPool().Query(c.Request.Context(), query, args...)
@@ -65,19 +106,25 @@ func GetAlertas(c *gin.Context) {
 	alertas := []Alerta{}
 	for rows.Next() {
 		var a Alerta
-		if err := rows.Scan(&a.ID, &a.Valor, &a.Tipo, &a.Periodo, &a.Hits, &a.Baseline, &a.Ratio, &a.Status, &a.CreatedAt, &a.WikiSummary, &a.WikiURL, &a.ImagePath); err != nil {
+		if err := rows.Scan(&a.ID, &a.Valor, &a.Tipo, &a.Periodo, &a.Hits, &a.Baseline, &a.Ratio, &a.Status, &a.CreatedAt, &a.Score, &a.WikiSummary, &a.WikiURL, &a.ImagePath); err != nil {
 			log.Printf("alerts: scan row error: %v", err)
 			continue
 		}
 		alertas = append(alertas, a)
 	}
 
-	var nuevas int
-	db.GetPool().QueryRow(c.Request.Context(), "SELECT COUNT(*)::int FROM alertas WHERE status = 'nueva'").Scan(&nuevas)
+	// `total` es el total REAL con los mismos filtros (antes era len(rows),
+	// con lo que la paginación mentía).
+	var total, nuevas int
+	countArgs := append([]interface{}{}, args[:len(args)-1]...)
+	db.GetPool().QueryRow(c.Request.Context(),
+		"SELECT COUNT(*)::int FROM alertas a "+where, countArgs...).Scan(&total)
+	db.GetPool().QueryRow(c.Request.Context(),
+		"SELECT COUNT(*)::int FROM alertas WHERE status = 'nueva'").Scan(&nuevas)
 
 	c.JSON(http.StatusOK, gin.H{
 		"alertas": alertas,
-		"total":   len(alertas),
+		"total":   total,
 		"nuevas":  nuevas,
 	})
 }
@@ -93,6 +140,31 @@ func MarkAlertaRead(c *gin.Context) {
 	_, err = db.GetPool().Exec(c.Request.Context(), "UPDATE alertas SET status = 'leida' WHERE id = $1", id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to update alert", Message: err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+// MarkAlertaDismiss marca una alerta como falsa (`status='descartada'`):
+// no se vuelve a mostrar en la vista por defecto y, mientras dure el
+// cooldown del scanner, tampoco se reinserta.
+func MarkAlertaDismiss(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Invalid alert id"})
+		return
+	}
+
+	res, err := db.GetPool().Exec(c.Request.Context(),
+		"UPDATE alertas SET status = 'descartada' WHERE id = $1", id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to dismiss alert", Message: err.Error()})
+		return
+	}
+	if n := res.RowsAffected(); n == 0 {
+		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: "Alert not found"})
 		return
 	}
 
@@ -146,42 +218,47 @@ func ScanAlertasAdmin(c *gin.Context) {
 //
 //  4. Se descarta la hora en curso (incompleta) y se exige un mínimo de
 //     buckets de baseline para no derivar un ratio de una sola hora.
+//
+//  5. Umbrales reescalados el 2026-09-30 (backtest sobre 118 h de serie
+//     real): `hits>=5`, `baseline>=1`, `ratio>=5`, `buckets>=2`, y para
+//     `tema` `6/2/6/3`. Con baseline>=1 el peor caso de Poisson es
+//     P(X>=5|λ=1)=0,0037<0,01: toda alerta es significativa por
+//     construcción. Los umbrales viejos (3/0,5/5) daban 169 alertas/día,
+//     el 74 % con baseline<1 y el 19 % sin significación, y nadie las
+//     leía.
+//
+//  6. Anti-FP y cooldown: se descarta lo que esté en `entity_blocklist` o
+//     clasifique distinto de "ninguna" en `entitycheck` (los FP débiles
+//     también: una alerta se lee, y en Populares siguen para revisión), y
+//     lo que ya se haya alertado en las últimas ALERTS_COOLDOWN_HOURS para
+//     no repetir la misma entidad mientras dura el pico.
 func RunAlertScan(ctx context.Context) (int, error) {
-	minHits := 3
-	minRatio := 5.0
-	minBaseline := 0.5
-	lookbackHours := 24
-	minBuckets := 2
-	if v := os.Getenv("ALERTS_MIN_HITS"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			minHits = n
-		}
+	// Umbrales por defecto: `entitycheck.AlertaBase`/`AlertaTema` (backtest
+	// del 2026-09-30 sobre 118 h de serie real, spec 04). Las env `ALERTS_*`
+	// siguen permitiendo moverlos sin recompilar.
+	umbBase := entitycheck.Umbrales{
+		MinHits:     envInt("ALERTS_MIN_HITS", entitycheck.AlertaBase.MinHits),
+		MinRatio:    envFloat("ALERTS_MIN_RATIO", entitycheck.AlertaBase.MinRatio),
+		MinBaseline: envFloat("ALERTS_MIN_BASELINE", entitycheck.AlertaBase.MinBaseline),
+		MinBuckets:  envInt("ALERTS_MIN_BASELINE_BUCKETS", entitycheck.AlertaBase.MinBuckets),
 	}
-	if v := os.Getenv("ALERTS_MIN_RATIO"); v != "" {
-		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
-			minRatio = f
-		}
+	// Los `tema` son palabras genéricas y generaban el 65 % del ruido:
+	// exigen doble exigencia (≈1,6 alertas/día en el backtest).
+	umbTema := entitycheck.Umbrales{
+		MinHits:     envInt("ALERTS_TEMA_MIN_HITS", entitycheck.AlertaTema.MinHits),
+		MinRatio:    envFloat("ALERTS_TEMA_MIN_RATIO", entitycheck.AlertaTema.MinRatio),
+		MinBaseline: envFloat("ALERTS_TEMA_MIN_BASELINE", entitycheck.AlertaTema.MinBaseline),
+		MinBuckets:  envInt("ALERTS_TEMA_MIN_BASELINE_BUCKETS", entitycheck.AlertaTema.MinBuckets),
 	}
-	if v := os.Getenv("ALERTS_MIN_BASELINE"); v != "" {
-		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
-			minBaseline = f
-		}
-	}
-	if v := os.Getenv("ALERTS_LOOKBACK_HOURS"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			lookbackHours = n
-		}
-	}
-	if v := os.Getenv("ALERTS_MIN_BASELINE_BUCKETS"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			minBuckets = n
-		}
-	}
+	lookbackHours := envInt("ALERTS_LOOKBACK_HOURS", 24)
+	cooldownHours := envInt("ALERTS_COOLDOWN_HOURS", 6)
 
 	// Diagnóstico previo: deja rastro de por qué un scan no dispara en vez
-	// de un "0 new alerts" sin contexto.
+	// de un "0 new alerts" sin contexto. El retraso se calcula dentro de la
+	// BD (mismo reloj que `n.fecha`) para no mezclar zonas horarias.
 	var refHour, refInfo string
 	var active, baseBuckets int
+	var retraso float64
 	if err := db.GetPool().QueryRow(ctx, `
 		WITH hourly AS (`+hourlyCTE+`),
 		ref AS (SELECT MAX(hora) AS h FROM hourly)
@@ -189,14 +266,20 @@ func RunAlertScan(ctx context.Context) (int, error) {
 		       (SELECT count(DISTINCT hora) FROM hourly) AS activas,
 		       (SELECT count(DISTINCT hora) FROM hourly
 		         WHERE hora < (SELECT h FROM ref)
-		           AND hora >= (SELECT h FROM ref) - ($1::int * interval '1 hour')) AS baseline
-	`, lookbackHours).Scan(&refHour, &active, &baseBuckets); err != nil {
+		           AND hora >= (SELECT h FROM ref) - ($1::int * interval '1 hour')) AS baseline,
+		       EXTRACT(EPOCH FROM (date_trunc('hour', CURRENT_TIMESTAMP)
+		                            - COALESCE((SELECT h FROM ref),
+		                                       date_trunc('hour', CURRENT_TIMESTAMP)))) / 3600 AS retraso_h
+	`, lookbackHours).Scan(&refHour, &active, &baseBuckets, &retraso); err != nil {
 		return 0, fmt.Errorf("diagnóstico de alertas: %w", err)
 	}
 	refInfo = fmt.Sprintf("ref=%s buckets_activos=%d baseline=%d", refHour, active, baseBuckets)
 	if refHour == "" {
 		log.Printf("alerts: sin datos etiquetados, scan omitido")
 		return 0, nil
+	}
+	if retraso > 3 {
+		log.Printf("alerts: WARNING la hora ref lleva %.0f h de retraso (¿NER parado?): las alertas son sobre datos viejos", retraso)
 	}
 
 	query := `
@@ -233,9 +316,15 @@ func RunAlertScan(ctx context.Context) (int, error) {
 			  AND h.hora >= (SELECT ref_hora FROM ref) - ($3::int * interval '1 hour')
 			GROUP BY c.tag_id, r.noticias
 		)
-		SELECT h.valor, h.tipo, h.hits, b.baseline,
+		SELECT h.valor, h.tipo, h.hits, b.baseline, b.n_buckets,
 		       (h.hits::float / b.baseline) AS ratio,
-		       (SELECT ref_hora FROM ref) AS periodo
+		       (SELECT ref_hora FROM ref) AS periodo,
+		       EXISTS (SELECT 1 FROM entity_blocklist bl
+		               WHERE bl.tipo = h.tipo AND bl.valor_lower = LOWER(h.valor)) AS en_blocklist,
+		       EXISTS (SELECT 1 FROM alertas a
+		               WHERE a.valor = h.valor AND a.tipo = h.tipo
+		                 AND a.periodo >= (SELECT ref_hora FROM ref)
+		                      - ($6::int * interval '1 hour')) AS reciente
 		FROM current_h h
 		JOIN base b USING (tag_id)
 		WHERE h.hits >= $1
@@ -244,7 +333,8 @@ func RunAlertScan(ctx context.Context) (int, error) {
 		  AND (h.hits::float / b.baseline) >= $2
 	`
 
-	rows, err := db.GetPool().Query(ctx, query, minHits, minRatio, lookbackHours, minBaseline, minBuckets)
+	rows, err := db.GetPool().Query(ctx, query, umbBase.MinHits, umbBase.MinRatio, lookbackHours,
+		umbBase.MinBaseline, umbBase.MinBuckets, cooldownHours)
 	if err != nil {
 		return 0, err
 	}
@@ -252,16 +342,57 @@ func RunAlertScan(ctx context.Context) (int, error) {
 
 	inserted := 0
 	candidates := 0
+	omitBlocklist, omitCooldown, omitFP, omitWeak, omitTema, omitUmbral := 0, 0, 0, 0, 0, 0
 	for rows.Next() {
 		var valor, tipo string
-		var hits int
+		var hits, nBuckets int
 		var baseline, ratio float64
 		var periodo time.Time
-		if err := rows.Scan(&valor, &tipo, &hits, &baseline, &ratio, &periodo); err != nil {
+		var enBlocklist, reciente bool
+		if err := rows.Scan(&valor, &tipo, &hits, &baseline, &nBuckets, &ratio, &periodo, &enBlocklist, &reciente); err != nil {
 			log.Printf("alerts: scan row error: %v", err)
 			continue
 		}
 		candidates++
+
+		// Capa anti-FP: la misma que Populares (blocklist + reglas únicas),
+		// pero aquí también se descartan los FP DÉBILES: una alerta es un
+		// aviso que alguien lee, así que prima la precisión (los débiles
+		// siguen visibles en Populares, que es donde están para revisión).
+		if enBlocklist {
+			omitBlocklist++
+			continue
+		}
+		if sev, _ := entitycheck.Classify(tipo, valor); sev != entitycheck.SeverityNone {
+			if sev == entitycheck.SeverityStrong {
+				omitFP++
+			} else {
+				omitWeak++
+			}
+			continue
+		}
+		// Cooldown: una entidad ya alertada en las últimas horas no vuelve
+		// a entrar aunque el pico dure (el ON CONFLICT cubre la hora exacta).
+		if reciente {
+			omitCooldown++
+			continue
+		}
+		// Regla extra para `tema` (palabras genéricas): la SQL solo aplica
+		// los umbrales base, así que el de tema se comprueba aquí.
+		umb := umbBase
+		if tipo == "tema" {
+			umb = umbTema
+		}
+		if ok, motivo := umb.Acepta(hits, baseline, ratio, nBuckets); !ok {
+			if tipo == "tema" {
+				omitTema++
+			} else {
+				log.Printf("alerts: descartada %q (%s) por %s", valor, tipo, motivo)
+				omitUmbral++
+			}
+			continue
+		}
+
 		res, err := db.GetPool().Exec(ctx, `
 			INSERT INTO alertas (valor, tipo, periodo, hits, baseline, ratio)
 			VALUES ($1, $2, $3, $4, $5, $6)
@@ -276,8 +407,11 @@ func RunAlertScan(ctx context.Context) (int, error) {
 		}
 	}
 
-	log.Printf("alerts: %s candidatos=%d nuevas=%d (hits>=%d ratio>=%.1f baseline>=%.1f buckets>=%d)",
-		refInfo, candidates, inserted, minHits, minRatio, minBaseline, minBuckets)
+	log.Printf("alerts: %s candidatos=%d omitidas_bd=%d cooldown=%d fp=%d debiles=%d tema=%d umbral=%d nuevas=%d "+
+		"| base hits>=%d ratio>=%.1f baseline>=%.1f buckets>=%d · tema hits>=%d ratio>=%.1f baseline>=%.1f buckets>=%d · cooldown=%dh",
+		refInfo, candidates, omitBlocklist, omitCooldown, omitFP, omitWeak, omitTema, omitUmbral, inserted,
+		umbBase.MinHits, umbBase.MinRatio, umbBase.MinBaseline, umbBase.MinBuckets,
+		umbTema.MinHits, umbTema.MinRatio, umbTema.MinBaseline, umbTema.MinBuckets, cooldownHours)
 
 	return inserted, nil
 }
@@ -300,21 +434,17 @@ const hourlyCTE = `
 `
 
 // StartAlertScanner lanza una goroutine que revisa picos de actividad
-// periódicamente (cada ALERTS_SCAN_INTERVAL_MIN, por defecto 120 min).
+// periódicamente (cada ALERTS_SCAN_INTERVAL_MIN, por defecto 60 min: con
+// 120 min solo se cubrían ~12 de las 24 horas ref al día).
 func StartAlertScanner() {
-	interval := 120
-	if v := os.Getenv("ALERTS_SCAN_INTERVAL_MIN"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			interval = n
-		}
-	}
+	interval := envInt("ALERTS_SCAN_INTERVAL_MIN", 60)
 
-		go func() {
-			time.Sleep(45 * time.Second)
-			for {
-				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
-				inserted, err := RunAlertScan(ctx)
-				cancel()
+	go func() {
+		time.Sleep(45 * time.Second)
+		for {
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+			inserted, err := RunAlertScan(ctx)
+			cancel()
 			if err != nil {
 				log.Printf("alerts: scan error: %v", err)
 			} else {

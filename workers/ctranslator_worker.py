@@ -123,9 +123,9 @@ def _env_str(name: str, default=None):
 
 TARGET_LANGS = _env_list("TARGET_LANGS")
 BATCH_SIZE = _env_int("TRANSLATOR_BATCH", 128)
-MAX_SRC_TOKENS = _env_int("MAX_SRC_TOKENS", 512)
-MAX_NEW_TOKENS = _env_int("MAX_NEW_TOKENS", 512)
-MAX_SEQ_PER_CALL = _env_int("MAX_SEQ_PER_CALL", 128)
+MAX_SRC_TOKENS = _env_int("MAX_SRC_TOKENS", 2048)  # Aumentado para traducir textos más largos
+MAX_NEW_TOKENS = _env_int("MAX_NEW_TOKENS", 2048)  # Aumentado para traducciones más largas
+MAX_SEQ_PER_CALL = _env_int("MAX_SEQ_PER_CALL", 64)  # Reducido para evitar OOM
 
 CT2_MODEL_PATH = _env_str("CT2_MODEL_PATH", "/app/models/nllb-ct2")
 CT2_DEVICE = _env_str("CT2_DEVICE", "cpu")
@@ -133,8 +133,8 @@ CT2_COMPUTE_TYPE = _env_str("CT2_COMPUTE_TYPE", "int8")
 UNIVERSAL_MODEL = _env_str("UNIVERSAL_MODEL", "facebook/nllb-200-distilled-600M")
 CT2_INTRA_THREADS = _env_int("CT2_INTRA_THREADS", 0)
 CT2_INTER_THREADS = _env_int("CT2_INTER_THREADS", 1)
-BODY_CHARS_CHUNK = _env_int("BODY_CHARS_CHUNK", 900)
-MAX_BODY_CHARS = _env_int("MAX_BODY_CHARS", 12000)
+BODY_CHARS_CHUNK = _env_int("BODY_CHARS_CHUNK", 2000)  # Aumentado de 900
+MAX_BODY_CHARS = _env_int("MAX_BODY_CHARS", 80000)  # Aumentado de 12000 para artículos completos
 
 LANG_CODE_MAP = {
     "en": "eng_Latn",
@@ -347,6 +347,26 @@ def translate_texts(src: str, tgt: str, texts: List[str]) -> List[str]:
     return translated
 
 
+# Puntuación de fin de oración para chunking y truncamiento
+SENTENCE_END_CHARS = ".!?;؟؛।။॥।"
+
+def truncate_at_sentence_boundary(text: str, max_len: int) -> str:
+    """Trunca texto en frontera de oración si excede max_len."""
+    if len(text) <= max_len:
+        return text
+    # Buscar la última puntuación de fin de oración dentro del límite
+    search_end = min(len(text), max_len)
+    for i in range(search_end - 1, max(0, search_end - 200), -1):
+        if text[i] in SENTENCE_END_CHARS:
+            return text[:i + 1]
+    # Si no hay frontera clara, cortar en espacio dentro del último 10%
+    cutoff = int(max_len * 0.9)
+    last_space = text.rfind(" ", cutoff, max_len)
+    if last_space > 0:
+        return text[:last_space]
+    return text[:max_len]
+
+
 def split_body_into_chunks(text: str) -> List[str]:
     text = (text or "").strip()
     if len(text) <= BODY_CHARS_CHUNK:
@@ -492,7 +512,7 @@ def process_batch(conn, rows):
             for item in items:
                 body = (item["resumen"] or "").strip()
                 if len(body) > MAX_BODY_CHARS:
-                    body = body[:MAX_BODY_CHARS]
+                    body = truncate_at_sentence_boundary(body, MAX_BODY_CHARS)
                 if body:
                     chunks = split_body_into_chunks(body)
                     flat_chunks.extend(chunks)
