@@ -14,7 +14,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip
 
-RUN pip install --no-cache-dir torch==2.1.0 torchvision==0.16.0 --index-url https://download.pytorch.org/whl/cu118
+# CPU-only PyTorch
+RUN pip install --no-cache-dir torch==2.1.0 torchvision==0.16.0 --index-url https://download.pytorch.org/whl/cpu
 
 RUN pip install --no-cache-dir \
     ctranslate2==3.24.0 \
@@ -30,9 +31,7 @@ RUN find /usr/local/lib/python3.11/site-packages/ctranslate2* \
 
 COPY worker.py /app/worker.py
 
-# CT2_DEVICE y CT2_COMPUTE_TYPE se configuran via variables de entorno
-# Valores por defecto: cuda + float16 (requiere GPU NVIDIA con 6GB+ VRAM)
-# Para CPU: CT2_DEVICE=cpu CT2_COMPUTE_TYPE=int8
+# Valores por defecto: CPU + int8 (sin GPU)
 ENV CT2_DEVICE=${CT2_DEVICE:-cpu}
 ENV CT2_COMPUTE_TYPE=${CT2_COMPUTE_TYPE:-int8}
 

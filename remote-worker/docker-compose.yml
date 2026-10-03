@@ -1,87 +1,56 @@
-# ==================================================================================
-# Remote Worker Docker Compose
-# ==================================================================================
-# Este archivo permite ejecutar workers remotos de forma independiente.
-# No requiere el servidor RSS2 completo, solo conexión a su endpoint WebSocket.
-#
-# Uso:
-#   WORKER_API_KEY="tu-api-key" WORKER_SERVER="wss://tu-servidor.com/ws/worker" \
-#   docker compose up -d
-#
-# O con archivo .env:
-#   cp .env.example .env
-#   # Editar .env con tus valores
-#   docker compose up -d
-# ==================================================================================
+# Remote Translation Workers
+# Ejecutar en un host separado:
+#   docker compose -f docker-compose.remote.yml up -d
 
 services:
-  # ------------------------------------------------------------------------------
-  # Remote Worker GPU (para máquinas con NVIDIA GPU)
-  # ------------------------------------------------------------------------------
-  remote-worker-gpu:
+  remote-worker-1:
     build:
       context: .
       dockerfile: Dockerfile
-    image: rss2-remote-worker:latest
-    container_name: rss2-remote-worker-gpu
+    container_name: rss2_remote_worker_1
     environment:
-      # === REQUERIDO: Configura estas variables ===
-      WORKER_API_KEY: "${WORKER_API_KEY}"
-      WORKER_SERVER: "${WORKER_SERVER:-ws://localhost:8080/ws/worker}"
-      
-      # === OPCIONAL: Personalización ===
-      WORKER_NAME: "${WORKER_NAME:-gpu-worker-1}"
-      CT2_DEVICE: "${CT2_DEVICE:-cuda}"
-      CT2_COMPUTE_TYPE: "${CT2_COMPUTE_TYPE:-float16}"
-      CT2_MODEL_PATH: /app/models/nllb-ct2
-      UNIVERSAL_MODEL: "${UNIVERSAL_MODEL:-facebook/nllb-200-1.3B}"
+      WORKER_NAME: "remote-worker-1"
+      WORKER_API_KEY: "${WORKER_API_KEY_1}"
+      WORKER_SERVER: "ws://${BACKEND_HOST}:8080/ws/worker"
+      CT2_DEVICE: cpu
+      CT2_COMPUTE_TYPE: int8
+      MAX_SRC_TOKENS: 2048
+      MAX_NEW_TOKENS: 2048
+      MAX_BODY_CHARS: 80000
+      BODY_CHARS_CHUNK: 2000
     volumes:
-      - ./models:/app/models
-      - ./hf_cache:/app/hf_cache
-    # Solo activa este profile para workers GPU
-    profiles:
-      - gpu
+      - ./models:/app/models:ro
     restart: unless-stopped
     deploy:
       resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-    networks:
-      - external
+        limits:
+          cpus: '2'
+          memory: 3G
 
-  # ------------------------------------------------------------------------------
-  # Remote Worker CPU (para máquinas sin GPU o testing)
-  # ------------------------------------------------------------------------------
-  remote-worker-cpu:
+  remote-worker-2:
     build:
       context: .
       dockerfile: Dockerfile
-    image: rss2-remote-worker:latest
-    container_name: rss2-remote-worker-cpu
+    container_name: rss2_remote_worker_2
     environment:
-      # === REQUERIDO: Configura estas variables ===
-      WORKER_API_KEY: "${WORKER_API_KEY}"
-      WORKER_SERVER: "${WORKER_SERVER:-ws://localhost:8080/ws/worker}"
-      
-      # === OPCIONAL: Personalización ===
-      WORKER_NAME: "${WORKER_NAME:-cpu-worker-1}"
-      CT2_DEVICE: "cpu"
-      CT2_COMPUTE_TYPE: "${CT2_COMPUTE_TYPE:-int8}"
-      CT2_MODEL_PATH: /app/models/nllb-ct2
-      UNIVERSAL_MODEL: "${UNIVERSAL_MODEL:-facebook/nllb-200-1.3B}"
+      WORKER_NAME: "remote-worker-2"
+      WORKER_API_KEY: "${WORKER_API_KEY_2}"
+      WORKER_SERVER: "ws://${BACKEND_HOST}:8080/ws/worker"
+      CT2_DEVICE: cpu
+      CT2_COMPUTE_TYPE: int8
+      MAX_SRC_TOKENS: 2048
+      MAX_NEW_TOKENS: 2048
+      MAX_BODY_CHARS: 80000
+      BODY_CHARS_CHUNK: 2000
     volumes:
-      - ./models:/app/models
-      - ./hf_cache:/app/hf_cache
-    # Solo activa este profile para workers CPU
-    profiles:
-      - cpu
+      - ./models:/app/models:ro
     restart: unless-stopped
-    networks:
-      - external
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 3G
 
 networks:
-  external:
-    external: true
+  default:
+    name: rss2_remote

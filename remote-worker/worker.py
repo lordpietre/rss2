@@ -45,6 +45,7 @@ MAX_SRC_TOKENS = int(os.environ.get("MAX_SRC_TOKENS", "2048"))
 MAX_NEW_TOKENS = int(os.environ.get("MAX_NEW_TOKENS", "2048"))
 MAX_BODY_CHARS = int(os.environ.get("MAX_BODY_CHARS", "80000"))
 BODY_CHARS_CHUNK = int(os.environ.get("BODY_CHARS_CHUNK", "2000"))
+MAX_SEQ_PER_CALL = int(os.environ.get("MAX_SEQ_PER_CALL", "32"))
 
 LANG_CODE_MAP = {
     "en": "eng_Latn", "es": "spa_Latn", "fr": "fra_Latn", "de": "deu_Latn",
@@ -136,9 +137,9 @@ def translate_texts(src: str, tgt: str, texts: List[str]) -> List[str]:
     target_prefix = [[tgt_code]] * len(sources)
     translated = []
 
-    for i in range(0, len(sources), 32):
+    for i in range(0, len(sources), MAX_SEQ_PER_CALL):
         results = _translator.translate_batch(
-            sources[i:i+32], target_prefix=target_prefix[i:i+32],
+            sources[i:i+MAX_SEQ_PER_CALL], target_prefix=target_prefix[i:i+MAX_SEQ_PER_CALL],
             beam_size=1, max_decoding_length=MAX_NEW_TOKENS,
             repetition_penalty=1.2, no_repeat_ngram_size=2,
         )
