@@ -104,9 +104,12 @@ while [ -z "$API_KEY" ]; do
     fi
 done
 
-# Server URL
-read -p "Backend URL [ws://localhost:8080/ws/worker]: " SERVER_URL
-SERVER_URL="${SERVER_URL:-ws://localhost:8080/ws/worker}"
+# Server URL (NO tiene default - tienes que especificarlo)
+read -p "Backend URL (ej: ws://192.168.1.193:8080/ws/worker): " SERVER_URL
+while [ -z "$SERVER_URL" ]; do
+    echo -e "${RED}Error: Backend URL is required${NC}"
+    read -p "Backend URL (ej: ws://192.168.1.193:8080/ws/worker): " SERVER_URL
+done
 
 # Container name
 read -p "Container name [rss2-worker]: " CONTAINER_NAME
