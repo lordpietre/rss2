@@ -324,6 +324,21 @@ def on_open(ws):
     register()
 
 
+def send_result(ws, result, max_retries=3):
+    """Send result with retries on failure."""
+    job_id = result.get("job_id", "unknown")
+    payload = json.dumps({"type": "result", **result})
+    
+    for attempt in range(max_retries):
+        try:
+            ws.send(payload)
+            return True
+        except Exception as e:
+            LOG.warning(f"Send attempt {attempt + 1}/{max_retries} failed for job {job_id}: {e}")
+            if attempt < max_retries - 1:
+                time.sleep(1)  # Brief wait before retry
+    return False
+
 def on_message(ws, message):
     global _running
     try:
@@ -338,9 +353,14 @@ def on_message(ws, message):
             LOG.error(f"Server error: {msg.get('error')}")
         elif msg_type == "job":
             job = msg.get("job", {})
+            job_id = job.get("id", "unknown")
+            LOG.info(f"Processing job {job_id}: {job.get('lang_from')} -> {job.get('lang_to')}")
             result = process_job(job)
-            ws.send(json.dumps({"type": "result", **result}))
-            _stats["jobs_completed"] += 1
+            if not send_result(ws, result):
+                LOG.error(f"Failed to send result for job {job_id} after retries - job will be reassigned by server")
+                _stats["jobs_failed"] += 1
+            else:
+                _stats["jobs_completed"] += 1
         elif msg_type == "stop":
             LOG.info("Received stop command")
             _running = False

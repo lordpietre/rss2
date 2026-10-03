@@ -1109,3 +1109,511 @@ func RestoreDatabase(c *gin.Context) {
 		"output":   out.String(),
 	})
 }
+
+// DownloadRemoteWorker generates a downloadable package with configured remote workers
+func DownloadRemoteWorker(c *gin.Context) {
+	countStr := c.DefaultQuery("count", "1")
+	count, err := strconv.Atoi(countStr)
+	if err != nil || count < 1 || count > 10 {
+		count = 1
+	}
+
+	serverURL := c.DefaultQuery("server", "")
+	if serverURL == "" {
+		proto := "ws"
+		if c.Request.TLS != nil {
+			proto = "wss"
+		}
+		host := c.Request.Host
+		if strings.HasSuffix(host, ":8080") {
+			host = strings.TrimSuffix(host, ":8080")
+		}
+		serverURL = fmt.Sprintf("%s://%s/ws/worker", proto, host)
+	}
+
+	ctx := c.Request.Context()
+
+	type WorkerInfo struct {
+		ID     int
+		Name   string
+		APIKey string
+	}
+
+	workers := []WorkerInfo{}
+
+	for i := 1; i <= count; i++ {
+		workerName := fmt.Sprintf("remote-worker-%d", i)
+
+		var id int
+		var apiKey string
+
+		err := db.GetPool().QueryRow(ctx, `
+			SELECT id, api_key FROM remote_workers WHERE name = $1
+		`, workerName).Scan(&id, &apiKey)
+
+		if err != nil {
+			apiKey = generateAPIKey()
+			err = db.GetPool().QueryRow(ctx, `
+				INSERT INTO remote_workers (name, api_key, capabilities, status, created_at)
+				VALUES ($1, $2, 'cpu', 'offline', NOW())
+				RETURNING id
+			`, workerName, apiKey).Scan(&id)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create worker: " + err.Error()})
+				return
+			}
+		}
+
+		workers = append(workers, WorkerInfo{
+			ID:     id,
+			Name:   workerName,
+			APIKey: apiKey,
+		})
+	}
+
+	buf := new(bytes.Buffer)
+	zipWriter := zip.NewWriter(buf)
+
+	files := map[string]string{
+		"worker.py":          generateWorkerPy(),
+		"Dockerfile":         generateWorkerDockerfile(),
+		"docker-compose.yml": generateDockerCompose(count, serverURL),
+		"deploy.sh":          generateDeployScript(),
+		"README.md":          generateReadme(),
+	}
+
+	if count == 1 {
+		files[".env"] = generateEnvFile(workers[0].APIKey, serverURL)
+	}
+
+	for filename, content := range files {
+		w, err := zipWriter.Create(filename)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create zip: " + err.Error()})
+			return
+		}
+		w.Write([]byte(content))
+	}
+
+	zipWriter.Close()
+
+	filename := fmt.Sprintf("rss2-remote-workers-%d.zip", count)
+
+	c.Header("Content-Type", "application/zip")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+	c.Data(http.StatusOK, "application/zip", buf.Bytes())
+}
+
+func generateAPIKey() string {
+	b := make([]byte, 16)
+	for i := range b {
+		b[i] = byte(time.Now().UnixNano() % 256)
+	}
+	return fmt.Sprintf("%x", b)
+}
+
+func generateWorkerPy() string {
+	return `#!/usr/bin/env python3
+"""
+Remote Translation Worker para RSS2.
+Se conecta al backend por WebSocket y traduce noticias.
+Traduce títulos, resúmenes y contenido completo.
+"""
+
+import os
+import sys
+import time
+import json
+import logging
+import re
+from typing import List
+
+import websocket
+
+import ctranslate2
+from transformers import AutoTokenizer
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s: %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+LOG = logging.getLogger("remote-translator")
+
+WORKER_NAME = os.environ.get("WORKER_NAME", "remote-worker")
+WORKER_API_KEY = os.environ.get("WORKER_API_KEY", "")
+WORKER_SERVER = os.environ.get("WORKER_SERVER", "ws://localhost:8080/ws/worker")
+
+DEVICE = os.environ.get("CT2_DEVICE", "cpu")
+MODEL_PATH = os.environ.get("CT2_MODEL_PATH", "/app/models/nllb-ct2")
+COMPUTE_TYPE = os.environ.get("CT2_COMPUTE_TYPE", "int8")
+UNIVERSAL_MODEL = os.environ.get("UNIVERSAL_MODEL", "facebook/nllb-200-distilled-600M")
+
+MAX_SRC_TOKENS = int(os.environ.get("MAX_SRC_TOKENS", "2048"))
+MAX_NEW_TOKENS = int(os.environ.get("MAX_NEW_TOKENS", "2048"))
+MAX_BODY_CHARS = int(os.environ.get("MAX_BODY_CHARS", "80000"))
+BODY_CHARS_CHUNK = int(os.environ.get("BODY_CHARS_CHUNK", "2000"))
+MAX_SEQ_PER_CALL = int(os.environ.get("MAX_SEQ_PER_CALL", "32"))
+
+LANG_CODE_MAP = {
+    "en": "eng_Latn", "es": "spa_Latn", "fr": "fra_Latn", "de": "deu_Latn",
+    "it": "ita_Latn", "pt": "por_Latn", "nl": "nld_Latn", "sv": "swe_Latn",
+    "da": "dan_Latn", "fi": "fin_Latn", "no": "nob_Latn", "pl": "pol_Latn",
+    "cs": "ces_Latn", "sk": "slk_Latn", "hu": "hun_Latn", "ro": "ron_Latn",
+    "el": "ell_Grek", "ru": "rus_Cyrl", "uk": "ukr_Cyrl", "tr": "tur_Latn",
+    "ar": "arb_Arab", "fa": "pes_Arab", "he": "heb_Hebr", "zh": "zho_Hans",
+    "ja": "jpn_Jpan", "ko": "kor_Hang", "vi": "vie_Latn", "lt": "lit_Latn",
+    "bg": "bul_Cyrl", "sq": "als_Latn", "so": "som_Latn", "sk": "slk_Latn",
+}
+
+SENTENCE_END_CHARS = set(".!?;؟؛।။॥।")
+
+_tokenizer = None
+_translator = None
+_ws = None
+_reconnect_delay = 5
+_running = True
+_stats = {"jobs_completed": 0, "jobs_failed": 0}
+
+def ensure_model():
+    global _tokenizer, _translator
+    if _translator:
+        return
+    model_bin = os.path.join(MODEL_PATH, "model.bin")
+    if not os.path.exists(model_bin):
+        LOG.info(f"Model not found, converting...")
+        convert_model()
+    LOG.info(f"Loading model from {MODEL_PATH}")
+    _translator = ctranslate2.Translator(MODEL_PATH, device=DEVICE, compute_type=COMPUTE_TYPE)
+    _tokenizer = AutoTokenizer.from_pretrained(UNIVERSAL_MODEL)
+    LOG.info("Model loaded successfully")
+
+def convert_model():
+    import subprocess
+    os.makedirs(MODEL_PATH, exist_ok=True)
+    cmd = ["ct2-transformers-converter", "--model", UNIVERSAL_MODEL,
+           "--output_dir", MODEL_PATH, "--quantization", COMPUTE_TYPE, "--force"]
+    LOG.info(f"Converting {UNIVERSAL_MODEL}...")
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
+    if result.returncode != 0:
+        LOG.error(f"Conversion failed: {result.stderr}")
+        raise RuntimeError("Model conversion failed")
+
+def translate_texts(src, tgt, texts):
+    if not texts:
+        return []
+    ensure_model()
+    clean = [(t or "").strip() for t in texts]
+    if all(not t for t in clean):
+        return ["" for _ in clean]
+    src_code = LANG_CODE_MAP.get(src, f"{src}_Latn")
+    tgt_code = LANG_CODE_MAP.get(tgt, "spa_Latn")
+    try:
+        _tokenizer.src_lang = src_code
+    except:
+        pass
+    sources = []
+    for t in clean:
+        if t:
+            ids = _tokenizer.encode(t, truncation=True, max_length=MAX_SRC_TOKENS)
+            tokens = _tokenizer.convert_ids_to_tokens(ids)
+            sources.append(tokens)
+        else:
+            sources.append([])
+    target_prefix = [[tgt_code]] * len(sources)
+    translated = []
+    for i in range(0, len(sources), MAX_SEQ_PER_CALL):
+        results = _translator.translate_batch(
+            sources[i:i+MAX_SEQ_PER_CALL],
+            target_prefix=target_prefix[i:i+MAX_SEQ_PER_CALL],
+            beam_size=1, max_decoding_length=MAX_NEW_TOKENS,
+            repetition_penalty=1.2, no_repeat_ngram_size=2)
+        for result in results:
+            try:
+                if result.hypotheses and len(result.hypotheses) > 0:
+                    hyp = result.hypotheses[0]
+                    if isinstance(hyp, list) and len(hyp) > 0:
+                        first_hyp = hyp[0]
+                        if isinstance(first_hyp, dict) and "token_ids" in first_hyp:
+                            tokens = first_hyp["token_ids"]
+                            text = _tokenizer.decode(tokens)
+                            translated.append(text.strip())
+                        elif isinstance(first_hyp, str):
+                            token_strings = hyp[1:] if len(hyp) > 1 else []
+                            if token_strings:
+                                text = _tokenizer.convert_tokens_to_string(token_strings)
+                                translated.append(text.strip())
+                            else:
+                                translated.append("")
+                        else:
+                            translated.append("")
+                else:
+                    translated.append("")
+            except:
+                translated.append("")
+    return translated
+
+def truncate_at_sentence_boundary(text, max_len):
+    if len(text) <= max_len:
+        return text
+    search_end = min(len(text), max_len)
+    for i in range(search_end - 1, max(0, search_end - 200), -1):
+        if text[i] in SENTENCE_END_CHARS:
+            return text[:i + 1]
+    cutoff = int(max_len * 0.9)
+    last_space = text.rfind(" ", cutoff, max_len)
+    if last_space > 0:
+        return text[:last_space]
+    return text[:max_len]
+
+def split_into_chunks(text):
+    text = (text or "").strip()
+    if len(text) <= BODY_CHARS_CHUNK:
+        return [text] if text else []
+    parts = re.split(r"(\n\n+|(?<=[\.\!\?؛؟।။॥।])\s+)", text)
+    chunks, current = [], ""
+    for part in parts:
+        if not part:
+            continue
+        if len(current) + len(part) <= BODY_CHARS_CHUNK:
+            current += part
+        else:
+            if current.strip():
+                chunks.append(current.strip())
+            current = part
+    if current.strip():
+        chunks.append(current.strip())
+    return chunks if chunks else [text]
+
+def translate_long_text(src, tgt, body):
+    body = (body or "").strip()
+    if not body:
+        return ""
+    if len(body) > MAX_BODY_CHARS:
+        body = truncate_at_sentence_boundary(body, MAX_BODY_CHARS)
+    chunks = split_into_chunks(body)
+    if len(chunks) == 1:
+        return translate_texts(src, tgt, [body])[0]
+    translated_chunks = translate_texts(src, tgt, chunks)
+    return join_chunks(translated_chunks)
+
+def join_chunks(chunks):
+    if not chunks:
+        return ""
+    if len(chunks) == 1:
+        return chunks[0]
+    result = chunks[0]
+    for chunk in chunks[1:]:
+        if not chunk:
+            continue
+        starts_lower = chunk and chunk[0].islower()
+        prev_ends_lower = result and result[-1].islower() if result else False
+        if prev_ends_lower and starts_lower:
+            result += " " + chunk
+        elif result and result[-1] in SENTENCE_END_CHARS:
+            result += " " + chunk
+        else:
+            result += " " + chunk
+    return result
+
+def process_job(job):
+    job_id = job.get("id")
+    lang_from = job.get("lang_from", "en")
+    lang_to = job.get("lang_to", "es")
+    title = job.get("title", "")
+    summary = job.get("summary", "")
+    content = job.get("content", "")
+    LOG.info(f"Processing job {job_id}: {lang_from} -> {lang_to}")
+    if lang_from == lang_to:
+        return {"job_id": job_id, "title_trad": title, "summary_trad": summary, "contenido_trad": content}
+    try:
+        title_tr = translate_texts(lang_from, lang_to, [title])[0] if title else title
+        summary_tr = translate_long_text(lang_from, lang_to, summary) if summary else summary
+        content_tr = translate_long_text(lang_from, lang_to, content) if content else content
+        return {"job_id": job_id, "title_trad": title_tr, "summary_trad": summary_tr, "contenido_trad": content_tr}
+    except Exception as e:
+        LOG.error(f"Job {job_id} failed: {e}")
+        return {"job_id": job_id, "error": str(e)}
+
+def connect_ws():
+    global _ws, _reconnect_delay
+    try:
+        ws_url = f"{WORKER_SERVER}?api_key={WORKER_API_KEY}"
+        _ws = websocket.WebSocketApp(ws_url,
+            on_open=on_open, on_message=on_message,
+            on_error=on_error, on_close=on_close)
+        LOG.info(f"Connecting to {ws_url}")
+        _ws.run_forever()
+    except Exception as e:
+        LOG.error(f"WebSocket error: {e}")
+    _reconnect_delay = min(_reconnect_delay * 2, 60)
+    LOG.info(f"Reconnecting in {_reconnect_delay}s...")
+    time.sleep(_reconnect_delay)
+    _reconnect_delay = 5
+    connect_ws()
+
+def on_open(ws):
+    LOG.info("WebSocket connected")
+    ws.send(json.dumps({"type": "register", "worker_name": WORKER_NAME, "capabilities": "cpu"}))
+    LOG.info(f"Registered as {WORKER_NAME}")
+
+def on_message(ws, message):
+    global _running
+    try:
+        msg = json.loads(message)
+        msg_type = msg.get("type")
+        if msg_type == "ping":
+            ws.send(json.dumps({"type": "pong"}))
+        elif msg_type == "job":
+            job = msg.get("job", {})
+            result = process_job(job)
+            ws.send(json.dumps({"type": "result", **result}))
+            _stats["jobs_completed"] += 1
+        elif msg_type == "stop":
+            _running = False
+    except Exception as e:
+        LOG.error(f"Error: {e}")
+
+def on_error(ws, error):
+    LOG.error(f"WebSocket error: {error}")
+
+def on_close(ws, close_status_code, close_msg):
+    LOG.info(f"Closed: {close_status_code}")
+
+def main():
+    LOG.info(f"Starting {WORKER_NAME}")
+    ensure_model()
+    connect_ws()
+
+if __name__ == "__main__":
+    main()
+`
+}
+
+func generateWorkerDockerfile() string {
+	return `FROM python:3.11-slim-bookworm
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    patchelf gcc git curl wget \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    TOKENIZERS_PARALLELISM=false \
+    HF_HOME=/root/.cache/huggingface
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir torch==2.1.0 torchvision==0.16.0 --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir \
+    ctranslate2==3.24.0 \
+    sentencepiece \
+    transformers==4.36.0 \
+    protobuf==3.20.3 \
+    "numpy<2" \
+    websocket-client
+
+COPY worker.py /app/worker.py
+
+ENV CT2_DEVICE=${CT2_DEVICE:-cpu}
+ENV CT2_COMPUTE_TYPE=${CT2_COMPUTE_TYPE:-int8}
+
+CMD ["python", "/app/worker.py"]
+`
+}
+
+func generateDockerCompose(count int, serverURL string) string {
+	services := `version: '3.8'
+
+services:
+`
+	for i := 1; i <= count; i++ {
+		services += fmt.Sprintf(`  worker-%d:
+    build: .
+    container_name: rss2-worker-%d
+    environment:
+      WORKER_NAME: "worker-%d"
+      WORKER_API_KEY: "${WORKER_API_KEY_%d}"
+      WORKER_SERVER: "%s"
+      CT2_DEVICE: "cpu"
+      CT2_COMPUTE_TYPE: "int8"
+      MAX_SRC_TOKENS: 2048
+      MAX_NEW_TOKENS: 2048
+      MAX_BODY_CHARS: 80000
+      BODY_CHARS_CHUNK: 2000
+      MAX_SEQ_PER_CALL: 32
+    volumes:
+      - ./models:/app/models
+    restart: unless-stopped
+`, i, i, i, i, serverURL)
+	}
+
+	services += `
+networks:
+  default:
+    name: rss2_remote
+`
+	return services
+}
+
+func generateDeployScript() string {
+	return `#!/bin/bash
+set -e
+
+echo "=== RSS2 Remote Worker Deployment ==="
+echo ""
+
+echo "Building Docker image..."
+docker build --no-cache -t rss2-remote-worker:latest .
+
+echo "Creating models directory..."
+mkdir -p models
+
+echo "Starting workers..."
+docker compose up -d
+
+echo ""
+echo "=== Deployed successfully! ==="
+echo "View logs: docker compose logs -f"
+echo "Stop: docker compose down"
+`
+}
+
+func generateEnvFile(apiKey, serverURL string) string {
+	return fmt.Sprintf(`WORKER_API_KEY_1=%s
+SERVER_URL=%s
+`, apiKey, serverURL)
+}
+
+func generateReadme() string {
+	return `# RSS2 Remote Workers
+
+Downloaded from RSS2 Admin Panel
+
+## Quick Start
+
+1. Extract the zip file
+2. Run: chmod +x deploy.sh && ./deploy.sh
+3. Or: docker compose up -d
+
+## Configuration
+
+Edit .env or docker-compose.yml to adjust:
+- WORKER_API_KEY: Your API key  
+- SERVER_URL: WebSocket URL to backend
+
+## Files Included
+
+- worker.py - Python translation worker
+- Dockerfile - Docker image definition
+- docker-compose.yml - Multi-worker setup
+- deploy.sh - Deployment script
+
+## Requirements
+
+- Docker
+- 4GB RAM per worker
+- CPU with AVX2 support
+`
+}

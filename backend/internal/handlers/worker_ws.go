@@ -300,14 +300,38 @@ func StartJobAssigner() {
 					workersMu.RLock()
 				}
 				workersMu.RUnlock()
+			}
+		}
+	}()
+}
 
+// StartStaleJobCleanup releases jobs that have been stuck in "assigned" status
+// for too long (worker disconnected or crashed). Runs independently.
+func StartStaleJobCleanup() {
+	go func() {
+		// Check every 30 seconds for stale jobs
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
 				ctx := context.Background()
-				db.GetPool().Exec(ctx, `
-					UPDATE traducciones 
+				// Release jobs assigned more than 2 minutes ago (worker likely crashed/disconnected)
+				result, err := db.GetPool().Exec(ctx, `
+					UPDATE traducciones
 					SET status = 'pending', worker_id = NULL, assigned_at = NULL
-					WHERE status = 'assigned' 
-					  AND assigned_at < NOW() - INTERVAL '10 minutes'
+					WHERE status = 'assigned'
+					  AND assigned_at < NOW() - INTERVAL '2 minutes'
 				`)
+				if err != nil {
+					log.Printf("[StaleJobCleanup] Error: %v", err)
+					continue
+				}
+				rowsAffected, _ := result.RowsAffected()
+				if rowsAffected > 0 {
+					log.Printf("[StaleJobCleanup] Released %d stale jobs", rowsAffected)
+				}
 			}
 		}
 	}()

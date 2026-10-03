@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/rss2/backend/docs"
@@ -404,6 +406,7 @@ func Main() {
 			admin.DELETE("/workers/remote/:id", handlers.DeleteRemoteWorker)
 			admin.POST("/workers/remote/:id/toggle", handlers.ToggleRemoteWorker)
 			admin.POST("/workers/remote/:id/regenerate-key", handlers.RegenerateAPIKey)
+			admin.GET("/workers/download", handlers.DownloadRemoteWorker)
 		}
 
 		r.GET("/ws/worker", handlers.HandleWorkerWS)
@@ -420,15 +423,25 @@ func Main() {
 	port := cfg.ServerPort
 	addr := fmt.Sprintf(":%s", port)
 
+	// Create HTTP server with proper timeouts for WebSocket connections
+	srv := &http.Server{
+		Addr:         addr,
+		Handler:      r,
+		ReadTimeout:  60 * time.Second,  // Max time to read entire request
+		WriteTimeout: 120 * time.Second, // Max time to write response (high for WebSocket)
+		IdleTimeout:  180 * time.Second, // Max time for idle connections
+	}
+
 	go func() {
 		log.Info().Str("addr", addr).Msg("Server starting")
-		if err := r.Run(addr); err != nil {
+		if err := srv.ListenAndServe(); err != nil {
 			log.Fatal().Err(err).Msg("Failed to start server")
 		}
 	}()
 
 	handlers.StartJobAssigner()
 	handlers.StartAlertScanner()
+	handlers.StartStaleJobCleanup() // Cleanup stuck jobs from disconnected workers
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
