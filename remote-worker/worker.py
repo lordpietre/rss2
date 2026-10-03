@@ -95,7 +95,7 @@ def convert_model():
     os.makedirs(MODEL_PATH, exist_ok=True)
     cmd = [
         "ct2-transformers-converter", "--model", UNIVERSAL_MODEL,
-        "--output_dir", MODEL_PATH, "--quantization", COMPUTE_TYPE,
+        "--output_dir", MODEL_PATH, "--quantization", COMPUTE_TYPE, "--force",
     ]
     LOG.info(f"Converting {UNIVERSAL_MODEL} to CTranslate2...")
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)

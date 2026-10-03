@@ -19,7 +19,7 @@ services:
       MAX_BODY_CHARS: 80000
       BODY_CHARS_CHUNK: 2000
     volumes:
-      - ./models:/app/models:ro
+      - ./models:/app/models
     restart: unless-stopped
     deploy:
       resources:
@@ -43,7 +43,7 @@ services:
       MAX_BODY_CHARS: 80000
       BODY_CHARS_CHUNK: 2000
     volumes:
-      - ./models:/app/models:ro
+      - ./models:/app/models
     restart: unless-stopped
     deploy:
       resources:
