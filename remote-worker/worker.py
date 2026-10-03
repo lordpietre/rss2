@@ -213,10 +213,12 @@ def split_into_chunks(text: str) -> List[str]:
 
 
 def translate_long_text(src: str, tgt: str, body: str) -> str:
+    """Traduce texto largo dividiendo en chunks."""
     body = (body or "").strip()
     if not body:
         return ""
 
+    # Truncar si es muy largo
     if len(body) > MAX_BODY_CHARS:
         body = truncate_at_sentence_boundary(body, MAX_BODY_CHARS)
 
@@ -224,11 +226,8 @@ def translate_long_text(src: str, tgt: str, body: str) -> str:
     if len(chunks) == 1:
         return translate_texts(src, tgt, [body])[0]
 
-    translated_chunks = []
-    for ch in chunks:
-        tr = translate_texts(src, tgt, [ch])[0]
-        translated_chunks.append(tr)
-
+    # Traducir TODOS los chunks en una llamada (como el worker local)
+    translated_chunks = translate_texts(src, tgt, chunks)
     return join_chunks(translated_chunks)
 
 
