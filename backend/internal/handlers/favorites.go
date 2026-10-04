@@ -576,29 +576,64 @@ func GetListTags(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"tags": tags})
 }
 
-// --- Related News Search (based on list keywords) ---
+// --- Related News Search (based on list keywords, auto-updated from tags) ---
 
 func GetListRelatedNews(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	listID := c.Param("id")
 	ctx := c.Request.Context()
 
-	// Verify ownership and get keywords
+	// Verify ownership and get current keywords
 	var ownerID int
-	var keywords string
-	err := db.GetPool().QueryRow(ctx, `SELECT user_id, keywords FROM user_lists WHERE id = $1`, listID).Scan(&ownerID, &keywords)
+	var currentKeywords string
+	err := db.GetPool().QueryRow(ctx, `SELECT user_id, keywords FROM user_lists WHERE id = $1`, listID).Scan(&ownerID, &currentKeywords)
 	if err != nil || ownerID != userID {
 		c.JSON(http.StatusNotFound, gin.H{"error": "list not found"})
 		return
 	}
 
+	// Get top 10 tags from news in the list to use as keywords
+	tagsRows, err := db.GetPool().Query(ctx, `
+		SELECT t.valor, COUNT(*) as cnt
+		FROM user_list_items uli
+		JOIN tags_noticia tn ON uli.noticia_id = tn.noticia_id
+		JOIN tags t ON tn.tag_id = t.id
+		WHERE uli.list_id = $1
+		GROUP BY t.valor
+		ORDER BY cnt DESC
+		LIMIT 10
+	`, listID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer tagsRows.Close()
+
+	topTags := []string{}
+	for tagsRows.Next() {
+		var valor string
+		var cnt int
+		if err := tagsRows.Scan(&valor, &cnt); err != nil {
+			continue
+		}
+		topTags = append(topTags, valor)
+	}
+
+	// Build keywords string from top tags
+	keywords := strings.Join(topTags, ", ")
+
+	// Auto-update keywords if we have tags and they're different from current
+	if len(topTags) > 0 && keywords != currentKeywords {
+		db.GetPool().Exec(ctx, `UPDATE user_lists SET keywords = $1, updated_at = NOW() WHERE id = $2`, keywords, listID)
+	}
+
 	if keywords == "" {
-		c.JSON(http.StatusOK, gin.H{"news": []map[string]any{}, "message": "no keywords set"})
+		c.JSON(http.StatusOK, gin.H{"news": []map[string]any{}, "message": "no tags found in list", "keywords_updated": len(topTags) > 0})
 		return
 	}
 
 	// Search news by keywords using full-text search
-	searchTerms := strings.Split(keywords, ",")
+	searchTerms := strings.Split(keywords, ", ")
 	for i := range searchTerms {
 		searchTerms[i] = strings.TrimSpace(searchTerms[i])
 	}
@@ -666,7 +701,11 @@ func GetListRelatedNews(c *gin.Context) {
 		news = append(news, item)
 	}
 
-	c.JSON(http.StatusOK, gin.H{"news": news, "keywords": keywords})
+	c.JSON(http.StatusOK, gin.H{
+		"news":            news,
+		"keywords":        keywords,
+		"keywords_auto":   true,
+	})
 }
 
 // --- Suggested News for Sidebar (based on user's lists keywords) ---
