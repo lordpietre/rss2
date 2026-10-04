@@ -4,11 +4,13 @@ import { X } from 'lucide-react'
 interface CreateListModalProps {
   isOpen: boolean
   onClose: () => void
-  onCreate: (name: string) => Promise<void>
+  onCreate: (name: string, keywords?: string) => Promise<void>
   mode?: 'create' | 'add-to'
   existingLists?: Array<{ id: number; name: string }>
   selectedListId?: number
   onSelectList?: (id: number) => void
+  initialName?: string
+  initialKeywords?: string
 }
 
 export function CreateListModal({
@@ -19,8 +21,11 @@ export function CreateListModal({
   existingLists = [],
   selectedListId,
   onSelectList,
+  initialName = '',
+  initialKeywords = '',
 }: CreateListModalProps) {
-  const [name, setName] = useState('')
+  const [name, setName] = useState(initialName)
+  const [keywords, setKeywords] = useState(initialKeywords)
   const [creating, setCreating] = useState(false)
 
   if (!isOpen) return null
@@ -28,11 +33,12 @@ export function CreateListModal({
   const handleCreate = async () => {
     if (!name.trim()) return
     setCreating(true)
-    console.log('CreateListModal: calling onCreate with:', name.trim())
+    console.log('CreateListModal: calling onCreate with:', name.trim(), 'keywords:', keywords.trim())
     try {
-      await onCreate(name.trim())
+      await onCreate(name.trim(), keywords.trim())
       console.log('CreateListModal: onCreate completed')
       setName('')
+      setKeywords('')
       onClose()
     } catch (err) {
       console.error('Error creating list:', err)
@@ -95,20 +101,28 @@ export function CreateListModal({
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
                 O crear nueva lista
               </label>
-              <div className="flex gap-2">
+              <div className="space-y-2">
                 <input
                   type="text"
                   value={name}
                   onChange={e => setName(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="Nombre de la lista..."
-                  className="input flex-1"
+                  className="input w-full"
                   autoFocus
+                />
+                <input
+                  type="text"
+                  value={keywords}
+                  onChange={e => setKeywords(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Palabras clave (separadas por comas)..."
+                  className="input w-full"
                 />
                 <button
                   onClick={handleCreate}
                   disabled={!name.trim() || creating}
-                  className="btn-primary disabled:opacity-50"
+                  className="btn-primary w-full disabled:opacity-50"
                 >
                   {creating ? 'Creando...' : 'Crear'}
                 </button>
@@ -150,6 +164,20 @@ export function CreateListModal({
             className="input w-full mb-4"
             autoFocus
           />
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
+            Palabras clave <span className="text-gray-400 font-normal">(separadas por comas)</span>
+          </label>
+          <input
+            type="text"
+            value={keywords}
+            onChange={e => setKeywords(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="ej: Biden, elecciones, Estados Unidos"
+            className="input w-full mb-4"
+          />
+          <p className="text-xs text-gray-500 mb-4">
+            El sistema buscará noticias relacionadas con estas palabras clave automáticamente
+          </p>
           <div className="flex gap-3">
             <button onClick={onClose} className="flex-1 btn-secondary">
               Cancelar

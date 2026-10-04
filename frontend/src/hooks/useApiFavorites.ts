@@ -5,9 +5,16 @@ import { News } from '../services/api'
 interface SavedList {
   id: number
   name: string
+  keywords: string
   created_at: string
   updated_at: string
   item_count: number
+}
+
+interface ListTag {
+  valor: string
+  tipo: string
+  count: number
 }
 
 interface SavedSearch {
@@ -92,16 +99,19 @@ export function useApiLists() {
     fetchLists()
   }, [fetchLists])
 
-  const createList = useCallback(async (name: string): Promise<number> => {
-    console.log('createList: calling API with name:', name)
-    const res = await api.post('/lists', { name })
+  const createList = useCallback(async (name: string, keywords?: string): Promise<number> => {
+    console.log('createList: calling API with name:', name, 'keywords:', keywords)
+    const res = await api.post('/lists', { name, keywords: keywords || '' })
     console.log('createList: API response:', res.data)
     await fetchLists()
     return res.data.id as number
   }, [fetchLists])
 
-  const updateList = useCallback(async (id: number, name: string) => {
-    await api.put(`/lists/${id}`, { name })
+  const updateList = useCallback(async (id: number, name?: string, keywords?: string) => {
+    const data: { name?: string; keywords?: string } = {}
+    if (name !== undefined) data.name = name
+    if (keywords !== undefined) data.keywords = keywords
+    await api.put(`/lists/${id}`, data)
     await fetchLists()
   }, [fetchLists])
 
@@ -138,7 +148,55 @@ export function useApiLists() {
     }
   }, [])
 
-  return { lists, loading, createList, updateList, deleteList, addToList, removeFromList, getListItems, refresh: fetchLists }
+  const getListTags = useCallback(async (listId: number): Promise<ListTag[]> => {
+    try {
+      const res = await api.get(`/lists/${listId}/tags`)
+      return res.data.tags || []
+    } catch (err) {
+      console.error('Failed to fetch list tags:', err)
+      return []
+    }
+  }, [])
+
+  const getListRelatedNews = useCallback(async (listId: number): Promise<News[]> => {
+    try {
+      const res = await api.get(`/lists/${listId}/related`)
+      return res.data.news || []
+    } catch (err) {
+      console.error('Failed to fetch related news:', err)
+      return []
+    }
+  }, [])
+
+  return { lists, loading, createList, updateList, deleteList, addToList, removeFromList, getListItems, getListTags, getListRelatedNews, refresh: fetchLists }
+}
+
+// --- Suggested News (for sidebar) ---
+export function useSuggestedNews() {
+  const [suggestedNews, setSuggestedNews] = useState<News[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const fetchSuggestedNews = useCallback(async () => {
+    try {
+      const res = await api.get('/lists/suggested')
+      setSuggestedNews(res.data.news || [])
+    } catch (err) {
+      console.error('Failed to fetch suggested news:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (token) {
+      fetchSuggestedNews()
+    } else {
+      setLoading(false)
+    }
+  }, [fetchSuggestedNews])
+
+  return { suggestedNews, loading, refresh: fetchSuggestedNews }
 }
 
 // --- Saved Searches ---

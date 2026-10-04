@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { News } from '../services/api'
-import { Heart, Trash2, ExternalLink, Calendar, Newspaper, Search, Play, Edit2, Check, X, FolderPlus, Folder, Plus, Minus, Globe } from 'lucide-react'
+import { Heart, Trash2, ExternalLink, Calendar, Newspaper, Search, Play, Edit2, Check, X, FolderPlus, Folder, Plus, Minus, Globe, Lightbulb, Sparkles } from 'lucide-react'
 import { useNavigate, Link } from 'react-router-dom'
 import { CreateListModal } from '../components/CreateListModal'
 import { NewsCard } from '../components/ui/NewsCard'
+import { TagCloud } from '../components/ui/TagCloud'
 import { useApiFavorites, useApiLists, useApiSavedSearches } from '../hooks/useApiFavorites'
 
 type Tab = 'news' | 'lists' | 'searches'
@@ -147,8 +148,8 @@ function FavoriteCard({ news, onRemove, onAddToList }: {
 
 // --- ListCard ---
 function ListCard({ list, onOpen, onDelete }: {
-  list: { id: number; name: string; item_count: number }
-  onOpen: (id: number, name: string) => void
+  list: { id: number; name: string; keywords?: string; item_count: number }
+  onOpen: (id: number, name: string, keywords?: string) => void
   onDelete: (id: number) => void
 }) {
   const [editing, setEditing] = useState(false)
@@ -163,17 +164,22 @@ function ListCard({ list, onOpen, onDelete }: {
             <div className="flex items-center gap-1 flex-1">
               <input type="text" value={editName} onChange={e => setEditName(e.target.value)}
                 onKeyDown={e => {
-                  if (e.key === 'Enter') { onOpen(list.id, editName); setEditing(false) }
+                  if (e.key === 'Enter') { onOpen(list.id, editName, list.keywords); setEditing(false) }
                   if (e.key === 'Escape') setEditing(false)
                 }}
                 className="input py-1 px-2 text-sm flex-1" autoFocus />
-              <button onClick={() => { onOpen(list.id, editName); setEditing(false) }} className="p-1 text-green-600"><Check className="h-4 w-4" /></button>
+              <button onClick={() => { onOpen(list.id, editName, list.keywords); setEditing(false) }} className="p-1 text-green-600"><Check className="h-4 w-4" /></button>
               <button onClick={() => setEditing(false)} className="p-1 text-gray-500"><X className="h-4 w-4" /></button>
             </div>
           ) : (
-            <button onClick={() => onOpen(list.id, list.name)} className="flex-1 text-left">
+            <button onClick={() => onOpen(list.id, list.name, list.keywords)} className="flex-1 text-left">
               <span className="font-semibold text-gray-900 hover:text-primary-600">{list.name}</span>
               <span className="text-sm text-gray-500 ml-2">{list.item_count} noticias</span>
+              {list.keywords && (
+                <span className="ml-2 text-xs text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full">
+                  ✨
+                </span>
+              )}
             </button>
           )}
         </div>
@@ -186,21 +192,55 @@ function ListCard({ list, onOpen, onDelete }: {
           </button>
         </div>
       </div>
+      {list.keywords && !editing && (
+        <p className="text-xs text-gray-500 mt-2 truncate">{list.keywords}</p>
+      )}
     </div>
   )
 }
 
 // --- ListDetailView ---
-function ListDetailView({ listId, listName, news, onClose, onRemoveNews, onRename }: {
+interface ListTag {
+  valor: string
+  tipo: string
+  count: number
+}
+
+function ListDetailView({ 
+  listId, 
+  listName, 
+  keywords,
+  news, 
+  onClose, 
+  onRemoveNews, 
+  onRename,
+  onUpdateKeywords,
+  tags = [],
+  relatedNews = [],
+  onAddRelatedNews,
+}: {
   listId: number
   listName: string
+  keywords: string
   news: News[]
   onClose: () => void
   onRemoveNews: (newsId: string) => void
   onRename: (name: string) => void
+  onUpdateKeywords: (keywords: string) => void
+  tags?: ListTag[]
+  relatedNews?: News[]
+  onAddRelatedNews?: (news: News) => void
 }) {
   const [editing, setEditing] = useState(false)
   const [editName, setEditName] = useState(listName)
+  const [editingKeywords, setEditingKeywords] = useState(false)
+  const [editKeywords, setEditKeywords] = useState(keywords)
+  const [showRelated, setShowRelated] = useState(false)
+
+  const handleSaveKeywords = () => {
+    onUpdateKeywords(editKeywords)
+    setEditingKeywords(false)
+  }
 
   return (
     <div>
@@ -228,6 +268,94 @@ function ListDetailView({ listId, listName, news, onClose, onRemoveNews, onRenam
         <span className="text-gray-500">{news.length} noticias</span>
       </div>
 
+      {/* Keywords Section */}
+      <div className="card p-4 mb-6 bg-gradient-to-r from-primary-50 to-blue-50">
+        <div className="flex items-center gap-2 mb-3">
+          <Sparkles className="h-5 w-5 text-primary-600" />
+          <span className="font-semibold text-gray-900">Palabras clave</span>
+          {editingKeywords ? (
+            <div className="flex items-center gap-2 ml-auto">
+              <input
+                type="text"
+                value={editKeywords}
+                onChange={e => setEditKeywords(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleSaveKeywords(); if (e.key === 'Escape') setEditingKeywords(false) }}
+                placeholder=" palabra1, palabra2, palabra3"
+                className="input py-1 px-2 text-sm flex-1"
+                autoFocus
+              />
+              <button onClick={handleSaveKeywords} className="p-1 text-green-600"><Check className="h-4 w-4" /></button>
+              <button onClick={() => setEditingKeywords(false)} className="p-1 text-gray-500"><X className="h-4 w-4" /></button>
+            </div>
+          ) : (
+            <>
+              <button onClick={() => { setEditKeywords(keywords); setEditingKeywords(true) }} className="ml-auto p-1 text-gray-400 hover:text-gray-600">
+                <Edit2 className="h-4 w-4" />
+              </button>
+            </>
+          )}
+        </div>
+        {keywords ? (
+          <p className="text-sm text-gray-600">{keywords}</p>
+        ) : (
+          <p className="text-sm text-gray-400 italic">No hay palabras clave configuradas</p>
+        )}
+        <p className="text-xs text-gray-500 mt-1">El sistema busca noticias relacionadas automáticamente</p>
+      </div>
+
+      {/* Tags Cloud Section */}
+      {tags.length > 0 && (
+        <div className="card p-4 mb-6">
+          <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <span>🏷️</span> Etiquetas de la lista
+          </h3>
+          <TagCloud tags={tags} />
+        </div>
+      )}
+
+      {/* Related News Section */}
+      {relatedNews.length > 0 && (
+        <div className="card p-4 mb-6 border-2 border-dashed border-primary-200 bg-primary-50/30">
+          <button
+            onClick={() => setShowRelated(!showRelated)}
+            className="flex items-center gap-2 w-full text-left"
+          >
+            <Lightbulb className="h-5 w-5 text-primary-600" />
+            <span className="font-semibold text-gray-900">
+              Noticias relacionadas encontradas ({relatedNews.length})
+            </span>
+            <span className="ml-auto text-gray-400">{showRelated ? '▲' : '▼'}</span>
+          </button>
+          
+          {showRelated && (
+            <div className="mt-4 space-y-3">
+              {relatedNews.map(n => (
+                <div key={n.id} className="flex gap-3 p-2 bg-white rounded-lg hover:bg-gray-50">
+                  {n.imagen_url && (
+                    <img src={n.imagen_url} alt={n.titulo} className="w-16 h-16 object-cover rounded flex-shrink-0" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <Link to={`/news/${n.id}`} className="text-sm font-medium text-gray-900 hover:text-primary-600 line-clamp-2">
+                      {n.title_translated || n.titulo}
+                    </Link>
+                    <p className="text-xs text-gray-500 mt-0.5">{n.fuente_nombre}</p>
+                    {onAddRelatedNews && (
+                      <button
+                        onClick={() => onAddRelatedNews(n)}
+                        className="mt-1 text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1"
+                      >
+                        <Plus className="h-3 w-3" /> Añadir a lista
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* News Grid */}
       {news.length === 0 ? (
         <div className="card p-12 text-center">
           <Folder className="h-16 w-16 text-gray-300 mx-auto mb-4" />
@@ -283,10 +411,13 @@ export function Favorites() {
   const [selectedNewsForList, setSelectedNewsForList] = useState<News | null>(null)
   const [activeListId, setActiveListId] = useState<number | null>(null)
   const [activeListName, setActiveListName] = useState('')
+  const [activeListKeywords, setActiveListKeywords] = useState('')
   const [activeListNews, setActiveListNews] = useState<News[]>([])
+  const [activeListTags, setActiveListTags] = useState<ListTag[]>([])
+  const [activeListRelatedNews, setActiveListRelatedNews] = useState<News[]>([])
 
   const { favorites, removeFavorite, refresh: refreshFavorites } = useApiFavorites()
-  const { lists, createList, deleteList, updateList, addToList, removeFromList, getListItems, refresh: refreshLists } = useApiLists()
+  const { lists, createList, deleteList, updateList, addToList, removeFromList, getListItems, getListTags, getListRelatedNews, refresh: refreshLists } = useApiLists()
   const { searches, deleteSearch, updateSearch, refresh: refreshSearches } = useApiSavedSearches()
 
   const handleAddToList = (news: News) => {
@@ -302,8 +433,8 @@ export function Favorites() {
     }
   }
 
-  const handleCreateAndAdd = async (name: string) => {
-    const newListId = await createList(name)
+  const handleCreateAndAdd = async (name: string, keywords?: string) => {
+    const newListId = await createList(name, keywords)
     if (selectedNewsForList) {
       await addToList(newListId, selectedNewsForList.id)
     }
@@ -311,17 +442,29 @@ export function Favorites() {
     setSelectedNewsForList(null)
   }
 
-  const handleOpenList = async (id: number, name: string) => {
+  const handleOpenList = async (id: number, name: string, keywords: string = '') => {
     setActiveListId(id)
     setActiveListName(name)
+    setActiveListKeywords(keywords)
     const items = await getListItems(id)
     setActiveListNews(items)
+    
+    // Load tags and related news
+    const [tags, related] = await Promise.all([
+      getListTags(id),
+      getListRelatedNews(id),
+    ])
+    setActiveListTags(tags)
+    setActiveListRelatedNews(related)
   }
 
   const handleCloseList = () => {
     setActiveListId(null)
     setActiveListName('')
+    setActiveListKeywords('')
     setActiveListNews([])
+    setActiveListTags([])
+    setActiveListRelatedNews([])
   }
 
   const handleRemoveNewsFromList = async (newsId: string) => {
@@ -340,16 +483,41 @@ export function Favorites() {
     }
   }
 
+  const handleUpdateKeywords = async (keywords: string) => {
+    if (activeListId) {
+      await updateList(activeListId, undefined, keywords)
+      setActiveListKeywords(keywords)
+      await refreshLists()
+      
+      // Reload related news with new keywords
+      const related = await getListRelatedNews(activeListId)
+      setActiveListRelatedNews(related)
+    }
+  }
+
+  const handleAddRelatedNews = async (news: News) => {
+    if (activeListId) {
+      await addToList(activeListId, news.id)
+      const items = await getListItems(activeListId)
+      setActiveListNews(items)
+    }
+  }
+
   // If viewing a list detail
   if (activeListId !== null) {
     return (
       <ListDetailView
         listId={activeListId}
         listName={activeListName}
+        keywords={activeListKeywords}
         news={activeListNews}
         onClose={handleCloseList}
         onRemoveNews={handleRemoveNewsFromList}
         onRename={handleRenameList}
+        onUpdateKeywords={handleUpdateKeywords}
+        tags={activeListTags}
+        relatedNews={activeListRelatedNews}
+        onAddRelatedNews={handleAddRelatedNews}
       />
     )
   }
@@ -451,7 +619,7 @@ export function Favorites() {
       <CreateListModal
         isOpen={showCreateListModal}
         onClose={() => setShowCreateListModal(false)}
-        onCreate={async (name: string) => { await createList(name) }}
+        onCreate={async (name: string, keywords?: string) => { await createList(name, keywords) }}
         mode="create"
       />
 

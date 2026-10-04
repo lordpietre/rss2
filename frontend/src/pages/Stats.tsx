@@ -3,9 +3,10 @@ import { apiService } from '../services/api'
 import { Newspaper, Rss, TrendingUp, Globe, Languages, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
 
 export function Stats() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ['stats'],
     queryFn: apiService.getStats,
+    refetchInterval: 30000, // Refetch cada 30 segundos
   })
 
   if (isLoading) {

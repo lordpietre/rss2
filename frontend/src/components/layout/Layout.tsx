@@ -1,15 +1,28 @@
-import { Outlet, Link, useNavigate } from 'react-router-dom'
+import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
 import { Search, Rss, BarChart3, Home as HomeIcon, Heart, User, Flame, Settings, Users, Tags, Database, Server, TrendingUp, Bell, X, Menu } from 'lucide-react'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { apiService } from '../../services/api'
+import { useSuggestedNews } from '../../hooks/useApiFavorites'
+import { SuggestedNewsSidebar } from '../ui/SuggestedNewsSidebar'
+import { CreateListModal } from '../CreateListModal'
+import { News } from '../../services/api'
+import { useApiLists } from '../../hooks/useApiFavorites'
 
 export function Layout() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [username, setUsername] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
   const [showAdminMenu, setShowAdminMenu] = useState(false)
   const [nuevasAlertas, setNuevasAlertas] = useState(0)
+  const [showListModal, setShowListModal] = useState(false)
+  const [selectedNewsForList, setSelectedNewsForList] = useState<News | null>(null)
+
+  const { suggestedNews } = useSuggestedNews()
+  const { lists, createList, addToList } = useApiLists()
+
+  const isHomePage = location.pathname === '/'
 
   const checkAuth = () => {
     const token = localStorage.getItem('token')
@@ -59,6 +72,28 @@ export function Layout() {
     setIsLoggedIn(false)
     setUsername('')
     navigate('/login')
+  }
+
+  const handleAddToList = (news: News) => {
+    setSelectedNewsForList(news)
+    setShowListModal(true)
+  }
+
+  const handleSelectList = async (listId: number) => {
+    if (selectedNewsForList) {
+      await addToList(listId, selectedNewsForList.id)
+    }
+    setShowListModal(false)
+    setSelectedNewsForList(null)
+  }
+
+  const handleCreateAndAdd = async (name: string, keywords?: string) => {
+    const newListId = await createList(name, keywords)
+    if (selectedNewsForList) {
+      await addToList(newListId, selectedNewsForList.id)
+    }
+    setShowListModal(false)
+    setSelectedNewsForList(null)
   }
 
   return (
@@ -178,9 +213,64 @@ export function Layout() {
           </div>
         </div>
       </nav>
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Outlet />
-      </main>
+      
+      {/* Main content with sidebars */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex gap-8">
+          {/* Left Sidebar - Hidden on mobile */}
+          {isLoggedIn && isHomePage && suggestedNews.length > 0 && (
+            <aside className="hidden lg:block w-64 flex-shrink-0">
+              <div className="sticky top-24">
+                <SuggestedNewsSidebar news={suggestedNews} onAddToList={handleAddToList} />
+              </div>
+            </aside>
+          )}
+          
+          {/* Main Content */}
+          <main className="flex-1 min-w-0">
+            <Outlet />
+          </main>
+          
+          {/* Right Sidebar - Hidden on mobile */}
+          {isLoggedIn && isHomePage && suggestedNews.length > 0 && (
+            <aside className="hidden lg:block w-64 flex-shrink-0">
+              <div className="sticky top-24">
+                <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-3">
+                  <div className="p-2 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-primary-50 rounded-t-lg">
+                    <div className="flex items-center gap-2">
+                      <Rss className="h-4 w-4 text-blue-600" />
+                      <span className="font-semibold text-sm text-gray-900">Novedades</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Últimas noticias
+                    </p>
+                  </div>
+                  <div className="p-2 space-y-1">
+                    {suggestedNews.slice(0, 3).map(n => (
+                      <Link key={n.id} to={`/news/${n.id}`} className="block py-1.5 px-2 rounded hover:bg-gray-50">
+                        <p className="text-xs font-medium text-gray-700 hover:text-primary-600 line-clamp-2 leading-tight">
+                          {n.title_translated || n.titulo}
+                        </p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">{n.fuente_nombre}</p>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </aside>
+          )}
+        </div>
+      </div>
+
+      {/* Create List Modal */}
+      <CreateListModal
+        isOpen={showListModal}
+        onClose={() => { setShowListModal(false); setSelectedNewsForList(null) }}
+        onCreate={handleCreateAndAdd}
+        mode="add-to"
+        existingLists={lists.map((l: { id: number; name: string }) => ({ id: l.id, name: l.name }))}
+        onSelectList={handleSelectList}
+      />
     </div>
   )
 }

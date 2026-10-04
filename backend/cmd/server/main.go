@@ -162,10 +162,13 @@ func initDB() {
 			id SERIAL PRIMARY KEY,
 			user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			name VARCHAR(255) NOT NULL,
+			keywords TEXT DEFAULT '',
 			created_at TIMESTAMP DEFAULT NOW(),
 			updated_at TIMESTAMP DEFAULT NOW()
 		)
 	`)
+	// Add keywords column if table already exists
+	_, err = db.GetPool().Exec(ctx, `ALTER TABLE user_lists ADD COLUMN IF NOT EXISTS keywords TEXT DEFAULT ''`)
 	if err != nil {
 		log.Printf("Warning: Could not create user_lists table: %v", err)
 	} else {
@@ -366,6 +369,11 @@ func Main() {
 		api.GET("/lists/:id/items", middleware.AuthRequired(), handlers.GetListItems)
 		api.POST("/lists/:id/items/:noticiaId", middleware.AuthRequired(), handlers.AddToList)
 		api.DELETE("/lists/:id/items/:noticiaId", middleware.AuthRequired(), handlers.RemoveFromList)
+		api.GET("/lists/:id/tags", middleware.AuthRequired(), handlers.GetListTags)
+		api.GET("/lists/:id/related", middleware.AuthRequired(), handlers.GetListRelatedNews)
+
+		// Suggested news for sidebar (based on user's lists keywords)
+		api.GET("/lists/suggested", middleware.AuthRequired(), handlers.GetSuggestedNews)
 
 		// Saved Searches
 		api.GET("/saved-searches", middleware.AuthRequired(), handlers.GetSavedSearches)
