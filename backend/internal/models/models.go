@@ -5,7 +5,7 @@ import (
 )
 
 type News struct {
-	ID          int64      `json:"id"`
+	ID          string     `json:"id"`  // VARCHAR(32) en BD
 	Titulo      string     `json:"titulo"`
 	Resumen     string     `json:"resumen"`
 	Contenido   string     `json:"contenido"`
@@ -160,15 +160,27 @@ type FeedListResponse struct {
 }
 
 type Stats struct {
-	TotalNews       int64          `json:"total_news"`
-	TotalFeeds      int64          `json:"total_feeds"`
-	TotalUsers      int64          `json:"total_users"`
-	TotalTranslated int64          `json:"total_translated"`
-	NewsToday       int64          `json:"news_today"`
-	NewsThisWeek    int64          `json:"news_this_week"`
-	NewsThisMonth   int64          `json:"news_this_month"`
-	TopCategories   []CategoryStat `json:"top_categories"`
-	TopCountries    []CountryStat  `json:"top_countries"`
+	TotalNews           int64          `json:"total_news"`
+	TotalFeeds          int64          `json:"total_feeds"`
+	TotalUsers          int64          `json:"total_users"`
+	TotalTranslated     int64          `json:"total_translated"`
+	NewsToday           int64          `json:"news_today"`
+	NewsThisWeek        int64          `json:"news_this_week"`
+	NewsThisMonth       int64          `json:"news_this_month"`
+	TopCategories       []CategoryStat `json:"top_categories"`
+	TopCountries        []CountryStat  `json:"top_countries"`
+	TopLanguages        []LanguageStat `json:"top_languages"`
+	// Translation breakdown
+	TranslationsPending int64              `json:"translations_pending"`
+	TranslationsDone    int64              `json:"translations_done"`
+	TranslationsError   int64              `json:"translations_error"`
+	// Hourly translation metrics
+	TranslationStats12h []HourlyStat     `json:"translation_stats_12h"`
+	TranslationStats24h []HourlyStat     `json:"translation_stats_24h"`
+	TranslationStats2d  []HourlyStat     `json:"translation_stats_2d"`
+	TranslationStats3d  []HourlyStat     `json:"translation_stats_3d"`
+	TranslationStats4d  []HourlyStat     `json:"translation_stats_4d"`
+	TranslationStats5d  []HourlyStat     `json:"translation_stats_5d"`
 }
 
 type CategoryStat struct {
@@ -182,6 +194,18 @@ type CountryStat struct {
 	PaisName    string `json:"pais_nombre"`
 	FlagEmoji   string `json:"flag_emoji"`
 	Count       int64  `json:"count"`
+}
+
+type LanguageStat struct {
+	Lang   string `json:"lang"`
+	Count  int64  `json:"count"`
+	Dias   int64  `json:"dias_activos"`
+}
+
+type HourlyStat struct {
+	Hour       string `json:"hour"`
+	Total      int64  `json:"total"`
+	Items      int64  `json:"items"`
 }
 
 type LoginRequest struct {

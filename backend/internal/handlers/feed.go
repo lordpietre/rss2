@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -593,7 +594,9 @@ func ImportFeeds(c *gin.Context) {
 
 		if _, err := tx.Exec(context.Background(), "SAVEPOINT sp"); err != nil {
 			failed++
-			errors = append(errors, fmt.Sprintf("Error for %s: %v", url, err))
+			// No exponemos detalles del error de BD al cliente
+			log.Printf("Import feed savepoint error for %s: %v", url, err)
+			errors = append(errors, fmt.Sprintf("Error processing feed: savepoint failed"))
 			continue
 		}
 
@@ -615,16 +618,20 @@ func ImportFeeds(c *gin.Context) {
 
 		if err != nil {
 			if _, rbErr := tx.Exec(context.Background(), "ROLLBACK TO SAVEPOINT sp"); rbErr != nil {
-				errors = append(errors, fmt.Sprintf("Rollback failed for %s: %v", url, rbErr))
+				log.Printf("Import feed rollback error for %s: %v", url, rbErr)
+				errors = append(errors, "Error processing feed: rollback failed")
+			} else {
+				log.Printf("Import feed upsert error for %s: %v", url, err)
+				errors = append(errors, "Error processing feed: upsert failed")
 			}
 			failed++
-			errors = append(errors, fmt.Sprintf("Error upserting %s: %v", url, err))
 			continue
 		}
 
 		if _, err := tx.Exec(context.Background(), "RELEASE SAVEPOINT sp"); err != nil {
 			failed++
-			errors = append(errors, fmt.Sprintf("Error for %s: %v", url, err))
+			log.Printf("Import feed release savepoint error for %s: %v", url, err)
+			errors = append(errors, "Error processing feed: release savepoint failed")
 			continue
 		}
 
@@ -644,7 +651,7 @@ func ImportFeeds(c *gin.Context) {
 		"imported": imported,
 		"skipped":  skipped,
 		"failed":   failed,
-		"errors":   errors,
+		"errors":   errors,  // errors contiene solo códigos, no detalles de BD
 		"message":  fmt.Sprintf("Import completed. Imported: %d, Skipped: %d, Failed: %d", imported, skipped, failed),
 	})
 }

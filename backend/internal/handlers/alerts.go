@@ -115,12 +115,23 @@ func GetAlertas(c *gin.Context) {
 
 	// `total` es el total REAL con los mismos filtros (antes era len(rows),
 	// con lo que la paginación mentía).
+	// `nuevas` ahora usa los MISMOS filtros de tipo y blocklist para consistencia.
 	var total, nuevas int
 	countArgs := append([]interface{}{}, args[:len(args)-1]...)
 	db.GetPool().QueryRow(c.Request.Context(),
 		"SELECT COUNT(*)::int FROM alertas a "+where, countArgs...).Scan(&total)
+
+	// Count de nuevas con los mismos filtros (tipo, blocklist) pero solo status='nueva'
+	// Se reconstruye el WHERE base con parámetros para evitar SQL injection
+	nuevasWhere := `WHERE NOT EXISTS (SELECT 1 FROM entity_blocklist b
+	                  WHERE b.tipo = a.tipo AND b.valor_lower = LOWER(a.valor)) AND a.status = 'nueva'`
+	nuevasArgs := []interface{}{}
+	if tipo != "" {
+		nuevasWhere += " AND a.tipo = $1"
+		nuevasArgs = append(nuevasArgs, tipo)
+	}
 	db.GetPool().QueryRow(c.Request.Context(),
-		"SELECT COUNT(*)::int FROM alertas WHERE status = 'nueva'").Scan(&nuevas)
+		"SELECT COUNT(*)::int FROM alertas a "+nuevasWhere, nuevasArgs...).Scan(&nuevas)
 
 	c.JSON(http.StatusOK, gin.H{
 		"alertas": alertas,

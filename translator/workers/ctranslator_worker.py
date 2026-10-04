@@ -17,7 +17,7 @@ import re
 import time
 import logging
 import hashlib
-from typing import List, defaultdict
+from typing import List, Optional, defaultdict
 
 import psycopg2
 import psycopg2.extras

@@ -33,9 +33,34 @@ TARGET_LANGS = os.getenv('TARGET_LANGS', 'es').split(',')
 BATCH_SIZE = int(os.getenv('SCHEDULER_BATCH', '2000'))
 SLEEP_INTERVAL = int(os.getenv('SCHEDULER_SLEEP', '30'))
 
+# Códigos ISO 639-1 válidos para langdetect + comunes
+# https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes
+VALID_LANGS = {
+    'en', 'es', 'fr', 'de', 'it', 'pt', 'nl', 'sv', 'da', 'fi', 'no', 'pl',
+    'cs', 'sk', 'sl', 'hu', 'ro', 'el', 'ru', 'uk', 'tr', 'ar', 'fa', 'he',
+    'zh', 'ja', 'ko', 'vi', 'th', 'id', 'ms', 'tl', 'hi', 'bn', 'ur', 'ml',
+    'ta', 'te', 'uk', 'ru', 'bg', 'hr', 'sr', 'et', 'lv', 'lt', 'mk', 'sq',
+    'sh', 'ca', 'eu', 'gl', 'cy', 'ga', 'mt', 'oc', 'la'
+}
+
+# Códigos conocidos inválidos o problemáticos que NO deben generar jobs
+INVALID_LANGS = {'und', 'unknown', '', 'mul', 'zxx', 'mis', 'sgn'}
+
 
 def get_db_connection():
     return psycopg2.connect(**DB_CONFIG)
+
+
+def is_valid_lang(lang):
+    """Verifica si un código de idioma es válido para traducción."""
+    if not lang:
+        return False
+    lang = lang.strip().lower()[:2]  # Normaliza a 2 chars
+    if lang in INVALID_LANGS:
+        return False
+    if len(lang) != 2:
+        return False
+    return True
 
 
 def create_translation_jobs(conn):
@@ -49,6 +74,7 @@ def create_translation_jobs(conn):
                 continue
 
             # Crear jobs si hay resumen O contenido (el translator maneja ambos)
+            # Filtramos idiomas inválidos que langdetect pudo asignar
             cur.execute("""
                 INSERT INTO traducciones (noticia_id, lang_from, lang_to, status, created_at)
                 SELECT n.id, n.lang, %s, 'pending', NOW()
@@ -56,6 +82,8 @@ def create_translation_jobs(conn):
                 WHERE n.lang IS NOT NULL
                   AND TRIM(n.lang) != ''
                   AND n.lang != %s
+                  AND LOWER(n.lang) NOT IN ('und', 'unknown', 'mul', 'zxx', 'mis', 'sgn', '')
+                  AND LENGTH(TRIM(n.lang)) <= 5
                   AND (n.resumen IS NOT NULL AND n.resumen != ''
                        OR n.contenido IS NOT NULL AND n.contenido != '')
                   AND NOT EXISTS (

@@ -384,10 +384,6 @@ func GetNewsByID(c *gin.Context) {
 		f := fecha.Format(time.RFC3339)
 		n.Fecha = &f
 	}
-	if err != nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: "News not found"})
-		return
-	}
 
 	if imagenURL != nil {
 		n.ImagenURL = imagenURL

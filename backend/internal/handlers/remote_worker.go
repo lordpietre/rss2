@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"log"
 	"net/http"
 
@@ -178,10 +176,4 @@ func RegenerateAPIKey(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"api_key": newAPIKey})
-}
-
-func generateAPIKey() string {
-	bytes := make([]byte, 32)
-	rand.Read(bytes)
-	return hex.EncodeToString(bytes)
 }

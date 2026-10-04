@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -276,7 +278,7 @@ c.JSON(http.StatusOK, response)
 // @Router /stats [get]
 func GetStats(c *gin.Context) {
 	ctx := c.Request.Context()
-	cacheKey := cache.StatsKey()
+	cacheKey := cache.StatsKey() // Stats con lang limpio (TRIM en query)
 
 	if cached, err := cache.Get(ctx, cacheKey); err == nil && cached != "" {
 		c.Data(http.StatusOK, "application/json", []byte(cached))
@@ -293,11 +295,15 @@ func GetStats(c *gin.Context) {
 			(SELECT COUNT(*) FROM noticias WHERE fecha::date = CURRENT_DATE) as news_today,
 			(SELECT COUNT(*) FROM noticias WHERE fecha >= DATE_TRUNC('week', CURRENT_DATE)) as news_this_week,
 			(SELECT COUNT(*) FROM noticias WHERE fecha >= DATE_TRUNC('month', CURRENT_DATE)) as news_this_month,
-			(SELECT COUNT(DISTINCT noticia_id) FROM traducciones WHERE status = 'done') as total_translated
+			(SELECT COUNT(DISTINCT noticia_id) FROM traducciones WHERE status = 'done') as total_translated,
+			(SELECT COUNT(*) FROM traducciones WHERE status = 'pending') as translations_pending,
+			(SELECT COUNT(*) FROM traducciones WHERE status = 'done') as translations_done,
+			(SELECT COUNT(*) FROM traducciones WHERE status = 'error') as translations_error
 	`).Scan(
 		&stats.TotalNews, &stats.TotalFeeds, &stats.TotalUsers,
 		&stats.NewsToday, &stats.NewsThisWeek, &stats.NewsThisMonth,
-		&stats.TotalTranslated,
+		&stats.TotalTranslated, &stats.TranslationsPending, &stats.TranslationsDone,
+		&stats.TranslationsError,
 	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to get stats", Message: err.Error()})
@@ -346,9 +352,80 @@ func GetStats(c *gin.Context) {
 		log.Error().Err(err).Msg("GetStats: query top_countries")
 	}
 
+	// Top idiomas de noticias originales
+	rows, err = db.GetPool().Query(ctx, `
+		SELECT TRIM(n.lang)::TEXT as lang, COUNT(*) as count, COUNT(DISTINCT DATE(n.fecha)) as dias
+		FROM noticias n
+		WHERE n.lang IS NOT NULL AND TRIM(n.lang) != ''
+		GROUP BY TRIM(n.lang)
+		ORDER BY count DESC
+		LIMIT 15
+	`)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var ls models.LanguageStat
+			if err := rows.Scan(&ls.Lang, &ls.Count, &ls.Dias); err != nil {
+				log.Error().Err(err).Msg("GetStats: scan top_languages")
+				break
+			}
+			stats.TopLanguages = append(stats.TopLanguages, ls)
+		}
+	} else {
+		log.Error().Err(err).Msg("GetStats: query top_languages")
+	}
+
+	// Métricas de traducciones por hora para diferentes períodos
+	stats.TranslationStats12h = getHourlyStats(ctx, 12*time.Hour)
+	stats.TranslationStats24h = getHourlyStats(ctx, 24*time.Hour)
+	stats.TranslationStats2d = getHourlyStats(ctx, 48*time.Hour)
+	stats.TranslationStats3d = getHourlyStats(ctx, 72*time.Hour)
+	stats.TranslationStats4d = getHourlyStats(ctx, 96*time.Hour)
+	stats.TranslationStats5d = getHourlyStats(ctx, 120*time.Hour)
+
 	cache.Set(ctx, cacheKey, stats, cache.TTLMedium)
 
 	c.JSON(http.StatusOK, stats)
+}
+
+func getHourlyStats(ctx context.Context, duration time.Duration) []models.HourlyStat {
+	var stats []models.HourlyStat
+
+	query := `
+		SELECT 
+			DATE_TRUNC('hour', created_at) as hour,
+			COUNT(*) as total,
+			COALESCE(SUM(items_translated), 0) as items
+		FROM translation_stats
+		WHERE created_at > NOW() - $1::interval
+		GROUP BY 1
+		ORDER BY 1 DESC
+	`
+
+	intervalStr := fmt.Sprintf("%.0f hours", duration.Hours())
+
+	rows, err := db.GetPool().Query(ctx, query, intervalStr)
+	if err != nil {
+		log.Error().Err(err).Msg("getHourlyStats: query failed")
+		return stats
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var hs models.HourlyStat
+		var hour time.Time
+		if err := rows.Scan(&hour, &hs.Total, &hs.Items); err != nil {
+			log.Error().Err(err).Msg("getHourlyStats: scan failed")
+			continue
+		}
+		hs.Hour = hour.Format("2006-01-02 15:00")
+		stats = append(stats, hs)
+	}
+
+	if stats == nil {
+		stats = []models.HourlyStat{}
+	}
+	return stats
 }
 
 func GetCategories(c *gin.Context) {

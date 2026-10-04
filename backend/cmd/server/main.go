@@ -233,7 +233,6 @@ func initDB() {
 		"CREATE INDEX IF NOT EXISTS idx_entity_aliases_alias_tipo ON entity_aliases(alias, tipo)",
 		"CREATE INDEX IF NOT EXISTS idx_alertas_valor_tipo_periodo ON alertas(valor, tipo, periodo)",
 		"CREATE INDEX IF NOT EXISTS idx_alertas_status ON alertas(status)",
-		"CREATE INDEX IF NOT EXISTS idx_user_search_tags_user_id ON user_search_tags(user_id)",
 		"CREATE INDEX IF NOT EXISTS idx_feeds_activo ON feeds(activo)",
 		"CREATE INDEX IF NOT EXISTS idx_feeds_categoria_id ON feeds(categoria_id)",
 		"CREATE INDEX IF NOT EXISTS idx_feeds_pais_id ON feeds(pais_id)",
@@ -300,10 +299,9 @@ func Main() {
 		// Serve static images downloaded by wiki_worker
 		api.StaticFS("/wiki-images", gin.Dir(cfg.WikiImagesPath, false))
 
-		// Stricter rate limiting for auth endpoints (login/register are
-		// brute-force sensitive; check-first-user is a harmless public GET
-		// called on every page load, so it uses the general limiter).
-		api.GET("/auth/check-first-user", handlers.CheckFirstUser)
+		// Rate limiting para check-first-user: aunque es un GET inofensivo,
+		// evitar enumeración de usuarios bajo request massivos (30 req/min).
+		api.GET("/auth/check-first-user", middleware.RateLimitMiddleware(30), handlers.CheckFirstUser)
 		authGroup := api.Group("/auth")
 		authGroup.Use(middleware.RateLimitMiddleware(10)) // 10 req/min for auth
 		{

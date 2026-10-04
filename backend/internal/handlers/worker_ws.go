@@ -244,10 +244,10 @@ func AssignJobToWorker(workerID int) *models.TranslationJob {
 
 	var job models.TranslationJob
 	err := db.GetPool().QueryRow(ctx, `
-		SELECT t.id, t.noticia_id, t.lang_from, t.lang_to, n.titulo, n.resumen, n.contenido
+		SELECT t.id, t.noticia_id, t.lang_from, t.lang_to, n.titulo, n.resumen, COALESCE(n.contenido, '')
 		FROM traducciones t
 		JOIN noticias n ON n.id = t.noticia_id
-		WHERE t.status = 'pending' 
+		WHERE t.status = 'pending'
 		  AND t.worker_id IS NULL
 		  AND t.lang_to = 'es'
 		  AND (t.titulo_trad IS NULL OR t.resumen_trad IS NULL OR t.contenido_trad IS NULL)
@@ -319,7 +319,7 @@ func StartStaleJobCleanup() {
 			case <-ticker.C:
 				ctx := context.Background()
 				// Release jobs assigned more than 2 minutes ago (worker likely crashed/disconnected)
-				result, err := db.GetPool().Exec(ctx, `
+				_, err := db.GetPool().Exec(ctx, `
 					UPDATE traducciones
 					SET status = 'pending', worker_id = NULL, assigned_at = NULL
 					WHERE status = 'assigned'
@@ -328,10 +328,6 @@ func StartStaleJobCleanup() {
 				if err != nil {
 					log.Printf("[StaleJobCleanup] Error: %v", err)
 					continue
-				}
-				rowsAffected, _ := result.RowsAffected()
-				if rowsAffected > 0 {
-					log.Printf("[StaleJobCleanup] Released %d stale jobs", rowsAffected)
 				}
 			}
 		}

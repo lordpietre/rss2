@@ -147,6 +147,18 @@ export interface Stats {
   news_today: number
   news_this_week: number
   news_this_month: number
+  translations_pending: number
+  translations_done: number
+  translations_error: number
+  top_languages: Array<{ lang: string; count: number; dias_activos: number }>
+  translation_stats_12h: Array<{ hour: string; total: number; items: number }>
+  translation_stats_24h: Array<{ hour: string; total: number; items: number }>
+  translation_stats_2d: Array<{ hour: string; total: number; items: number }>
+  translation_stats_3d: Array<{ hour: string; total: number; items: number }>
+  translation_stats_4d: Array<{ hour: string; total: number; items: number }>
+  translation_stats_5d: Array<{ hour: string; total: number; items: number }>
+  top_categories: Array<{ categoria_id: number; categoria_nombre: string; count: number }>
+  top_countries: Array<{ pais_id: number; pais_nombre: string; flag_emoji: string; count: number }>
 }
 
 export const apiService = {

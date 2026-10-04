@@ -437,11 +437,16 @@ func ResetDatabase(c *gin.Context) {
 		"tags_noticia",
 		"tags",
 		"entity_aliases",
+		// favoritos: legacy (user_favorites es la tabla activa)
 		"favoritos",
+		"user_favorites",
 		"videos",
 		"video_parrillas",
 		"eventos",
 		"search_history",
+		"user_lists",
+		"user_list_items",
+		"user_saved_searches",
 	}
 
 	tx, err := db.GetPool().Begin(ctx)

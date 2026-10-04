@@ -4,18 +4,31 @@
 
 1. `langdetect` (`workers/langdetect_worker.py`, imagen `rss2-pyworkers`):
    `noticias.lang NULL → detect()` (solo `psycopg2+langdetect`).
+   **Nota**: Solo corre cuando `lang IS NULL`. Si el contenido de una noticia
+   cambia significativamente, se requiere re-detección manual con
+   `sanitize -requeue` que pone `lang=NULL`.
+
 2. `translation-scheduler` (`workers/translation_scheduler.py`, misma imagen):
    cada 30 s crea `traducciones(..., lang_to='es', status='pending')` para
    noticias con `lang` conocido y distinto de `es` (`TARGET_LANGS`,
-   batch 2000). Precondición documentada: sin `lang` no hay jobs.
+   batch 2000). Filtra idiomas inválidos: 'und', 'unknown', 'mul', 'zxx', etc.
+   Precondición documentada: sin `lang` no hay jobs.
+
 3. `translator` (`translator/Dockerfile.cpu`, CTranslate2 NLLB-200 int8 CPU):
    `ctranslator_worker.py` reclama por polling SQL (`SKIP LOCKED`,
    `locked_at` >10 min reintenta), traduce, `status='done'`, `locked_at=NULL`,
-   inserta en `translation_stats`, caché Redis best-effort (`tr:{de}:{a}:{md5}`,
+   inserta en `translation_stats`, caché Redis best-effort (`tr:{lang_from}:{lang_to}:{md5}`,
    TTL 30 d). Escalado 2026-09-15: `translator` + `translator-2`
    (misma imagen, `CT2_INTRA_THREADS=2`, reparto por `SKIP LOCKED`).
    OJO: 3 réplicas saturan los 22G y entran en swap (5.7G) dejando los
    workers colgados (CPU ~2%, MEM al límite); 2 es el techo de este host.
+
+## Cache Keys
+
+Formato: `tr:{lang_from}:{lang_to}:{md5(text)}`
+Ejemplo: `tr:en:es:a1b2c3d4e5f6...`
+
+TTL: 30 días (reconstruible desde BD si se purgea Redis).
 
 ## Env (compose, obligatorias)
 
@@ -51,6 +64,8 @@ DB_* reales en los tres servicios; `TARGET_LANGS=es`, `SCHEDULER_BATCH/SLEEP`,
       con el UPDATE masivo de `topics` → Postgres abortaba uno con
       `deadlock detected (SQLSTATE 40P01)`. Ahora `rows.sort(key=id)`
       antes del bucle (id ascendente, igual que topics).
+      **Regla**: Todos los workers que escriben a `noticias` deben usar
+      `ORDER BY id ASC` para evitar deadlocks.
 - [x] **OOM de los traductores** (2026-09-26): 41 `Memory cgroup out of
       memory` en el kernel, solo en `translator`/`translator_2` (límite
       4G), acelerando de 5/h a 14/h. Causa medida con test empírico, no

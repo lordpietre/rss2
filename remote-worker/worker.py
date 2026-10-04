@@ -13,6 +13,7 @@ import json
 import logging
 import re
 import hashlib
+import threading
 from typing import List, Dict, Optional, defaultdict
 
 import websocket
@@ -59,6 +60,8 @@ LANG_CODE_MAP = {
 
 SENTENCE_END_CHARS = set(".!?;؟؛।။॥।")
 
+# Mutex para proteger estado compartido entre threads
+_stats_mu = threading.Lock()
 _tokenizer = None
 _translator = None
 _ws = None
@@ -267,12 +270,16 @@ def process_job(job: dict) -> dict:
 
     LOG.info(f"Processing job {job_id}: {lang_from} -> {lang_to}")
 
+    # Cuando lang_from == lang_to, el backend marca 'done' directamente
+    # al recibir el resultado (igual que el worker local).
+    # El campo 'not_translated' indica al backend que copie el original.
     if lang_from == lang_to:
         return {
             "job_id": job_id,
             "title_trad": title,
             "summary_trad": summary,
             "contenido_trad": content,
+            "not_translated": True,  # Flag para el backend
         }
 
     try:
@@ -358,9 +365,11 @@ def on_message(ws, message):
             result = process_job(job)
             if not send_result(ws, result):
                 LOG.error(f"Failed to send result for job {job_id} after retries - job will be reassigned by server")
-                _stats["jobs_failed"] += 1
+                with _stats_mu:
+                    _stats["jobs_failed"] += 1
             else:
-                _stats["jobs_completed"] += 1
+                with _stats_mu:
+                    _stats["jobs_completed"] += 1
         elif msg_type == "stop":
             LOG.info("Received stop command")
             _running = False

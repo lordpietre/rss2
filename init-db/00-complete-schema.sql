@@ -192,7 +192,9 @@ CREATE TABLE IF NOT EXISTS eventos_noticias (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
--- Tabla de favoritos
+-- Tabla de favoritos (LEGACY: la tabla activa es user_favorites, ver main.go)
+-- Esta tabla existe por compatibilidad pero no se usa en el código actual.
+-- Incluye user_lists, user_list_items, user_saved_searches para limpieza completa.
 CREATE TABLE IF NOT EXISTS favoritos (
     id SERIAL PRIMARY KEY,
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,

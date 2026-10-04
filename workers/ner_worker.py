@@ -13,6 +13,17 @@ import spacy
 from bs4 import BeautifulSoup
 
 # ==========================================================
+# Constantes
+# ==========================================================
+
+# Tag especial para noticias sin entidades ni topics detectados.
+# Cuando el NER no encuentra nada (persona/org/lugar/tema), inserta este tag
+# para evitar re-procesar la misma traducción. El tipo 'sistema' lo excluye
+# de Populares/Alertas (ver queries con filtro tipo != 'sistema').
+NONE_TAG = "_none_"
+NONE_TAG_TYPE = "sistema"
+
+# ==========================================================
 # Logging
 # ==========================================================
 logging.basicConfig(
@@ -418,13 +429,13 @@ def main():
                         
                         text = f"{r['titulo_trad'] or ''}\n{r['resumen_trad'] or ''}".strip()
                         if not text:
-                            # Para evitar re-procesar, insertamos un tag especial '_none_'
-                            tags = [("_none_", "sistema")]
+                            # Para evitar re-procesar, insertamos un tag especial (NONE_TAG)
+                            tags = [(NONE_TAG, NONE_TAG_TYPE)]
                         else:
                             ents, topics = extract_entities_and_topics(nlp, text)
                             tags = ents + topics
                             if not tags:
-                                tags = [("_none_", "sistema")]
+                                tags = [(NONE_TAG, NONE_TAG_TYPE)]
 
                         for valor, tipo in tags:
                             try:
@@ -454,13 +465,20 @@ def main():
                                     inserted_links += 1
                             except Exception as e:
                                 log.error(f"Error insertando tag '{valor}': {e}")
-                                conn.rollback()
-                                # Volvemos a empezar el loop de tags para esta noticia no es buena idea,
-                                # pero el rollback abortó la transacción del cursor.
-                                # En psycopg2, tras rollback hay que seguir o cerrar.
-                                pass
-                        
-                        conn.commit()
+                                # Tras rollback el cursor está en estado indefinido.
+                                # Hacemos commit para recuperarlo y continuamos con la siguiente noticia.
+                                try:
+                                    conn.commit()
+                                except:
+                                    conn.rollback()
+                                break  # Ir a la siguiente noticia
+
+                        # Commit parcial después de cada noticia: si falla, no afecta a las anteriores
+                        try:
+                            conn.commit()
+                        except Exception as e:
+                            log.error(f"Error en commit de noticia {noticia_id}: {e}")
+                            conn.rollback()
 
                     log.info(f"Lote NER OK. Nuevas relaciones tag_noticia: {inserted_links}")
 

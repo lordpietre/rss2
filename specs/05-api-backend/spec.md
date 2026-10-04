@@ -58,6 +58,20 @@ users, reset-db, alerts/scan, workers/* (+ remote), WS `/ws/worker`
     traen (`GetNews`, `GetNewsByID`, `SearchNews`); `GetEntityNews` no lo
     selecciona. Verificado en vivo: `len=2`.
 
+## Auth (favoritos y listas)
+
+Todos los endpoints de `/api/favorites/*`, `/api/lists/*`, `/api/saved-searches/*`
+requieren autenticación JWT válida via `middleware.AuthRequired()`. El `user_id`
+se extrae del claims JWT y se pone en el contexto Gin (`c.Set("user_id", ...)`).
+Los handlers acceden via `c.GetInt("user_id")`.
+
+El middleware verifica:
+1. Presencia de header `Authorization: Bearer <token>`
+2. Validez y expiración del JWT
+3. Extrae `UserID` del claims y lo pone en contexto
+
+Si la auth falla, retorna 401 Unauthorized.
+
 ## Criterios de aceptación
 
 - [x] `GET /api/news`, `translated_only`, `/api/news/:id`, `/api/search`,

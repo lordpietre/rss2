@@ -60,8 +60,18 @@ Consumidores de lectura:
     scraper/discovery (ver spec 07)
 ```
 
-Volúmenes/estado observados: ~31k noticias, ~27k traducciones pending,
-~900+ done creciendo, ~31k tags, ~55k tags_noticia.
+## Métricas de Volumen (snapshot 2026-10-03)
+
+| Entidad | Count | Notas |
+|---------|-------|-------|
+| noticias | ~31k | Tabla principal |
+| traducciones pending | ~27k | Jobs de traducción pendientes |
+| traducciones done | ~900+ | Traducciones completadas |
+| tags | ~31k | Entidades nombradas |
+| tags_noticia | ~55k | Relaciones tag-noticia |
+
+**Nota**: Estas son métricas de snapshot y cambian con el tiempo. 
+Verificar con `SELECT COUNT(*) FROM tabla` para valores actuales.
 
 ## Contratos y convenciones
 
