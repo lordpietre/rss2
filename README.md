@@ -94,7 +94,7 @@ Sistema de favoritos y listas persistentes en Postgres (multidispositivo).
 ### Tablas
 
 - `user_favorites` — noticias guardadas por usuario
-- `user_lists` — listas de noticias creadas por usuario
+- `user_lists` — listas de noticias creadas por usuario (con campo `keywords`)
 - `user_list_items` — items dentro de cada lista
 - `user_saved_searches` — búsquedas guardadas
 
@@ -106,13 +106,16 @@ Sistema de favoritos y listas persistentes en Postgres (multidispositivo).
 | POST | `/api/favorites/:noticiaId` | Añadir a favoritos |
 | DELETE | `/api/favorites/:noticiaId` | Quitar de favoritos |
 | GET | `/api/favorites/:noticiaId/check` | Verificar si es favorito |
-| GET | `/api/lists` | Obtener listas del usuario |
-| POST | `/api/lists` | Crear nueva lista |
-| PUT | `/api/lists/:id` | Renombrar lista |
+| GET | `/api/lists` | Obtener listas del usuario (incluye keywords) |
+| POST | `/api/lists` | Crear nueva lista (con keywords opcionales) |
+| PUT | `/api/lists/:id` | Renombrar lista y/o actualizar keywords |
 | DELETE | `/api/lists/:id` | Eliminar lista |
 | GET | `/api/lists/:id/items` | Obtener noticias de una lista |
 | POST | `/api/lists/:id/items/:noticiaId` | Añadir noticia a lista |
 | DELETE | `/api/lists/:id/items/:noticiaId` | Quitar noticia de lista |
+| GET | `/api/lists/:id/tags` | Obtener nube de tags de la lista |
+| GET | `/api/lists/:id/related` | Buscar noticias relacionadas (auto-actualiza keywords) |
+| GET | `/api/lists/suggested` | Noticias sugeridas para sidebar (basadas en keywords) |
 | GET | `/api/saved-searches` | Obtener búsquedas guardadas |
 | POST | `/api/saved-searches` | Guardar búsqueda |
 | PUT | `/api/saved-searches/:id` | Renombrar búsqueda |
@@ -122,8 +125,19 @@ Sistema de favoritos y listas persistentes en Postgres (multidispositivo).
 
 - **Favoritos**: marca con ❤️ desde el carrusel de noticias
 - **Listas**: pulsa 📁 para añadir a una lista o crear una nueva
-- **Búsquedas guardadas**: guarda búsquedas frecuentes en la pestaña Favoritos → Búsquedas
+- **Keywords**: al crear una lista puedes añadir palabras clave separadas por comas
+- **Nube de tags**: en la vista de lista, los tags de las noticias se muestran con interactividad
+- **Noticias relacionadas**: el sistema busca automáticamente noticias basadas en los tags más frecuentes
+- **Sidebar de sugerencias**: en la portada aparecen noticias sugeridas a los lados (cuando estás logueado)
 - Requiere autenticación (JWT) para todas las operaciones
+
+### Algoritmo de Búsqueda Relacionada
+
+1. Se extraen los 10 tags con más menciones de las noticias en la lista
+2. Se convierten automáticamente en keywords (ej: "Biden, elecciones, Trump")
+3. Se actualiza el campo `keywords` de la lista
+4. Se buscan noticias relacionadas usando full-text search de Postgres
+5. Las noticias ya presentes en la lista se excluyen
 
 ## Re-procesar traducciones
 

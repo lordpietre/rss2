@@ -119,4 +119,11 @@ Estado global. El detalle y la evidencia están en cada `specs/NN-*/spec.md`.
       `simple_translator[.py]`, `translation_worker` (0 referencias vivas;
       respaldo en `/tmp/opencode/dead_workers_backup_20260915.tgz` +
       reversible vía git). Quedan los 5 workers en uso.
+- [x] **Listas avanzadas** (2026-10-04): Palabras clave en listas,
+      búsqueda automática de noticias relacionadas, nube de tags interactiva,
+      sidebar de sugerencias en homepage. Detalle en `specs/09-saved-searches/spec.md`.
+- [x] **Eliminar feeds inactivos por país** (2026-10-04): Nuevo endpoint
+      `DELETE /api/feeds/inactive?pais_id=X` y botón en UI de Feeds.
+- [x] **Fix nginx 502** (2026-10-04): nginx añadido a red `backend` para
+      conectar correctamente con el API gateway.
 - [ ] Backup pre-rotación (sigue manual).

@@ -191,6 +191,13 @@ export const apiService = {
     await api.delete(`/feeds/${id}`)
   },
 
+  deleteInactiveFeeds: async (paisId?: string): Promise<{ deleted_count: number }> => {
+    const { data } = await api.delete('/feeds/inactive', {
+      params: paisId ? { pais_id: paisId } : undefined
+    })
+    return data
+  },
+
   toggleFeed: async (id: number): Promise<void> => {
     await api.post(`/feeds/${id}/toggle`)
   },

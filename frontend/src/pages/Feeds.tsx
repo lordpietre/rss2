@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiService, Feed, Category, Country } from '../services/api'
-import { Plus, Trash2, ExternalLink, Upload, Download, RefreshCw, Power, PowerOff, AlertCircle } from 'lucide-react'
+import { Plus, Trash2, ExternalLink, Upload, Download, RefreshCw, Power, PowerOff, AlertCircle, Trash } from 'lucide-react'
 
 export function Feeds() {
   const queryClient = useQueryClient()
@@ -76,6 +76,15 @@ export function Feeds() {
         ? 'Debes iniciar sesión para importar archivos' 
         : error?.response?.data?.error || 'Error al importar el archivo'
       setImportResult({ imported: 0, skipped: 0, failed: 0, message })
+    },
+  })
+
+  const deleteInactiveFeeds = useMutation({
+    mutationFn: async ({ paisId }: { paisId?: string }) => {
+      return apiService.deleteInactiveFeeds(paisId)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feeds'] })
     },
   })
 
@@ -165,7 +174,7 @@ export function Feeds() {
       )}
 
       <div className="card p-4 mb-6">
-        <div className="flex flex-wrap gap-4">
+        <div className="flex flex-wrap gap-4 items-center">
           <select
             value={filtroActivo}
             onChange={(e) => { setFiltroActivo(e.target.value); setPage(1) }}
@@ -195,6 +204,20 @@ export function Feeds() {
               <option key={pais.id} value={pais.id}>{pais.nombre}</option>
             ))}
           </select>
+          {filtroActivo === 'false' && filtroPais && (
+            <button
+              onClick={() => {
+                if (confirm(`¿Eliminar todos los feeds inactivos del país seleccionado? (${feedsData?.total || 0} feeds)`)) {
+                  deleteInactiveFeeds.mutate({ paisId: filtroPais })
+                }
+              }}
+              disabled={deleteInactiveFeeds.isPending}
+              className="btn-danger flex items-center gap-2"
+            >
+              <Trash className="h-4 w-4" />
+              {deleteInactiveFeeds.isPending ? 'Eliminando...' : 'Eliminar todos inactivos'}
+            </button>
+          )}
         </div>
       </div>
 

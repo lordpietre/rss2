@@ -275,6 +275,35 @@ func DeleteFeed(c *gin.Context) {
 	c.JSON(http.StatusOK, models.SuccessResponse{Message: "Feed deleted successfully"})
 }
 
+func DeleteInactiveFeeds(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	// Optional country filter
+	paisID := c.Query("pais_id")
+
+	query := "DELETE FROM feeds WHERE activo = false"
+	args := []interface{}{}
+
+	if paisID != "" {
+		query += " AND pais_id = $1"
+		args = append(args, paisID)
+	}
+
+	result, err := db.GetPool().Exec(ctx, query, args...)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to delete inactive feeds", Message: err.Error()})
+		return
+	}
+
+	// Invalidate feed list cache
+	cache.InvalidateFeedList(ctx)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":        "Inactive feeds deleted",
+		"deleted_count": result.RowsAffected(),
+	})
+}
+
 func ToggleFeedActive(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {

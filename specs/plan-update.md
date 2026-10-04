@@ -803,5 +803,126 @@ Un fase está completa cuando:
 ---
 
 **Creado**: 2026-10-03
-**Actualizado**: 2026-10-03
+**Actualizado**: 2026-10-04
 **Estado**: Propuesta
+
+---
+
+## Novedades 2026-10-04 — Listas Avanzadas y Gestión de Feeds
+
+### Funcionalidades Implementadas
+
+#### 1. Listas con Palabras Clave
+
+**Descripción**: Las listas ahora soportan palabras clave para búsqueda automática de noticias relacionadas.
+
+**Cambios en BD**:
+- Tabla `user_lists` ampliada con columna `keywords TEXT DEFAULT ''`
+
+**API**:
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/api/lists` | Retorna listas incluyendo `keywords` |
+| POST | `/api/lists` | Crea lista con `keywords` opcionales |
+| PUT | `/api/lists/:id` | Actualiza `name` y/o `keywords` |
+
+**Frontend**:
+- `CreateListModal.tsx`: Nuevo campo para palabras clave
+- `Favorites.tsx`: Vista de lista con sección de keywords editable
+
+#### 2. Búsqueda Automática de Noticias Relacionadas
+
+**Descripción**: Al acceder a una lista, el sistema extrae automáticamente los 10 tags más frecuentes y los usa como keywords para buscar noticias relacionadas.
+
+**API**:
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/api/lists/:id/related` | Busca noticias relacionadas, auto-actualiza keywords |
+
+**Algoritmo**:
+1. Extrae top 10 tags de las noticias en la lista
+2. Genera string de keywords (ej: "Biden, elecciones, Trump")
+3. Actualiza campo `keywords` de la lista si cambió
+4. Busca usando full-text search (`tsquery`) con fallback `ILIKE`
+5. Excluye noticias ya presentes en la lista
+
+#### 3. Nube de Tags Interactiva
+
+**Descripción**: Los tags/entities de las noticias en una lista se muestran como nube interactiva.
+
+**API**:
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/api/lists/:id/tags` | Retorna tags ordenados por frecuencia |
+
+**Respuesta**:
+```json
+{
+  "tags": [
+    { "valor": "Biden", "tipo": "persona", "count": 15 },
+    { "valor": "Estados Unidos", "tipo": "lugar", "count": 12 }
+  ]
+}
+```
+
+**Frontend**:
+- Nuevo componente `TagCloud.tsx` en `frontend/src/components/ui/`
+- Tags con colores por tipo (persona=azul, organizacion=púrpura, lugar=verde, tema=naranja)
+- Clic en tag navega a Populares con filtro aplicado
+
+#### 4. Sidebar de Noticias Sugeridas
+
+**Descripción**: En la página principal aparecen noticias sugeridas basadas en las keywords de las listas del usuario.
+
+**API**:
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/api/lists/suggested` | Retorna noticias de últimos 7 días relacionadas con keywords |
+
+**Frontend**:
+- Nuevo componente `SuggestedNewsSidebar.tsx`
+- Mostrado solo en homepage para usuarios logueados
+- Sidebars a ambos lados del contenido principal
+- Diseño colapsable, letra pequeña
+
+#### 5. Eliminar Feeds Inactivos por País
+
+**Descripción**: Nuevo endpoint para eliminar todos los feeds inactivos filtrados por país.
+
+**API**:
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| DELETE | `/api/feeds/inactive?pais_id=X` | Elimina todos los feeds inactivos (opcionalmente por país) |
+
+**Frontend**:
+- `Feeds.tsx`: Botón "Eliminar todos inactivos" aparece al filtrar por Inactivos + País
+
+### Archivos Modificados
+
+| Archivo | Cambio |
+|---------|--------|
+| `backend/cmd/server/main.go` | Añadido `keywords` a tabla, nuevas rutas |
+| `backend/internal/handlers/favorites.go` | Handlers: `GetListTags`, `GetListRelatedNews`, `GetSuggestedNews` |
+| `backend/internal/handlers/feed.go` | Handler: `DeleteInactiveFeeds` |
+| `frontend/src/components/CreateListModal.tsx` | Campo keywords |
+| `frontend/src/components/ui/TagCloud.tsx` | Nuevo componente |
+| `frontend/src/components/ui/SuggestedNewsSidebar.tsx` | Nuevo componente |
+| `frontend/src/hooks/useApiFavorites.ts` | Nuevas funciones: `getListTags`, `getListRelatedNews`, `useSuggestedNews` |
+| `frontend/src/pages/Favorites.tsx` | Vista de lista con tags y related news |
+| `frontend/src/pages/Feeds.tsx` | Botón eliminar inactivos |
+| `frontend/src/services/api.ts` | Método `deleteInactiveFeeds` |
+| `frontend/src/components/layout/Layout.tsx` | Sidebars en homepage |
+| `docker-compose.yml` | nginx en red backend (fix 502) |
+| `README.md` | Actualizado con nuevas funcionalidades |
+| `specs/09-saved-searches/spec.md` | Actualizado con nuevos endpoints |
+
+### Verificaciones
+
+- [x] `go build ./backend/...` ✅
+- [x] `docker compose build backend frontend` ✅
+- [x] `docker compose up -d backend frontend nginx` ✅
+- [x] `curl http://localhost:8888/api/stats` → 200 ✅
+- [x] API de listas con keywords funcionando
+- [x] Nube de tags visible en vista de lista
+- [x] Sidebar de sugerencias en homepage
+- [x] Eliminar feeds inactivos por país funcional

@@ -641,6 +641,10 @@ func GetListRelatedNews(c *gin.Context) {
 	// Build tsquery from keywords
 	tsquery := strings.Join(searchTerms, " | ")
 
+	println("GetListRelatedNews: keywords =", keywords)
+	println("GetListRelatedNews: tsquery =", tsquery)
+
+	// Try full-text search first, fall back to ILIKE if it fails
 	rows, err := db.GetPool().Query(ctx, `
 		SELECT DISTINCT n.id, n.titulo, n.resumen, n.url, n.fecha, n.imagen_url,
 		       n.categoria_id, n.pais_id, n.fuente_nombre,
@@ -653,6 +657,34 @@ func GetListRelatedNews(c *gin.Context) {
 		ORDER BY n.fecha DESC NULLS LAST
 		LIMIT 20
 	`, tsquery, listID)
+
+	// If tsquery fails (e.g., due to special characters), try ILIKE fallback
+	if err != nil {
+		println("GetListRelatedNews: tsquery failed, trying ILIKE fallback:", err.Error())
+		// Build ILIKE conditions for each term
+		likeConditions := []string{}
+		for _, term := range searchTerms {
+			if term != "" {
+				likeConditions = append(likeConditions, fmt.Sprintf("(n.titulo ILIKE '%%%s%%' OR n.resumen ILIKE '%%%s%%')", term, term))
+			}
+		}
+		if len(likeConditions) > 0 {
+			likeQuery := strings.Join(likeConditions, " AND ")
+			query := fmt.Sprintf(`
+				SELECT DISTINCT n.id, n.titulo, n.resumen, n.url, n.fecha, n.imagen_url,
+				       n.categoria_id, n.pais_id, n.fuente_nombre,
+				       t.titulo_trad as title_translated, t.resumen_trad as summary_translated,
+				       t.contenido_trad as content_translated, t.lang_to as lang_translated
+				FROM noticias n
+				LEFT JOIN traducciones t ON n.id = t.noticia_id AND t.lang_to = 'es'
+				WHERE (%s)
+				  AND n.id NOT IN (SELECT noticia_id FROM user_list_items WHERE list_id = $1)
+				ORDER BY n.fecha DESC NULLS LAST
+				LIMIT 20
+			`, likeQuery)
+			rows, err = db.GetPool().Query(ctx, query, listID)
+		}
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -331,6 +331,7 @@ func Main() {
 			feeds.POST("/import", middleware.AuthRequired(), handlers.ImportFeeds)
 			feeds.PUT("/:id", middleware.AuthRequired(), handlers.UpdateFeed)
 			feeds.DELETE("/:id", middleware.AuthRequired(), handlers.DeleteFeed)
+			feeds.DELETE("/inactive", middleware.AuthRequired(), handlers.DeleteInactiveFeeds)
 			feeds.POST("/:id/toggle", middleware.AuthRequired(), handlers.ToggleFeedActive)
 			feeds.POST("/:id/reactivate", middleware.AuthRequired(), handlers.ReactivateFeed)
 		}
