@@ -331,11 +331,8 @@ export function Home() {
         />
       ) : (
         <>
-          {/* News Grid - Compact in search mode */}
-          <div className={isSearchMode 
-            ? 'grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
-            : 'grid gap-4 md:grid-cols-2'
-          }>
+          {/* News Grid */}
+          <div className='grid gap-4 md:grid-cols-2'>
             {data?.news?.map((news) => 
               useCompactCards ? (
                 <CompactNewsCard

@@ -56,6 +56,8 @@ export interface News {
   fuente_nombre: string
   title_translated?: string
   summary_translated?: string
+  content_translated?: string
+  contenido?: string
   lang_translated?: string
   entities?: any[]
 }
