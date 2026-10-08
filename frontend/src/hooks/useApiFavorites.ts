@@ -23,6 +23,8 @@ interface SavedSearch {
   label: string
   params: Record<string, any>
   created_at: string
+  last_used?: string
+  use_count: number
 }
 
 // --- Favorites ---
@@ -33,6 +35,7 @@ export function useApiFavorites() {
   const fetchFavorites = useCallback(async () => {
     try {
       const res = await api.get('/favorites')
+      console.log('Fetch favorites response:', res.data)
       setFavorites(res.data.favorites || [])
     } catch (err) {
       console.error('Failed to fetch favorites:', err)
@@ -41,25 +44,48 @@ export function useApiFavorites() {
     }
   }, [])
 
+  // Auto-refresh every 30 seconds
   useEffect(() => {
     fetchFavorites()
+    const interval = setInterval(fetchFavorites, 30000)
+    return () => clearInterval(interval)
   }, [fetchFavorites])
 
   const addFavorite = useCallback(async (noticiaId: string) => {
+    if (!localStorage.getItem('token')) {
+      alert('Debes iniciar sesión para guardar favoritos')
+      return
+    }
     try {
-      await api.post(`/favorites/${noticiaId}`)
+      console.log('Adding favorite:', noticiaId, 'token:', localStorage.getItem('token')?.substring(0, 20) + '...')
+      const res = await api.post(`/favorites/${noticiaId}`)
+      console.log('Add favorite response:', res.data)
       await fetchFavorites()
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to add favorite:', err)
+      console.error('Error status:', err?.response?.status)
+      console.error('Error data:', err?.response?.data)
+      if (err?.response?.status === 401) {
+        alert('Sesión expirada. Por favor inicia sesión nuevamente.')
+      } else {
+        alert('Error al guardar favorito: ' + (err?.response?.data?.error || err.message))
+      }
     }
   }, [fetchFavorites])
 
   const removeFavorite = useCallback(async (noticiaId: string) => {
+    if (!localStorage.getItem('token')) {
+      alert('Debes iniciar sesión para guardar favoritos')
+      return
+    }
     try {
       await api.delete(`/favorites/${noticiaId}`)
       await fetchFavorites()
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to remove favorite:', err)
+      if (err?.response?.status === 401) {
+        alert('Sesión expirada. Por favor inicia sesión nuevamente.')
+      }
     }
   }, [fetchFavorites])
 
@@ -72,28 +98,33 @@ export function useApiFavorites() {
     }
   }, [favorites, addFavorite, removeFavorite])
 
+  // Check if user is logged in
+  const isLoggedIn = useCallback((): boolean => {
+    return !!localStorage.getItem('token')
+  }, [])
+
   const isFavorite = useCallback((noticiaId: string): boolean => {
     return favorites.some(f => f.id === noticiaId)
   }, [favorites])
 
-  return { favorites, loading, addFavorite, removeFavorite, toggleFavorite, isFavorite, refresh: fetchFavorites }
+  return { favorites, loading, addFavorite, removeFavorite, toggleFavorite, isFavorite, isLoggedIn, refresh: fetchFavorites }
 }
 
 // --- Lists ---
-export function useApiLists() {
+export function useApiLists(sortBy: string = 'updated_at') {
   const [lists, setLists] = useState<SavedList[]>([])
   const [loading, setLoading] = useState(true)
 
   const fetchLists = useCallback(async () => {
     try {
-      const res = await api.get('/lists')
+      const res = await api.get('/lists', { params: { sort_by: sortBy } })
       setLists(res.data.lists || [])
     } catch (err) {
       console.error('Failed to fetch lists:', err)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [sortBy])
 
   useEffect(() => {
     fetchLists()
@@ -200,20 +231,20 @@ export function useSuggestedNews() {
 }
 
 // --- Saved Searches ---
-export function useApiSavedSearches() {
+export function useApiSavedSearches(sortBy: string = 'last_used') {
   const [searches, setSearches] = useState<SavedSearch[]>([])
   const [loading, setLoading] = useState(true)
 
   const fetchSearches = useCallback(async () => {
     try {
-      const res = await api.get('/saved-searches')
+      const res = await api.get('/saved-searches', { params: { sort_by: sortBy } })
       setSearches(res.data.searches || [])
     } catch (err) {
       console.error('Failed to fetch saved searches:', err)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [sortBy])
 
   useEffect(() => {
     fetchSearches()
@@ -246,5 +277,14 @@ export function useApiSavedSearches() {
     }
   }, [fetchSearches])
 
-  return { searches, loading, createSearch, updateSearch, deleteSearch, refresh: fetchSearches }
+  const useSearch = useCallback(async (id: number) => {
+    try {
+      await api.post(`/saved-searches/${id}/use`)
+      await fetchSearches()
+    } catch (err) {
+      console.error('Failed to mark search as used:', err)
+    }
+  }, [fetchSearches])
+
+  return { searches, loading, createSearch, updateSearch, deleteSearch, useSearch, refresh: fetchSearches }
 }

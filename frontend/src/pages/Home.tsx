@@ -35,8 +35,11 @@ export function Home() {
   // Expanded modal for hover/touch
   const [expandedNews, setExpandedNews] = useState<News | null>(null)
 
-  // Detect if we're in search mode
-  const isSearchMode = !!q || !!categoryId || !!countryId || translatedOnly
+  // Detect if we're in search mode (for grid layout)
+  const isSearchMode = !!q || !!categoryId || !!countryId
+
+  // Use compact cards only when there's actual text/category/country search, not just translated filter
+  const useCompactCards = !!q || !!categoryId || !!countryId
 
   // Load the user's most frequent search terms (dynamic tags) when logged in
   useEffect(() => {
@@ -334,7 +337,7 @@ export function Home() {
             : 'grid gap-4 md:grid-cols-2'
           }>
             {data?.news?.map((news) => 
-              isSearchMode ? (
+              useCompactCards ? (
                 <CompactNewsCard
                   key={news.id}
                   news={news}

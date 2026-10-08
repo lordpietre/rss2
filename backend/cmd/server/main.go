@@ -386,6 +386,7 @@ func Main() {
 		api.POST("/saved-searches", middleware.AuthRequired(), handlers.CreateSavedSearch)
 		api.PUT("/saved-searches/:id", middleware.AuthRequired(), handlers.UpdateSavedSearch)
 		api.DELETE("/saved-searches/:id", middleware.AuthRequired(), handlers.DeleteSavedSearch)
+		api.POST("/saved-searches/:id/use", middleware.AuthRequired(), handlers.UseSavedSearch)
 
 		admin := api.Group("/admin")
 		admin.Use(middleware.AuthRequired(), middleware.AdminRequired())

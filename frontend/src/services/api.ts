@@ -48,6 +48,8 @@ export interface News {
   resumen: string
   url: string
   fecha: string
+  news_created_at?: string  // When scraped
+  added_at?: string         // When added to list
   imagen_url?: string
   categoria_id?: number
   pais_id?: number
@@ -122,6 +124,7 @@ export interface EntitySuggestion {
   valor: string
   tipo: string
   cnt: number
+  last_date?: string
 }
 
 export interface Alerta {
@@ -245,7 +248,7 @@ export const apiService = {
     return data
   },
 
-  searchEntities: async (params: { tipo: string; q?: string; page?: number; per_page?: number }): Promise<{ entities: EntitySuggestion[]; total: number }> => {
+  searchEntities: async (params: { tipo: string; q?: string; page?: number; per_page?: number; sort_by?: string }): Promise<{ entities: EntitySuggestion[]; total: number }> => {
     const { data } = await api.get('/entities', { params })
     return data
   },

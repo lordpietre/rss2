@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -647,6 +648,7 @@ func GetEntities(c *gin.Context) {
 	countryID := c.Query("country_id")
 	categoryID := c.Query("category_id")
 	entityType := c.DefaultQuery("tipo", "persona")
+	sortBy := c.DefaultQuery("sort_by", "count")
 
 	q := c.Query("q")
 
@@ -677,6 +679,19 @@ func GetEntities(c *gin.Context) {
 	if apellido := c.Query("apellido"); apellido != "" {
 		where += fmt.Sprintf(" AND t.apellido ILIKE $%d", len(args)+1)
 		args = append(args, "%"+apellido+"%")
+	}
+
+	// Validate sort_by
+	orderBy := "cnt DESC"
+	switch sortBy {
+	case "count":
+		orderBy = "cnt DESC"
+	case "name":
+		orderBy = "valor ASC"
+	case "recent":
+		orderBy = "MAX(n.fecha) DESC NULLS LAST"
+	case "last_mentioned":
+		orderBy = "t.last_mentioned_at DESC NULLS LAST"
 	}
 
 	// 1. Get the total count of distinct canonical entities matching the filter.
@@ -718,7 +733,7 @@ func GetEntities(c *gin.Context) {
 	args = append(args, perPage, offset)
 	query := fmt.Sprintf(`
 		SELECT mode() WITHIN GROUP (ORDER BY COALESCE(ea.canonical_name, t.valor)) as valor, t.tipo, MAX(t.apellido), COUNT(*)::int as cnt,
-		       MAX(t.wiki_summary), MAX(t.wiki_url), MAX(t.image_path)
+		       MAX(t.wiki_summary), MAX(t.wiki_url), MAX(t.image_path), MAX(n.fecha) as last_date
 		FROM tags_noticia tn
 		JOIN tags t ON tn.tag_id = t.id
 		JOIN traducciones tr ON tn.traduccion_id = tr.id
@@ -728,9 +743,9 @@ func GetEntities(c *gin.Context) {
 			SELECT 1 FROM entity_blocklist b WHERE b.tipo = t.tipo AND b.valor_lower = LOWER(t.valor)
 		)
 		GROUP BY LOWER(COALESCE(ea.canonical_name, t.valor)), t.tipo
-		ORDER BY cnt DESC
+		ORDER BY %s
 		LIMIT $%d OFFSET $%d
-	`, where, len(args)-1, len(args))
+	`, where, orderBy, len(args)-1, len(args))
 
 	rows, err := db.GetPool().Query(c.Request.Context(), query, args...)
 	if err != nil {
@@ -743,11 +758,15 @@ func GetEntities(c *gin.Context) {
 	for rows.Next() {
 		var e models.Entity
 		var apellido *string
-		if err := rows.Scan(&e.Valor, &e.Tipo, &apellido, &e.Count, &e.WikiSummary, &e.WikiURL, &e.ImagePath); err != nil {
+		var lastDate sql.NullTime
+		if err := rows.Scan(&e.Valor, &e.Tipo, &apellido, &e.Count, &e.WikiSummary, &e.WikiURL, &e.ImagePath, &lastDate); err != nil {
 			continue
 		}
 		if apellido != nil {
 			e.Apellido = *apellido
+		}
+		if lastDate.Valid {
+			e.LastDate = &lastDate.Time
 		}
 		entities = append(entities, e)
 	}

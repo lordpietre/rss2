@@ -41,13 +41,14 @@ type NewsWithTranslations struct {
 }
 
 type Entity struct {
-	Valor       string  `json:"valor"`
-	Tipo        string  `json:"tipo"`
-	Apellido    string  `json:"apellido"`
-	Count       int     `json:"count"`
-	WikiSummary *string `json:"wiki_summary"`
-	WikiURL     *string `json:"wiki_url"`
-	ImagePath   *string `json:"image_path"`
+	Valor           string     `json:"valor"`
+	Tipo            string     `json:"tipo"`
+	Apellido        string     `json:"apellido"`
+	Count           int        `json:"count"`
+	WikiSummary     *string    `json:"wiki_summary"`
+	WikiURL         *string    `json:"wiki_url"`
+	ImagePath       *string    `json:"image_path"`
+	LastDate        *time.Time `json:"last_date,omitempty"`
 }
 
 type EntityListResponse struct {

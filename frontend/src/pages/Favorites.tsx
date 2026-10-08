@@ -24,10 +24,11 @@ function formatDate(dateStr?: string) {
 }
 
 // --- SavedSearchCard ---
-function SavedSearchCard({ search, onRemove, onUpdateLabel }: {
-  search: { id: number; type: string; label: string; params: Record<string, any>; created_at: string }
+function SavedSearchCard({ search, onRemove, onUpdateLabel, onUse }: {
+  search: { id: number; type: string; label: string; params: Record<string, any>; created_at: string; last_used?: string; use_count: number }
   onRemove: (id: number) => void
   onUpdateLabel: (id: number, label: string) => void
+  onUse: (id: number) => void
 }) {
   const navigate = useNavigate()
   const [editing, setEditing] = useState(false)
@@ -37,6 +38,7 @@ function SavedSearchCard({ search, onRemove, onUpdateLabel }: {
   const tipoIcon = isNews ? '📰' : TIPO_LABELS[search.params.tipo as string] || '📰'
 
   const handleExecute = () => {
+    onUse(search.id)
     if (isNews) {
       const params = new URLSearchParams()
       if (search.params.q) params.set('q', String(search.params.q))
@@ -87,11 +89,13 @@ function SavedSearchCard({ search, onRemove, onUpdateLabel }: {
             )}
           </div>
           {paramsDisplay && <p className="text-xs text-gray-500 mb-2">{paramsDisplay}</p>}
-          <div className="flex items-center gap-3 mt-2">
-            <button onClick={handleExecute} className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 font-medium">
-              <Play className="h-4 w-4" /> Ejecutar
+          <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
+            <button onClick={handleExecute} className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-700 font-medium">
+              <Play className="h-3 w-3" /> Ejecutar
             </button>
-            <span className="text-xs text-gray-400">Guardado {formatDate(search.created_at)}</span>
+            <span>{search.use_count} usos</span>
+            {search.last_used && <span>• Último uso {formatDate(search.last_used)}</span>}
+            {!search.last_used && <span>• Creado {formatDate(search.created_at)}</span>}
           </div>
         </div>
         <button onClick={() => onRemove(search.id)} className="text-red-500 hover:text-red-600 p-1" title="Eliminar">
@@ -419,10 +423,23 @@ export function Favorites() {
   const [activeListNews, setActiveListNews] = useState<News[]>([])
   const [activeListTags, setActiveListTags] = useState<ListTag[]>([])
   const [activeListRelatedNews, setActiveListRelatedNews] = useState<News[]>([])
+  const [listSortBy, setListSortBy] = useState('updated_at')
+  const [searchSortBy, setSearchSortBy] = useState('last_used')
 
   const { favorites, removeFavorite, refresh: refreshFavorites } = useApiFavorites()
-  const { lists, createList, deleteList, updateList, addToList, removeFromList, getListItems, getListTags, getListRelatedNews, refresh: refreshLists } = useApiLists()
-  const { searches, deleteSearch, updateSearch, refresh: refreshSearches } = useApiSavedSearches()
+  const { lists, createList, deleteList, updateList, addToList, removeFromList, getListItems, getListTags, getListRelatedNews, refresh: refreshLists } = useApiLists(listSortBy)
+  const { searches, deleteSearch, updateSearch, useSearch, refresh: refreshSearches } = useApiSavedSearches(searchSortBy)
+
+  // Refresh favorites when page becomes visible
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        refreshFavorites()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [refreshFavorites])
 
   const handleAddToList = (news: News) => {
     setSelectedNewsForList(news)
@@ -580,7 +597,17 @@ export function Favorites() {
       {/* Lists Tab */}
       {tab === 'lists' && (
         <>
-          <div className="flex justify-end mb-4">
+          <div className="flex justify-between items-center mb-4">
+            <select
+              value={listSortBy}
+              onChange={(e) => setListSortBy(e.target.value)}
+              className="input w-auto"
+            >
+              <option value="updated_at">Última modificación</option>
+              <option value="created_at">Fecha creación</option>
+              <option value="name">Nombre A-Z</option>
+              <option value="item_count">Más noticias</option>
+            </select>
             <button onClick={() => setShowCreateListModal(true)} className="btn-primary flex items-center gap-2">
               <Plus className="h-4 w-4" />
               Nueva lista
@@ -604,19 +631,33 @@ export function Favorites() {
 
       {/* Searches Tab */}
       {tab === 'searches' && (
-        searches.length === 0 ? (
-          <div className="card p-12 text-center">
-            <Search className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-700 mb-2">No hay búsquedas guardadas</h2>
-            <p className="text-gray-500">Guarda tus búsquedas haciendo clic en el botón "💾" en Search o Populares.</p>
+        <>
+          <div className="flex justify-end mb-4">
+            <select
+              value={searchSortBy}
+              onChange={(e) => setSearchSortBy(e.target.value)}
+              className="input w-auto"
+            >
+              <option value="last_used">Último uso</option>
+              <option value="created_at">Fecha creación</option>
+              <option value="use_count">Más usos</option>
+              <option value="label">Nombre A-Z</option>
+            </select>
           </div>
-        ) : (
-          <div className="space-y-4">
-            {searches.map(search => (
-              <SavedSearchCard key={search.id} search={search} onRemove={deleteSearch} onUpdateLabel={updateSearch} />
-            ))}
-          </div>
-        )
+          {searches.length === 0 ? (
+            <div className="card p-12 text-center">
+              <Search className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold text-gray-700 mb-2">No hay búsquedas guardadas</h2>
+              <p className="text-gray-500">Guarda tus búsquedas haciendo clic en el botón "💾" en Search o Populares.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {searches.map(search => (
+                <SavedSearchCard key={search.id} search={search} onRemove={deleteSearch} onUpdateLabel={updateSearch} onUse={useSearch} />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {/* Create List Modal */}

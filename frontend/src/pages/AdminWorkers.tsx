@@ -368,16 +368,6 @@ export function AdminWorkers() {
         </div>
       </div>
 
-      <div className="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-        <h3 className="font-medium text-blue-800 dark:text-blue-200 mb-2">Información</h3>
-        <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
-          <li>• CPU: Más lento pero funciona en cualquier equipo</li>
-          <li>• GPU: Mucho más rápido, necesita tarjeta NVIDIA</li>
-          <li>• Los cambios en la configuración se aplicarán al iniciar los workers</li>
-          <li>• Recomendado: 2-4 workers para CPU, 1-2 para GPU</li>
-        </ul>
-      </div>
-
       <div className="mt-6 bg-white dark:bg-gray-800 rounded-lg shadow p-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-semibold flex items-center gap-2">

@@ -7,10 +7,10 @@ import { Globe, ArrowLeft, ExternalLink, Newspaper, Heart, MapPin } from 'lucide
 import { useState, useEffect } from 'react'
 import { WikiTooltip } from '../components/ui/WikiTooltip'
 import { ShareButtons } from '../components/ui/ShareButtons'
+import { useApiFavorites } from '../hooks/useApiFavorites'
 
 export function News() {
   const { id } = useParams<{ id: string }>()
-  const [isFavorite, setIsFavorite] = useState(false)
   
   const { data: news, isLoading, error } = useQuery({
     queryKey: ['news', id],
@@ -23,6 +23,8 @@ export function News() {
     queryFn: apiService.getCountries,
   })
 
+  const { isFavorite, toggleFavorite, refresh: refreshFavorites } = useApiFavorites()
+
   // Helper to get country name by ID
   const getCountryName = (countryId: number | undefined) => {
     if (!countryId || !countries) return undefined
@@ -32,26 +34,19 @@ export function News() {
 
   const countryName = news ? getCountryName(news.pais_id) : undefined
 
-  useEffect(() => {
-    const stored = localStorage.getItem('favorites')
-    if (stored && id) {
-      const favorites = JSON.parse(stored)
-      setIsFavorite(favorites.some((n: any) => n.id === id))
+  const handleToggleFavorite = () => {
+    if (!id) return
+    // Convert apiService format to our News format
+    const newsForToggle = {
+      id: news!.id,
+      titulo: news!.titulo || news!.title_translated || '',
+      resumen: news!.resumen || news!.summary_translated || '',
+      url: news!.url,
+      fecha: news!.fecha || '',
+      imagen_url: news!.imagen_url,
+      fuente_nombre: news!.fuente_nombre || '',
     }
-  }, [id])
-
-  const toggleFavorite = () => {
-    const stored = localStorage.getItem('favorites')
-    let favorites = stored ? JSON.parse(stored) : []
-    
-    if (isFavorite) {
-      favorites = favorites.filter((n: any) => n.id !== id)
-    } else if (news) {
-      favorites.push(news)
-    }
-    
-    localStorage.setItem('favorites', JSON.stringify(favorites))
-    setIsFavorite(!isFavorite)
+    toggleFavorite(newsForToggle)
   }
 
   if (isLoading) {
@@ -126,11 +121,11 @@ export function News() {
             View Original
           </a>
           <button
-            onClick={toggleFavorite}
-            className={`inline-flex items-center gap-2 ${isFavorite ? 'text-red-500' : 'text-gray-500 hover:text-red-500'}`}
+            onClick={handleToggleFavorite}
+            className={`inline-flex items-center gap-2 ${id && isFavorite(id) ? 'text-red-500' : 'text-gray-500 hover:text-red-500'}`}
           >
-            <Heart className={`h-4 w-4 ${isFavorite ? 'fill-current' : ''}`} />
-            {isFavorite ? 'Saved' : 'Save'}
+            <Heart className={`h-4 w-4 ${id && isFavorite(id) ? 'fill-current' : ''}`} />
+            {id && isFavorite(id) ? 'Saved' : 'Save'}
           </button>
           <ShareButtons news={news} size="md" />
         </div>

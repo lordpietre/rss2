@@ -13,6 +13,7 @@ interface Entity {
   wiki_summary?: string
   wiki_url?: string
   image_path?: string
+  last_date?: string
 }
 
 interface Category {
@@ -57,6 +58,7 @@ export function Populares() {
   const [countryId, setCountryId] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
+  const [sortBy, setSortBy] = useState('count')
   const [activeSearch, setActiveSearch] = useState('')
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
@@ -94,11 +96,11 @@ export function Populares() {
 
   useEffect(() => {
     setPage(1)
-  }, [tipo, countryId, categoryId, activeSearch])
+  }, [tipo, countryId, categoryId, activeSearch, sortBy])
 
   useEffect(() => {
     fetchEntities()
-  }, [tipo, countryId, categoryId, activeSearch, page])
+  }, [tipo, countryId, categoryId, activeSearch, page, sortBy])
 
   const fetchEntities = async () => {
     setLoading(true)
@@ -108,6 +110,7 @@ export function Populares() {
       if (countryId) params.append('country_id', countryId)
       if (categoryId) params.append('category_id', categoryId)
       if (activeSearch) params.append('q', activeSearch)
+      params.append('sort_by', sortBy)
       params.append('page', page.toString())
       params.append('per_page', '50')
       const res = await api.get(`/entities?${params}`)
@@ -374,6 +377,18 @@ export function Populares() {
               {categories.map(c => (
                 <option key={c.id} value={c.id}>{c.nombre}</option>
               ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Ordenar por</label>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+            >
+              <option value="count">Más menciones</option>
+              <option value="name">Nombre A-Z</option>
+              <option value="recent">Más recientes</option>
             </select>
           </div>
           <div>

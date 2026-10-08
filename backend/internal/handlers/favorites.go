@@ -134,16 +134,30 @@ func IsFavorite(c *gin.Context) {
 func GetLists(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	ctx := c.Request.Context()
+	sortBy := c.DefaultQuery("sort_by", "updated_at")
 
-	rows, err := db.GetPool().Query(ctx, `
+	// Validate sort_by
+	orderBy := "ul.updated_at DESC"
+	switch sortBy {
+	case "created_at":
+		orderBy = "ul.created_at DESC"
+	case "updated_at":
+		orderBy = "ul.updated_at DESC"
+	case "name":
+		orderBy = "ul.name ASC"
+	case "item_count":
+		orderBy = "item_count DESC"
+	}
+
+	rows, err := db.GetPool().Query(ctx, fmt.Sprintf(`
 		SELECT ul.id, ul.name, ul.keywords, ul.created_at, ul.updated_at,
 		       COUNT(uli.id) as item_count
 		FROM user_lists ul
 		LEFT JOIN user_list_items uli ON ul.id = uli.list_id
 		WHERE ul.user_id = $1
 		GROUP BY ul.id
-		ORDER BY ul.updated_at DESC
-	`, userID)
+		ORDER BY %s
+	`, orderBy), userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -159,14 +173,19 @@ func GetLists(c *gin.Context) {
 		if err := rows.Scan(&id, &name, &keywords, &createdAt, &updatedAt, &itemCount); err != nil {
 			continue
 		}
-		lists = append(lists, map[string]any{
+		list := map[string]any{
 			"id":         id,
 			"name":       name,
 			"keywords":   keywords,
-			"created_at": createdAt.Time,
-			"updated_at": updatedAt.Time,
 			"item_count": itemCount,
-		})
+		}
+		if createdAt.Valid {
+			list["created_at"] = createdAt.Time
+		}
+		if updatedAt.Valid {
+			list["updated_at"] = updatedAt.Time
+		}
+		lists = append(lists, list)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"lists": lists})
@@ -277,6 +296,7 @@ func GetListItems(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	listID := c.Param("id")
 	ctx := c.Request.Context()
+	sortBy := c.DefaultQuery("sort_by", "added_at")
 
 	// Verify ownership
 	var ownerID int
@@ -286,17 +306,29 @@ func GetListItems(c *gin.Context) {
 		return
 	}
 
-	rows, err := db.GetPool().Query(ctx, `
+	// Validate sort_by
+	orderBy := "uli.created_at DESC"
+	switch sortBy {
+	case "added_at":
+		orderBy = "uli.created_at DESC"
+	case "published_at":
+		orderBy = "n.fecha DESC NULLS LAST"
+	case "title":
+		orderBy = "COALESCE(t.titulo_trad, n.titulo) ASC"
+	}
+
+	rows, err := db.GetPool().Query(ctx, fmt.Sprintf(`
 		SELECT n.id, n.titulo, n.resumen, n.url, n.fecha, n.imagen_url,
-		       n.categoria_id, n.pais_id, n.fuente_nombre,
+		       n.categoria_id, n.pais_id, n.fuente_nombre, n.created_at as news_created_at,
 		       t.titulo_trad as title_translated, t.resumen_trad as summary_translated, 
-		       t.contenido_trad as content_translated, t.lang_to as lang_translated
+		       t.contenido_trad as content_translated, t.lang_to as lang_translated,
+		       uli.created_at as added_at
 		FROM user_list_items uli
 		JOIN noticias n ON uli.noticia_id = n.id
 		LEFT JOIN traducciones t ON n.id = t.noticia_id AND t.lang_to = 'es'
 		WHERE uli.list_id = $1
-		ORDER BY uli.created_at DESC
-	`, listID)
+		ORDER BY %s
+	`, orderBy), listID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -315,14 +347,17 @@ func GetListItems(c *gin.Context) {
 			CategoriaID      sql.NullInt64
 			PaisID           sql.NullInt64
 			FuenteNombre     sql.NullString
+			NewsCreatedAt    sql.NullTime
 			TitleTranslated  sql.NullString
 			SummaryTranslated sql.NullString
 			ContentTranslated sql.NullString
 			LangTranslated   sql.NullString
+			AddedAt          sql.NullTime
 		}
 		if err := rows.Scan(&f.ID, &f.Titulo, &f.Resumen, &f.URL, &f.Fecha, &f.ImagenURL,
-			&f.CategoriaID, &f.PaisID, &f.FuenteNombre, &f.TitleTranslated,
-			&f.SummaryTranslated, &f.ContentTranslated, &f.LangTranslated); err != nil {
+			&f.CategoriaID, &f.PaisID, &f.FuenteNombre, &f.NewsCreatedAt,
+			&f.TitleTranslated, &f.SummaryTranslated, &f.ContentTranslated, &f.LangTranslated,
+			&f.AddedAt); err != nil {
 			continue
 		}
 		item := map[string]any{
@@ -341,6 +376,12 @@ func GetListItems(c *gin.Context) {
 		}
 		if f.Fecha.Valid {
 			item["fecha"] = f.Fecha.Time
+		}
+		if f.NewsCreatedAt.Valid {
+			item["news_created_at"] = f.NewsCreatedAt.Time
+		}
+		if f.AddedAt.Valid {
+			item["added_at"] = f.AddedAt.Time
 		}
 		items = append(items, item)
 	}
@@ -527,13 +568,27 @@ func RemoveFromList(c *gin.Context) {
 func GetSavedSearches(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	ctx := c.Request.Context()
+	sortBy := c.DefaultQuery("sort_by", "last_used")
 
-	rows, err := db.GetPool().Query(ctx, `
-		SELECT id, type, label, params, created_at
+	// Validate sort_by
+	orderBy := "last_used DESC NULLS LAST"
+	switch sortBy {
+	case "last_used":
+		orderBy = "last_used DESC NULLS LAST"
+	case "created_at":
+		orderBy = "created_at DESC"
+	case "use_count":
+		orderBy = "use_count DESC"
+	case "label":
+		orderBy = "label ASC"
+	}
+
+	rows, err := db.GetPool().Query(ctx, fmt.Sprintf(`
+		SELECT id, type, label, params, created_at, last_used, use_count
 		FROM user_saved_searches
 		WHERE user_id = $1
-		ORDER BY created_at DESC
-	`, userID)
+		ORDER BY %s
+	`, orderBy), userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -545,19 +600,27 @@ func GetSavedSearches(c *gin.Context) {
 		var id int
 		var stype, label string
 		var paramsJSON []byte
-		var createdAt sql.NullTime
-		if err := rows.Scan(&id, &stype, &label, &paramsJSON, &createdAt); err != nil {
+		var createdAt, lastUsed sql.NullTime
+		var useCount int
+		if err := rows.Scan(&id, &stype, &label, &paramsJSON, &createdAt, &lastUsed, &useCount); err != nil {
 			continue
 		}
 		var params map[string]any
 		json.Unmarshal(paramsJSON, &params)
-		searches = append(searches, map[string]any{
+		search := map[string]any{
 			"id":         id,
 			"type":       stype,
 			"label":      label,
-			"params":      params,
-			"created_at": createdAt.Time,
-		})
+			"params":     params,
+			"use_count":  useCount,
+		}
+		if createdAt.Valid {
+			search["created_at"] = createdAt.Time
+		}
+		if lastUsed.Valid {
+			search["last_used"] = lastUsed.Time
+		}
+		searches = append(searches, search)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"searches": searches})
@@ -594,6 +657,30 @@ func CreateSavedSearch(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"id": id, "type": body.Type, "label": body.Label, "params": body.Params})
+}
+
+// UseSavedSearch updates last_used timestamp and increments use_count
+func UseSavedSearch(c *gin.Context) {
+	userID := c.GetInt("user_id")
+	searchID := c.Param("id")
+	ctx := c.Request.Context()
+
+	result, err := db.GetPool().Exec(ctx, `
+		UPDATE user_saved_searches 
+		SET last_used = NOW(), use_count = use_count + 1 
+		WHERE id = $1 AND user_id = $2
+	`, searchID, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if result.RowsAffected() == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "search not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "updated"})
 }
 
 func UpdateSavedSearch(c *gin.Context) {

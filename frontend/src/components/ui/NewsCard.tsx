@@ -42,7 +42,7 @@ export function NewsCard({
   }
 
   return (
-    <Link to={`/news/${news.id}`} className={`card hover:shadow-md transition-shadow flex gap-3 p-3 ${className}`}>
+    <Link to={`/news/${news.id}`} className={`card hover:shadow-md transition-shadow flex gap-3 p-3 min-h-[120px] ${className}`}>
       {/* Image - smaller and on the left */}
       {news.imagen_url && news.imagen_url.trim() && (
         <img
@@ -77,13 +77,13 @@ export function NewsCard({
           {news.title_translated || news.titulo}
         </h3>
 
-        {/* Summary - smaller, more lines visible */}
+        {/* Summary - always 3 lines for consistency */}
         <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-3 leading-relaxed flex-1">
           {news.summary_translated || news.resumen}
         </p>
 
         {/* Action buttons - minimal */}
-        <div className="flex items-center gap-1 mt-2">
+        <div className="flex items-center gap-1 mt-auto pt-1">
           {showFavoriteButton && onToggleFavorite && (
             <button
               onClick={handleFavoriteClick}
