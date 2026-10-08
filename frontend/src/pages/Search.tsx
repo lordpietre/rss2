@@ -96,8 +96,6 @@ export function Search() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Buscar Noticias</h1>
-      
       <form onSubmit={handleSearch} className="card p-4 mb-6">
         <div className="flex flex-wrap gap-4 items-end">
           <div className="flex-1 min-w-[200px]">

@@ -37,71 +37,65 @@ export function NewsCard({
   }
 
   return (
-    <Link to={`/news/${news.id}`} className={`card hover:shadow-md transition-shadow ${className}`}>
+    <Link to={`/news/${news.id}`} className={`card hover:shadow-md transition-shadow flex gap-3 p-3 ${className}`}>
+      {/* Image - smaller and on the left */}
       {news.imagen_url && news.imagen_url.trim() && (
         <img
           src={news.imagen_url}
-          alt={news.title_translated || news.titulo}
-          className="w-full h-48 object-cover rounded-t-xl"
+          alt=""
+          className="w-24 h-24 object-cover rounded-lg shrink-0"
         />
       )}
-      <div className="p-4">
-        {/* Action buttons */}
-        <div className="flex items-center gap-2 mb-3">
-          {showFavoriteButton && onToggleFavorite && (
-            <button
-              onClick={handleFavoriteClick}
-              className={`p-1.5 rounded-full transition-colors ${
-                isFavorite
-                  ? 'text-red-500 bg-red-50 hover:bg-red-100'
-                  : 'text-gray-400 bg-gray-50 hover:text-red-500 hover:bg-red-50'
-              }`}
-              title={isFavorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
-            >
-              <Heart className={`h-5 w-5 ${isFavorite ? 'fill-current' : ''}`} />
-            </button>
-          )}
-          {showListButton && onAddToList && (
-            <button
-              onClick={handleListClick}
-              className="p-1.5 rounded-full text-gray-400 bg-gray-50 hover:text-blue-500 hover:bg-blue-50 transition-colors"
-              title="Añadir a lista"
-            >
-              <FolderPlus className="h-5 w-5" />
-            </button>
-          )}
-          <div className="ml-auto flex items-center gap-2 text-xs text-gray-500">
-            {news.title_translated && (
-              <span className="flex items-center gap-1 bg-primary-100 text-primary-700 px-2 py-0.5 rounded">
-                <Globe className="h-3 w-3" />
-                ES
-              </span>
-            )}
-          </div>
-        </div>
 
-        {/* Meta */}
-        <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
+      {/* Content - elongated vertical layout */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        {/* Meta row - small text */}
+        <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
           {news.fuente_nombre && (
-            <span className="flex items-center gap-1">
-              <Newspaper className="h-4 w-4" />
-              {news.fuente_nombre}
-            </span>
+            <span className="truncate max-w-[120px]">{news.fuente_nombre}</span>
           )}
           {news.fecha && (
-            <span className="text-xs">
+            <span className="shrink-0">
               {formatDistanceToNow(new Date(news.fecha), { addSuffix: true, locale: es })}
             </span>
           )}
         </div>
 
-        {/* Title & Summary */}
-        <h2 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
+        {/* Title - smaller, more lines */}
+        <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-1 line-clamp-2 leading-snug">
           {news.title_translated || news.titulo}
-        </h2>
-        <p className="text-gray-600 text-sm line-clamp-3">
+        </h3>
+
+        {/* Summary - smaller, more lines visible */}
+        <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-3 leading-relaxed flex-1">
           {news.summary_translated || news.resumen}
         </p>
+
+        {/* Action buttons - minimal */}
+        <div className="flex items-center gap-1 mt-2">
+          {showFavoriteButton && onToggleFavorite && (
+            <button
+              onClick={handleFavoriteClick}
+              className={`p-1 rounded-full transition-colors ${
+                isFavorite
+                  ? 'text-red-500 bg-red-50 hover:bg-red-100'
+                  : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
+              }`}
+              title={isFavorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+            >
+              <Heart className={`h-3.5 w-3.5 ${isFavorite ? 'fill-current' : ''}`} />
+            </button>
+          )}
+          {showListButton && onAddToList && (
+            <button
+              onClick={handleListClick}
+              className="p-1 rounded-full text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
+              title="Añadir a lista"
+            >
+              <FolderPlus className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       </div>
     </Link>
   )

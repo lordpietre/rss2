@@ -276,10 +276,7 @@ export function Populares() {
     <div className="p-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
-        <h1 className="text-2xl font-bold">
-          🔥 Populares {selectedCountry ? `en ${selectedCountry.nombre}` : 'Global'}
-        </h1>
-        <div className="flex items-center gap-4">
+        <div>
           <button
             onClick={() => setAllExpanded(p => !p)}
             className="px-3 py-1.5 text-sm border rounded hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600 transition-colors"
@@ -410,7 +407,7 @@ export function Populares() {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
           <div className="p-4 bg-gray-50 dark:bg-gray-700 border-b dark:border-gray-700">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">📊 {entities.length} entidades populares</span>
+              <span className="text-sm font-medium text-gray-500">{entities.length} entidades</span>
               <div className="flex gap-1">
                 <button
                   onClick={() => setExpandedEntities(new Set<string>())}

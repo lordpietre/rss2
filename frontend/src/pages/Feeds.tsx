@@ -133,8 +133,7 @@ export function Feeds() {
   return (
     <div>
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Feeds RSS</h1>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button onClick={() => fileInputRef.current?.click()} className="btn-secondary flex items-center gap-2">
             <Upload className="h-4 w-4" />
             Importar CSV

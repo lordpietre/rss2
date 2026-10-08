@@ -94,7 +94,7 @@ func loadConfig() {
 		DBName:       getEnv("DB_NAME", "rss"),
 		MaxWorkers:   getEnvInt("RSS_MAX_WORKERS", 20), // Default to higher concurrency in Go
 		MaxFailures:  getEnvInt("RSS_MAX_FAILURES", 10),
-		PokeInterval: time.Duration(getEnvInt("RSS_POKE_INTERVAL_MIN", 8)) * time.Minute,
+		PokeInterval: time.Duration(getEnvInt("RSS_POKE_INTERVAL_MIN", 15)) * time.Minute,
 		FeedTimeout:  getEnvInt("RSS_FEED_TIMEOUT", 60),
 		HostDelay:    time.Duration(getEnvInt("RSS_HOST_DELAY_MS", 500)) * time.Millisecond,
 	}

@@ -1,0 +1,196 @@
+ID	País	ISO2	ISO3
+1	Afganistán	AF	AFG
+2	Albania	AL	ALB
+3	Alemania	DE	DEU
+4	Andorra	AD	AND
+5	Angola	AO	AGO
+6	Antigua y Barbuda	AG	ATG
+7	Arabia Saudita	SA	SAU
+8	Argelia	DZ	DZA
+9	Argentina	AR	ARG
+10	Armenia	AM	ARM
+11	Australia	AU	AUS
+12	Austria	AT	AUT
+13	Azerbaiyán	AZ	AZE
+14	Bahamas	BS	BHS
+15	Bangladés	BD	BGD
+16	Barbados	BB	BRB
+17	Baréin	BH	BHR
+18	Bélgica	BE	BEL
+19	Belice	BZ	BLZ
+20	Benín	BJ	BEN
+21	Bielorrusia	BY	BLR
+22	Birmania	MM	MMR
+23	Bolivia	BO	BOL
+24	Bosnia y Herzegovina	BA	BIH
+25	Botsuana	BW	BWA
+26	Brasil	BR	BRA
+27	Brunéi	BN	BRN
+28	Bulgaria	BG	BGR
+29	Burkina Faso	BF	BFA
+30	Burundi	BI	BDI
+31	Bután	BT	BTN
+32	Cabo Verde	CV	CPV
+33	Camboya	KH	KHM
+34	Camerún	CM	CMR
+35	Canadá	CA	CAN
+36	Catar	QA	QAT
+37	Chad	TD	TCD
+38	Chile	CL	CHL
+39	China	CN	CHN
+40	Chipre	CY	CYP
+41	Colombia	CO	COL
+42	Comoras	KM	COM
+43	Corea del Norte	KP	PRK
+44	Corea del Sur	KR	KOR
+45	Costa de Marfil	CI	CIV
+46	Costa Rica	CR	CRI
+47	Croacia	HR	HRV
+48	Cuba	CU	CUB
+49	Dinamarca	DK	DNK
+50	Dominica	DM	DMA
+51	Ecuador	EC	ECU
+52	Egipto	EG	EGY
+53	El Salvador	SV	SLV
+54	Emiratos Árabes Unidos	AE	ARE
+55	Eritrea	ER	ERI
+56	Eslovaquia	SK	SVK
+57	Eslovenia	SI	SVN
+58	España	ES	ESP
+59	Estados Unidos	US	USA
+60	Estonia	EE	EST
+61	Esuatini	SZ	SWZ
+62	Etiopía	ET	ETH
+63	Filipinas	PH	PHL
+64	Finlandia	FI	FIN
+65	Fiyi	FJ	FJI
+66	Francia	FR	FRA
+67	Gabón	GA	GAB
+68	Gambia	GM	GMB
+69	Georgia	GE	GEO
+70	Ghana	GH	GHA
+71	Granada	GD	GRD
+72	Grecia	GR	GRC
+73	Guatemala	GT	GTM
+74	Guinea	GN	GIN
+75	Guinea-Bisáu	GW	GNB
+76	Guinea Ecuatorial	GQ	GNQ
+77	Guyana	GY	GUY
+78	Haití	HT	HTI
+79	Honduras	HN	HND
+80	Hungría	HU	HUN
+81	India	IN	IND
+82	Indonesia	ID	IDN
+83	Irak	IQ	IRQ
+84	Irán	IR	IRN
+85	Irlanda	IE	IRL
+86	Islandia	IS	ISL
+87	Islas Marshall	MH	MHL
+88	Islas Salomón	SB	SLB
+89	Israel	IL	ISR
+90	Italia	IT	ITA
+91	Jamaica	JM	JAM
+92	Japón	JP	JPN
+93	Jordania	JO	JOR
+94	Kazajistán	KZ	KAZ
+95	Kenia	KE	KEN
+96	Kirguistán	KG	KGZ
+97	Kiribati	KI	KIR
+98	Kuwait	KW	KWT
+99	Laos	LA	LAO
+100	Lesoto	LS	LSO
+101	Letonia	LV	LVA
+102	Líbano	LB	LBN
+103	Liberia	LR	LBR
+104	Libia	LY	LBY
+105	Liechtenstein	LI	LIE
+106	Lituania	LT	LTU
+107	Luxemburgo	LU	LUX
+108	Macedonia del Norte	MK	MKD
+109	Madagascar	MG	MDG
+110	Malasia	MY	MYS
+111	Malaui	MW	MWI
+112	Maldivas	MV	MDV
+113	Malí	ML	MLI
+114	Malta	MT	MLT
+115	Marruecos	MA	MAR
+116	Mauricio	MU	MUS
+117	Mauritania	MR	MRT
+118	México	MX	MEX
+119	Micronesia	FM	FSM
+120	Moldavia	MD	MDA
+121	Mónaco	MC	MCO
+122	Mongolia	MN	MNG
+123	Montenegro	ME	MNE
+124	Mozambique	MZ	MOZ
+125	Namibia	NA	NAM
+126	Nauru	NR	NRU
+127	Nepal	NP	NPL
+128	Nicaragua	NI	NIC
+129	Níger	NE	NER
+130	Nigeria	NG	NGA
+131	Noruega	NO	NOR
+132	Nueva Zelanda	NZ	NZL
+133	Omán	OM	OMN
+134	Países Bajos	NL	NLD
+135	Pakistán	PK	PAK
+136	Palaos	PW	PLW
+137	Palestina	PS	PSE
+138	Panamá	PA	PAN
+139	Papúa Nueva Guinea	PG	PNG
+140	Paraguay	PY	PRY
+141	Perú	PE	PER
+142	Polonia	PL	POL
+143	Portugal	PT	PRT
+144	Reino Unido	GB	GBR
+145	República Centroafricana	CF	CAF
+146	República Checa	CZ	CZE
+147	República del Congo	CG	COG
+148	República Democrática del Congo	CD	COD
+149	República Dominicana	DO	DOM
+150	Ruanda	RW	RWA
+151	Rumanía	RO	ROU
+152	Rusia	RU	RUS
+153	Samoa	WS	WSM
+154	San Cristóbal y Nieves	KN	KNA
+155	San Marino	SM	SMR
+156	San Vicente y las Granadinas	VC	VCT
+157	Santa Lucía	LC	LCA
+158	Santo Tomé y Príncipe	ST	STP
+159	Senegal	SN	SEN
+160	Serbia	RS	SRB
+161	Seychelles	SC	SYC
+162	Sierra Leona	SL	SLE
+163	Singapur	SG	SGP
+164	Siria	SY	SYR
+165	Somalia	SO	SOM
+166	Sri Lanka	LK	LKA
+167	Sudáfrica	ZA	ZAF
+168	Sudán	SD	SDN
+169	Sudán del Sur	SS	SSD
+170	Suecia	SE	SWE
+171	Suiza	CH	CHE
+172	Surinam	SR	SUR
+173	Tailandia	TH	THA
+174	Tanzania	TZ	TZA
+175	Tayikistán	TJ	TJK
+176	Timor Oriental	TL	TLS
+177	Togo	TG	TGO
+178	Tonga	TO	TON
+179	Trinidad y Tobago	TT	TTO
+180	Túnez	TN	TUN
+181	Turkmenistán	TM	TKM
+182	Turquía	TR	TUR
+183	Tuvalu	TV	TUV
+184	Ucrania	UA	UKR
+185	Uganda	UG	UGA
+186	Uruguay	UY	URY
+187	Uzbekistán	UZ	UZB
+188	Vanuatu	VU	VUT
+189	Vaticano	VA	VAT
+190	Venezuela	VE	VEN
+191	Vietnam	VN	VNM
+192	Yemen	YE	YEM
+193	Yibuti	DJ	DJI
+194	Zambia	ZM	ZMB
+195	Zimbabue	ZW	ZWE

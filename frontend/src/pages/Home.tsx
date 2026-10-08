@@ -1,13 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { apiService, api } from '../services/api'
 import { News } from '../services/api'
-import { Search, Globe } from 'lucide-react'
-import { SkeletonNewsList, NoResultsFound } from '../components/ui'
+import { Search, Globe, X } from 'lucide-react'
+import { SkeletonNewsList, NoResultsFound, CompactNewsCard, ExpandedNewsModal } from '../components/ui'
 import { NewsCard } from '../components/ui/NewsCard'
 import { CreateListModal } from '../components/CreateListModal'
 import { useApiFavorites, useApiLists } from '../hooks/useApiFavorites'
+import { useSearchHistory } from '../hooks/useSearchHistory'
 
 export function Home() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -16,20 +17,46 @@ export function Home() {
   const categoryId = searchParams.get('category_id') || ''
   const countryId = searchParams.get('country_id') || ''
   const translatedOnly = searchParams.get('translated_only') === 'true'
-  const [suggestions, setSuggestions] = useState<string[]>([])
-
+  
+  // Local state for search input
+  const [localQuery, setLocalQuery] = useState(q)
+  
   // List modal state
   const [showListModal, setShowListModal] = useState(false)
   const [selectedNewsForList, setSelectedNewsForList] = useState<News | null>(null)
   const { favorites, toggleFavorite, isFavorite } = useApiFavorites()
   const { lists, createList, addToList } = useApiLists()
+  
+  // Search history
+  const { history, addToHistory, clearHistory, removeFromHistory } = useSearchHistory()
+  const [showHistory, setShowHistory] = useState(false)
+  const historyRef = useRef<HTMLDivElement>(null)
+  
+  // Expanded modal for hover/touch
+  const [expandedNews, setExpandedNews] = useState<News | null>(null)
+
+  // Detect if we're in search mode
+  const isSearchMode = !!q || !!categoryId || !!countryId || translatedOnly
 
   // Load the user's most frequent search terms (dynamic tags) when logged in
   useEffect(() => {
     if (!localStorage.getItem('token')) return
     api.get('/search/suggestions')
-      .then((res) => setSuggestions(res.data.terms || []))
+      .then((res) => {
+        // Merge with local history
+      })
       .catch(() => {})
+  }, [])
+
+  // Close history dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (historyRef.current && !historyRef.current.contains(e.target as Node)) {
+        setShowHistory(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
   const { data: categories } = useQuery({
@@ -56,17 +83,48 @@ export function Home() {
   const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
-    const query = formData.get('q')
+    const query = formData.get('q') as string
+    
+    // Add to history if not empty
+    if (query?.trim()) {
+      addToHistory(query.trim())
+    }
+    
+    // Log search if logged in
     if (localStorage.getItem('token') && query) {
       api.post('/searchlog', { q: String(query) }).catch(() => {})
     }
+    
     setSearchParams({ 
-      q: query as string, 
+      q: query || '',
       page: '1',
       category_id: categoryId,
       country_id: countryId,
       translated_only: translatedOnly ? 'true' : '',
     })
+    setShowHistory(false)
+  }
+
+  const handleClearSearch = () => {
+    setLocalQuery('')
+    setSearchParams({ 
+      page: '1',
+      category_id: categoryId,
+      country_id: countryId,
+      translated_only: translatedOnly ? 'true' : '',
+    })
+  }
+
+  const handleHistoryClick = (term: string) => {
+    setLocalQuery(term)
+    setSearchParams({ 
+      q: term,
+      page: '1',
+      category_id: categoryId,
+      country_id: countryId,
+      translated_only: translatedOnly ? 'true' : '',
+    })
+    setShowHistory(false)
   }
 
   const handleFilterChange = (key: string, value: string) => {
@@ -105,40 +163,96 @@ export function Home() {
   }
 
   const handleCreateAndAdd = async (name: string) => {
-    console.log('Home: handleCreateAndAdd called with:', name)
     const newListId = await createList(name)
-    console.log('Home: createList returned:', newListId)
     if (selectedNewsForList) {
-      console.log('Home: adding to list:', newListId, selectedNewsForList.id)
       await addToList(newListId, selectedNewsForList.id)
     }
     setShowListModal(false)
     setSelectedNewsForList(null)
   }
 
+  // Update localQuery when URL changes
+  useEffect(() => {
+    setLocalQuery(q)
+  }, [q])
+
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-4">Noticias del Mundo</h1>
+      {/* Header - Only show count, not title */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-sm text-gray-500">
+            {data?.total || 0} noticias
+            {isSearchMode && q && (
+              <span className="ml-1">para "<strong>{q}</strong>"</span>
+            )}
+          </div>
+        </div>
         
+        {/* Search Box with History */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-          <div className="relative md:col-span-2">
+          <div className="relative md:col-span-2" ref={historyRef}>
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
             <form onSubmit={handleSearch} className="flex gap-2">
-              <input
-                name="q"
-                defaultValue={q}
-                placeholder="Buscar noticias..."
-                list="user-search-suggestions"
-                className="input pl-10 w-full"
-              />
-              <datalist id="user-search-suggestions">
-                {suggestions.map((s) => <option key={s} value={s} />)}
-              </datalist>
+              <div className="relative flex-1">
+                <input
+                  name="q"
+                  value={localQuery}
+                  onChange={(e) => setLocalQuery(e.target.value)}
+                  onFocus={() => setShowHistory(true)}
+                  placeholder="Buscar noticias..."
+                  className="input pl-10 pr-10 w-full"
+                />
+                {localQuery && (
+                  <button
+                    type="button"
+                    onClick={handleClearSearch}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-1"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
               <button type="submit" className="btn-primary">
                 Buscar
               </button>
             </form>
+            
+            {/* History Dropdown */}
+            {showHistory && history.length > 0 && (
+              <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden">
+                <div className="flex justify-between items-center px-3 py-2 border-b border-gray-200 dark:border-gray-700">
+                  <span className="text-xs text-gray-500">Búsquedas recientes</span>
+                  <button 
+                    onClick={clearHistory} 
+                    className="text-xs text-red-500 hover:underline"
+                  >
+                    Limpiar todo
+                  </button>
+                </div>
+                {history.map((term) => (
+                  <div
+                    key={term}
+                    className="flex items-center justify-between px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors"
+                    onClick={() => handleHistoryClick(term)}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Search className="h-4 w-4 text-gray-400" />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">{term}</span>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        removeFromHistory(term)
+                      }}
+                      className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           
           <select
@@ -177,9 +291,9 @@ export function Home() {
             Solo traducidas
           </button>
           
-          {(categoryId || countryId || translatedOnly) && (
+          {isSearchMode && (
             <button
-              onClick={() => setSearchParams({ page: '1', q })}
+              onClick={() => setSearchParams({ page: '1' })}
               className="text-sm text-gray-500 hover:text-gray-700"
             >
               Limpiar filtros
@@ -203,25 +317,35 @@ export function Home() {
       ) : data?.news?.length === 0 ? (
         <NoResultsFound
           query={q}
-          onClearFilters={() => setSearchParams({ page: '1', q })}
+          onClearFilters={() => setSearchParams({ page: '1' })}
         />
       ) : (
         <>
-          <div className="mb-4 text-sm text-gray-600">
-            {data?.total} noticias encontradas
-            {translatedOnly && <span className="ml-2 text-primary-600">(traducidas)</span>}
-          </div>
-
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {data?.news?.map((news) => (
-              <NewsCard
-                key={news.id}
-                news={news}
-                isFavorite={isFavorite(news.id)}
-                onToggleFavorite={toggleFavorite}
-                onAddToList={handleAddToList}
-              />
-            ))}
+          {/* News Grid - Compact in search mode */}
+          <div className={isSearchMode 
+            ? 'grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+            : 'grid gap-4 md:grid-cols-2'
+          }>
+            {data?.news?.map((news) => 
+              isSearchMode ? (
+                <CompactNewsCard
+                  key={news.id}
+                  news={news}
+                  isFavorite={isFavorite(news.id)}
+                  onToggleFavorite={toggleFavorite}
+                  onAddToList={handleAddToList}
+                  onClick={() => setExpandedNews(news)}
+                />
+              ) : (
+                <NewsCard
+                  key={news.id}
+                  news={news}
+                  isFavorite={isFavorite(news.id)}
+                  onToggleFavorite={toggleFavorite}
+                  onAddToList={handleAddToList}
+                />
+              )
+            )}
           </div>
 
           {data && data.total_pages > 1 && (
@@ -255,6 +379,15 @@ export function Home() {
         mode="add-to"
         existingLists={lists.map((l) => ({ id: l.id, name: l.name }))}
         onSelectList={handleSelectList}
+      />
+
+      {/* Expanded News Modal for hover/touch */}
+      <ExpandedNewsModal
+        news={expandedNews}
+        isFavorite={expandedNews ? isFavorite(expandedNews.id) : false}
+        onClose={() => setExpandedNews(null)}
+        onToggleFavorite={toggleFavorite}
+        onAddToList={handleAddToList}
       />
     </div>
   )

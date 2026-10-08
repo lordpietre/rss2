@@ -207,8 +207,9 @@ func initDB() {
 	}
 
 	// Añadir columnas a traducciones para workers remotos
+	// Use ON DELETE SET NULL to allow deleting workers without breaking translations
 	_, err = db.GetPool().Exec(ctx, `
-		ALTER TABLE traducciones ADD COLUMN IF NOT EXISTS worker_id INTEGER REFERENCES remote_workers(id)
+		ALTER TABLE traducciones ADD COLUMN IF NOT EXISTS worker_id INTEGER REFERENCES remote_workers(id) ON DELETE SET NULL
 	`)
 	if err != nil {
 		log.Printf("Warning: Could not add worker_id column: %v", err)

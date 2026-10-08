@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { apiService, EntitySuggestion } from '../services/api'
 import { LineChart } from '../components/LineChart'
-import { X, Search, TrendingUp } from 'lucide-react'
+import { X, Search } from 'lucide-react'
 
 const TIPOS = [
   { value: 'persona', label: 'Personas' },
@@ -68,14 +68,6 @@ export function Analisis() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-        <TrendingUp className="h-7 w-7 text-primary-600" />
-        Evolución de menciones
-      </h1>
-      <p className="text-gray-500 dark:text-gray-400 mt-1 mb-6">
-        Selecciona personas, lugares, organizaciones o temas y compara su actividad día a día.
-      </p>
-
       <div className="card p-4 mb-6">
         <div className="flex flex-col md:flex-row md:items-end gap-4">
           <div>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { apiService, api, Alerta, News } from '../services/api'
-import { Bell, CheckCheck, ChevronDown, ChevronUp, FileText, XCircle } from 'lucide-react'
+import { CheckCheck, ChevronDown, ChevronUp, FileText, XCircle } from 'lucide-react'
 import { WikiTooltip } from '../components/ui/WikiTooltip'
 
 const TIPO_LABEL: Record<string, string> = {
@@ -81,10 +81,6 @@ export function Alertas() {
   return (
     <div>
       <div className="flex justify-between items-center mb-8 flex-wrap gap-3">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-          <Bell className="h-7 w-7 text-primary-600" />
-          Alertas de actividad
-        </h1>
         <div className="flex items-center gap-2 flex-wrap">
           <select
             value={tipoFiltro}

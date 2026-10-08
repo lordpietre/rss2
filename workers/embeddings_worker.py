@@ -151,6 +151,8 @@ def texts_from_rows(rows: List[psycopg2.extras.DictRow]) -> List[str]:
 def upsert_embeddings(conn, rows, embs: np.ndarray, model_name: str):
     """
     Inserta o actualiza embeddings en la base de datos.
+    Guarda tanto en embedding (DOUBLE PRECISION[]) como en 
+    embedding_vector (vector) para compatibilidad y búsqueda.
     """
     if embs.size == 0 or not rows:
         return
@@ -184,6 +186,23 @@ def upsert_embeddings(conn, rows, embs: np.ndarray, model_name: str):
         )
 
     conn.commit()
+
+    # Also update the vector column for pgvector search
+    # pgvector accepts arrays in format '[val1, val2, ...]'
+    for i, r in enumerate(rows):
+        embedding_list = embs[i].astype(float).tolist()
+        # Format as pgvector string '[val1,val2,...]'
+        vector_str = '[' + ','.join(str(v) for v in embedding_list) + ']'
+        
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE traduccion_embeddings 
+                SET embedding_vector = %s::vector
+                WHERE traduccion_id = %s AND model = %s
+            """, (vector_str, int(r["traduccion_id"]), model_name))
+        
+    conn.commit()
+    log.info(f"Upserted {len(rows)} embeddings to pgvector column")
 
 
 # ================================================================

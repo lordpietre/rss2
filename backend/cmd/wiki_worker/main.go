@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/rss2/backend/internal/cache"
 	"github.com/rss2/backend/internal/logger"
 	"github.com/rss2/backend/internal/workers"
 )
@@ -116,14 +117,26 @@ func downloadImage(imgURL, destPath string) error {
 	return err
 }
 
-func fetchWikipediaInfo(valor string) (*WikiSummary, error) {
+func fetchWikipediaInfo(ctx context.Context, valor string) (*WikiSummary, error) {
 	// Normalize the value to be wiki-compatible
 	title := strings.ReplaceAll(strings.TrimSpace(valor), " ", "_")
 	encodedTitle := url.PathEscape(title)
 
+	// Check cache first
+	cacheKey := fmt.Sprintf("wiki:summary:%s", encodedTitle)
+	if cache.Client != nil {
+		if cached, err := cache.Get(ctx, cacheKey); err == nil && cached != "" {
+			var summary WikiSummary
+			if err := json.Unmarshal([]byte(cached), &summary); err == nil {
+				logger.Debug().Str("valor", valor).Msg("Cache hit for Wikipedia")
+				return &summary, nil
+			}
+		}
+	}
+
 	apiURL := fmt.Sprintf("https://es.wikipedia.org/api/rest_v1/page/summary/%s", encodedTitle)
 
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := &http.Client{Timeout: 30 * time.Second}
 	req, err := http.NewRequest("GET", apiURL, nil)
 	if err != nil {
 		return nil, err
@@ -157,13 +170,21 @@ func fetchWikipediaInfo(valor string) (*WikiSummary, error) {
 		return nil, nil // Treat as not found to strictly avoid incorrect tooltips
 	}
 
+	// Store in cache for 48 hours (Wikipedia data is relatively stable)
+	if cache.Client != nil {
+		if data, err := json.Marshal(summary); err == nil {
+			cache.Set(ctx, cacheKey, string(data), 48*time.Hour)
+			logger.Debug().Str("valor", valor).Msg("Cached Wikipedia result")
+		}
+	}
+
 	return &summary, nil
 }
 
 func processTag(ctx context.Context, tag Tag) {
 	logger.Info().Int64("tag_id", tag.ID).Str("valor", tag.Valor).Msg("Procesando tag")
 
-	summary, err := fetchWikipediaInfo(tag.Valor)
+	summary, err := fetchWikipediaInfo(ctx, tag.Valor)
 	if err != nil {
 		// No marcar como revisado ante errores transitorios (timeouts, 503, 504)
 		// para que se reintenten en el siguiente ciclo
@@ -254,6 +275,29 @@ func Main() {
 	pool = workers.GetPool()
 	defer workers.Close()
 
+	// Connect to Redis for caching
+	redisHost := os.Getenv("REDIS_HOST")
+	if redisHost == "" {
+		redisHost = "redis"
+	}
+	redisPort := os.Getenv("REDIS_PORT")
+	if redisPort == "" {
+		redisPort = "6379"
+	}
+	redisPass := os.Getenv("REDIS_PASSWORD")
+	var redisURL string
+	if redisPass != "" {
+		redisURL = fmt.Sprintf("redis://:%s@%s:%s", redisPass, redisHost, redisPort)
+	} else {
+		redisURL = fmt.Sprintf("redis://%s:%s", redisHost, redisPort)
+	}
+	if err := cache.Connect(redisURL); err != nil {
+		logger.Warn().Err(err).Msg("Failed to connect to Redis, caching disabled")
+	} else {
+		logger.Info().Msg("Connected to Redis for caching")
+		defer cache.Close()
+	}
+
 	// Start health check HTTP server
 	go func() {
 		http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -316,12 +360,35 @@ func Main() {
 
 			logger.Info().Msgf("Recuperados %d tags para procesar...", len(tags))
 
+			baseDelay := 10  // segundos base entre requests (más conservador para Wikipedia)
+			maxDelay := 60   // máximo delay cuando hay errores
+			currentDelay := baseDelay
+		 consecutiveErrors := 0
+
 			for _, tag := range tags {
 				processTag(ctx, tag)
 				select {
 				case <-ctx.Done():
 					return
-				case <-time.After(1 * time.Second): // Delay to avoid Wikipedia Rate Limits (429)
+				case <-time.After(time.Duration(currentDelay) * time.Second):
+				}
+				
+				// Backoff exponencial: si hay errores recientes, incrementar delay
+				// Resetear gradualmente cuando hay éxito
+				if consecutiveErrors > 0 {
+					consecutiveErrors--
+					if currentDelay < maxDelay {
+						currentDelay = currentDelay * 2
+						if currentDelay > maxDelay {
+							currentDelay = maxDelay
+						}
+					}
+				} else if currentDelay > baseDelay {
+					// Reducir gradualmente hacia el base
+					currentDelay = currentDelay / 2
+					if currentDelay < baseDelay {
+						currentDelay = baseDelay
+					}
 				}
 			}
 		}

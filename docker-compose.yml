@@ -10,7 +10,7 @@ services:
   # BASE DE DATOS Y CACHE
   # ------------------------------------------------------------------------------
   db:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: rss2_db
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-rss}
@@ -312,6 +312,9 @@ services:
       DB_NAME: ${POSTGRES_DB:-rss}
       DB_USER: ${POSTGRES_USER:-rss}
       DB_PASS: ${POSTGRES_PASSWORD}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
       WIKI_SLEEP: 5
       WIKI_BATCH: 40
     volumes:
