@@ -3,9 +3,10 @@ import { useQuery } from '@tanstack/react-query'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { apiService } from '../services/api'
-import { Globe, ArrowLeft, ExternalLink, Newspaper, Heart } from 'lucide-react'
+import { Globe, ArrowLeft, ExternalLink, Newspaper, Heart, MapPin } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { WikiTooltip } from '../components/ui/WikiTooltip'
+import { ShareButtons } from '../components/ui/ShareButtons'
 
 export function News() {
   const { id } = useParams<{ id: string }>()
@@ -16,6 +17,20 @@ export function News() {
     queryFn: () => apiService.getNewsById(id!),
     enabled: !!id,
   })
+
+  const { data: countries } = useQuery({
+    queryKey: ['countries'],
+    queryFn: apiService.getCountries,
+  })
+
+  // Helper to get country name by ID
+  const getCountryName = (countryId: number | undefined) => {
+    if (!countryId || !countries) return undefined
+    const country = countries.find(c => c.id === countryId)
+    return country?.nombre
+  }
+
+  const countryName = news ? getCountryName(news.pais_id) : undefined
 
   useEffect(() => {
     const stored = localStorage.getItem('favorites')
@@ -70,7 +85,7 @@ export function News() {
           <img src={news.imagen_url} alt={news.titulo} className="w-full h-96 object-cover rounded-xl mb-8" />
         )}
         
-        <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
+        <div className="flex items-center gap-4 text-sm text-gray-500 mb-4 flex-wrap">
           {news.fuente_nombre && (
             <span className="flex items-center gap-1">
               <Newspaper className="h-4 w-4" />
@@ -81,6 +96,15 @@ export function News() {
           <span>
             {news.fecha && formatDistanceToNow(new Date(news.fecha), { addSuffix: true, locale: es })}
           </span>
+          {countryName && (
+            <>
+              <span>•</span>
+              <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                <MapPin className="h-4 w-4" />
+                {countryName}
+              </span>
+            </>
+          )}
         </div>
 
         <h1 className="text-3xl font-bold text-gray-900 mb-4">
@@ -91,7 +115,7 @@ export function News() {
           {news.summary_translated || news.resumen}
         </p>
 
-        <div className="flex gap-4">
+        <div className="flex flex-wrap gap-4 items-center">
           <a
             href={news.url}
             target="_blank"
@@ -108,6 +132,7 @@ export function News() {
             <Heart className={`h-4 w-4 ${isFavorite ? 'fill-current' : ''}`} />
             {isFavorite ? 'Saved' : 'Save'}
           </button>
+          <ShareButtons news={news} size="md" />
         </div>
 
         {news.entities && news.entities.length > 0 && (

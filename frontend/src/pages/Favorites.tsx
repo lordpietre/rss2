@@ -5,6 +5,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { CreateListModal } from '../components/CreateListModal'
 import { NewsCard } from '../components/ui/NewsCard'
 import { TagCloud } from '../components/ui/TagCloud'
+import { ListShareButtons } from '../components/ui/ListShareButtons'
 import { useApiFavorites, useApiLists, useApiSavedSearches } from '../hooks/useApiFavorites'
 
 type Tab = 'news' | 'lists' | 'searches'
@@ -265,7 +266,10 @@ function ListDetailView({
             </div>
           )}
         </div>
-        <span className="text-gray-500">{news.length} noticias</span>
+        <div className="flex items-center gap-3">
+          <span className="text-gray-500">{news.length} noticias</span>
+          <ListShareButtons listName={listName} news={news} size="md" />
+        </div>
       </div>
 
       {/* Keywords Section */}

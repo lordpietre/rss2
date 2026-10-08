@@ -25,6 +25,197 @@ func getTargetLang(c *gin.Context) string {
 	return lang
 }
 
+// GetSharePreview returns an HTML page with Open Graph meta tags for social sharing
+// This allows Facebook and other social networks to display rich previews with the news content
+// @Summary Get share preview page
+// @Description Returns HTML with OG meta tags for social media sharing
+// @Tags news
+// @Produce html
+// @Param id path string true "News ID"
+// @Success 200 {string} string "HTML page with OG meta tags"
+// @Failure 404 {object} models.ErrorResponse
+// @Router /api/share/{id} [get]
+func GetSharePreview(c *gin.Context) {
+	id := c.Param("id")
+	targetLang := getTargetLang(c)
+
+	// Query to get news with translation, country name, and category name
+	sqlQuery := `
+		SELECT 
+			n.id, 
+			COALESCE(n.titulo, ''), 
+			COALESCE(n.resumen, ''), 
+			COALESCE(n.contenido, ''), 
+			n.url, 
+			n.fecha, 
+			n.imagen_url, 
+			n.fuente_nombre,
+			n.lang,
+			t.titulo_trad,
+			t.resumen_trad,
+			t.contenido_trad,
+			p.nombre as pais_nombre,
+			cat.nombre as categoria_nombre
+		FROM noticias n
+		LEFT JOIN traducciones t ON t.noticia_id = n.id AND t.lang_to = $1
+		LEFT JOIN paises p ON p.id = n.pais_id
+		LEFT JOIN categorias cat ON cat.id = n.categoria_id
+		WHERE n.id = $2
+	`
+
+	var n struct {
+		ID              string
+		Titulo          string
+		Resumen         string
+		Contenido       string
+		URL             string
+		Fecha           *time.Time
+		ImagenURL       *string
+		FuenteNombre    *string
+		Lang            *string
+		TituloTrad      *string
+		ResumenTrad     *string
+		ContenidoTrad   *string
+		PaisNombre     *string
+		CategoriaNombre *string
+	}
+
+	err := db.GetPool().QueryRow(c.Request.Context(), sqlQuery, targetLang, id).Scan(
+		&n.ID, &n.Titulo, &n.Resumen, &n.Contenido, &n.URL, &n.Fecha,
+		&n.ImagenURL, &n.FuenteNombre, &n.Lang,
+		&n.TituloTrad, &n.ResumenTrad, &n.ContenidoTrad,
+		&n.PaisNombre, &n.CategoriaNombre,
+	)
+
+	if err != nil {
+		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: "News not found"})
+		return
+	}
+
+	// Use translated content if available
+	title := n.Titulo
+	summary := n.Resumen
+	if n.TituloTrad != nil && *n.TituloTrad != "" {
+		title = *n.TituloTrad
+	}
+	if n.ResumenTrad != nil && *n.ResumenTrad != "" {
+		summary = *n.ResumenTrad
+	}
+
+	// Build the og:description from summary + meta info
+	description := summary
+	metaInfo := ""
+	if n.FuenteNombre != nil && *n.FuenteNombre != "" {
+		metaInfo = *n.FuenteNombre
+	}
+	if n.Fecha != nil {
+		if metaInfo != "" {
+			metaInfo += " • "
+		}
+		metaInfo += n.Fecha.Format("02/01/2006")
+	}
+	if n.PaisNombre != nil && *n.PaisNombre != "" {
+		if metaInfo != "" {
+			metaInfo += " • "
+		}
+		metaInfo += *n.PaisNombre
+	}
+
+	if metaInfo != "" {
+		description = metaInfo + "\n\n" + summary
+	}
+
+	// Use the original URL as og:url so sharing points to the source
+	ogURL := n.URL
+	if n.ImagenURL == nil || *n.ImagenURL == "" {
+		n.ImagenURL = nil
+	}
+
+	// HTML template with Open Graph meta tags
+	html := fmt.Sprintf(`<!DOCTYPE html>
+<html lang="es">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="description" content="%s">
+	
+	<!-- Open Graph / Facebook -->
+	<meta property="og:type" content="article">
+	<meta property="og:url" content="%s">
+	<meta property="og:title" content="%s">
+	<meta property="og:description" content="%s">
+	<meta property="og:image" content="%s">
+	<meta property="og:site_name" content="RSS2 News">
+	
+	<!-- Twitter -->
+	<meta property="twitter:card" content="summary_large_image">
+	<meta property="twitter:url" content="%s">
+	<meta property="twitter:title" content="%s">
+	<meta property="twitter:description" content="%s">
+	<meta property="twitter:image" content="%s">
+	
+	<title>%s</title>
+	
+	<style>
+		body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; line-height: 1.6; }
+		.header { color: #333; margin-bottom: 20px; }
+		.meta { color: #666; font-size: 14px; margin-bottom: 15px; }
+		.summary { font-size: 18px; color: #222; margin-bottom: 20px; }
+		.content { color: #444; }
+		.source { margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee; color: #888; font-size: 12px; }
+		a { color: #0066cc; }
+	</style>
+</head>
+<body>
+	<article>
+		<div class="header">
+			<h1>%s</h1>
+		</div>
+		<div class="meta">%s</div>
+		<div class="summary">%s</div>
+		<div class="source">
+			Fuente: <a href="%s" target="_blank" rel="noopener">%s</a>
+		</div>
+	</article>
+</body>
+</html>`,
+		escapeHTML(description),
+		escapeHTML(ogURL),
+		escapeHTML(title),
+		escapeHTML(description),
+		getImageOrEmpty(n.ImagenURL),
+		escapeHTML(ogURL),
+		escapeHTML(title),
+		escapeHTML(description),
+		getImageOrEmpty(n.ImagenURL),
+		escapeHTML(title),
+		escapeHTML(title),
+		escapeHTML(metaInfo),
+		escapeHTML(summary),
+		escapeHTML(n.URL),
+		escapeHTML(n.URL),
+	)
+
+	c.Header("Content-Type", "text/html; charset=utf-8")
+	c.String(http.StatusOK, html)
+}
+
+func escapeHTML(s string) string {
+	s = strings.ReplaceAll(s, "&", "&amp;")
+	s = strings.ReplaceAll(s, "<", "&lt;")
+	s = strings.ReplaceAll(s, ">", "&gt;")
+	s = strings.ReplaceAll(s, "\"", "&quot;")
+	s = strings.ReplaceAll(s, "'", "&#39;")
+	return s
+}
+
+func getImageOrEmpty(img *string) string {
+	if img != nil && *img != "" {
+		return *img
+	}
+	return ""
+}
+
 // GetNews returns paginated news with optional filters
 // @Summary List news
 // @Description Returns paginated news with optional filtering by query, category, country, and translation status

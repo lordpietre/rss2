@@ -323,6 +323,9 @@ func Main() {
 			news.DELETE("/:id", middleware.AuthRequired(), handlers.DeleteNews)
 		}
 
+		// Share preview with Open Graph tags for social media
+		api.GET("/share/:id", handlers.GetSharePreview)
+
 		feeds := api.Group("/feeds")
 		{
 			feeds.GET("", handlers.GetFeeds)
@@ -369,6 +372,7 @@ func Main() {
 		api.PUT("/lists/:id", middleware.AuthRequired(), handlers.UpdateList)
 		api.DELETE("/lists/:id", middleware.AuthRequired(), handlers.DeleteList)
 		api.GET("/lists/:id/items", middleware.AuthRequired(), handlers.GetListItems)
+		api.GET("/lists/:id/export", middleware.AuthRequired(), handlers.GetListExport)
 		api.POST("/lists/:id/items/:noticiaId", middleware.AuthRequired(), handlers.AddToList)
 		api.DELETE("/lists/:id/items/:noticiaId", middleware.AuthRequired(), handlers.RemoveFromList)
 		api.GET("/lists/:id/tags", middleware.AuthRequired(), handlers.GetListTags)

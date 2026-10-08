@@ -1,13 +1,15 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { X, Heart, FolderPlus, Globe, ExternalLink } from 'lucide-react'
+import { X, Heart, FolderPlus, Globe, ExternalLink, MapPin } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { News } from '../../services/api'
+import { ShareButtons } from './ShareButtons'
 
 interface ExpandedNewsModalProps {
   news: News | null
   isFavorite: boolean
+  countryName?: string
   onClose: () => void
   onToggleFavorite: (news: News) => void
   onAddToList: (news: News) => void
@@ -16,6 +18,7 @@ interface ExpandedNewsModalProps {
 export function ExpandedNewsModal({
   news,
   isFavorite,
+  countryName,
   onClose,
   onToggleFavorite,
   onAddToList,
@@ -101,11 +104,16 @@ export function ExpandedNewsModal({
             <h2 className="text-2xl font-bold text-white mb-2 line-clamp-2">
               {news.title_translated || news.titulo}
             </h2>
-            <div className="flex items-center gap-3 text-sm text-white/80">
+            <div className="flex items-center gap-3 text-sm text-white/80 flex-wrap">
               {news.fuente_nombre && <span>{news.fuente_nombre}</span>}
               {news.fecha && (
                 <span>
                   {formatDistanceToNow(new Date(news.fecha), { addSuffix: true, locale: es })}
+                </span>
+              )}
+              {countryName && (
+                <span className="flex items-center gap-1 bg-white/20 px-2 py-0.5 rounded">
+                  <MapPin className="h-3 w-3" /> {countryName}
                 </span>
               )}
               {news.title_translated && (
@@ -150,6 +158,7 @@ export function ExpandedNewsModal({
               <FolderPlus className="h-4 w-4" />
               Añadir a lista
             </button>
+            <ShareButtons news={news} size="md" />
             <Link
               to={`/news/${news.id}`}
               className="btn-primary flex items-center gap-2 ml-auto"

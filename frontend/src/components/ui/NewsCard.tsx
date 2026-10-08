@@ -1,14 +1,17 @@
 import { Link } from 'react-router-dom'
-import { Heart, FolderPlus, Newspaper, Globe } from 'lucide-react'
+import { Heart, FolderPlus, Newspaper, Globe, MapPin } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { News } from '../../services/api'
+import { ShareButtons } from './ShareButtons'
 
 interface NewsCardProps {
   news: News
   showFavoriteButton?: boolean
   showListButton?: boolean
+  showShareButtons?: boolean
   isFavorite?: boolean
+  countryName?: string
   onToggleFavorite?: (news: News) => void
   onAddToList?: (news: News) => void
   className?: string
@@ -18,7 +21,9 @@ export function NewsCard({
   news,
   showFavoriteButton = true,
   showListButton = true,
+  showShareButtons = false,
   isFavorite = false,
+  countryName,
   onToggleFavorite,
   onAddToList,
   className = ''
@@ -50,13 +55,19 @@ export function NewsCard({
       {/* Content - elongated vertical layout */}
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Meta row - small text */}
-        <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
+        <div className="flex items-center gap-2 text-xs text-gray-500 mb-1 flex-wrap">
           {news.fuente_nombre && (
             <span className="truncate max-w-[120px]">{news.fuente_nombre}</span>
           )}
           {news.fecha && (
             <span className="shrink-0">
               {formatDistanceToNow(new Date(news.fecha), { addSuffix: true, locale: es })}
+            </span>
+          )}
+          {countryName && (
+            <span className="flex items-center gap-0.5 shrink-0 text-emerald-600 dark:text-emerald-400">
+              <MapPin className="h-3 w-3" />
+              {countryName}
             </span>
           )}
         </div>
@@ -94,6 +105,9 @@ export function NewsCard({
             >
               <FolderPlus className="h-3.5 w-3.5" />
             </button>
+          )}
+          {showShareButtons && (
+            <ShareButtons news={news} size="sm" />
           )}
         </div>
       </div>

@@ -348,6 +348,126 @@ func GetListItems(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"items": items})
 }
 
+// GetListExport returns a compiled text with all news in a list
+// @Summary Export list as compiled text
+// @Description Returns a plain text with all news items compiled together
+// @Tags lists
+// @Produce text
+// @Param id path int true "List ID"
+// @Success 200 {string} string "Compiled text of all news in the list"
+// @Failure 403 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Router /api/lists/{id}/export [get]
+func GetListExport(c *gin.Context) {
+	userID := c.GetInt("user_id")
+	listID := c.Param("id")
+	ctx := c.Request.Context()
+
+	// Verify ownership
+	var ownerID int
+	var listName string
+	err := db.GetPool().QueryRow(ctx, `SELECT user_id, name FROM user_lists WHERE id = $1`, listID).Scan(&ownerID, &listName)
+	if err != nil || ownerID != userID {
+		c.JSON(http.StatusNotFound, gin.H{"error": "list not found"})
+		return
+	}
+
+	// Get all news items in the list with translations and country info
+	rows, err := db.GetPool().Query(ctx, `
+		SELECT 
+			n.titulo, 
+			n.resumen,
+			n.url, 
+			n.fecha, 
+			n.fuente_nombre,
+			t.titulo_trad, 
+			t.resumen_trad,
+			p.nombre as pais_nombre
+		FROM user_list_items uli
+		JOIN noticias n ON uli.noticia_id = n.id
+		LEFT JOIN traducciones t ON n.id = t.noticia_id AND t.lang_to = 'es'
+		LEFT JOIN paises p ON p.id = n.pais_id
+		WHERE uli.list_id = $1
+		ORDER BY uli.created_at DESC
+	`, listID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	var sb strings.Builder
+	sb.WriteString("📋 " + listName + "\n")
+	sb.WriteString(strings.Repeat("=", len(listName)+3) + "\n\n")
+
+	itemNum := 1
+	for rows.Next() {
+		var titulo, resumen, url, fuenteNombre, paisNombre string
+		var tituloTrad, resumenTrad sql.NullString
+		var fecha interface{}
+
+		if err := rows.Scan(&titulo, &resumen, &url, &fecha, &fuenteNombre, &tituloTrad, &resumenTrad, &paisNombre); err != nil {
+			continue
+		}
+
+		// Use translated title if available
+		displayTitle := titulo
+		if tituloTrad.Valid && tituloTrad.String != "" {
+			displayTitle = tituloTrad.String
+		}
+
+		// Use translated summary if available
+		displaySummary := resumen
+		if resumenTrad.Valid && resumenTrad.String != "" {
+			displaySummary = resumenTrad.String
+		}
+
+		// Format date
+		dateStr := ""
+		if fecha != nil {
+			if ft, ok := fecha.(interface{ Format(string) string }); ok {
+				dateStr = ft.Format("02/01/2006")
+			}
+		}
+
+		// Build the entry
+		sb.WriteString(fmt.Sprintf("📰 %d. %s\n", itemNum, displayTitle))
+		
+		metaParts := []string{}
+		if fuenteNombre != "" {
+			metaParts = append(metaParts, fuenteNombre)
+		}
+		if dateStr != "" {
+			metaParts = append(metaParts, dateStr)
+		}
+		if paisNombre != "" {
+			metaParts = append(metaParts, paisNombre)
+		}
+		if len(metaParts) > 0 {
+			sb.WriteString("   [" + strings.Join(metaParts, " • ") + "]\n")
+		}
+
+		if displaySummary != "" {
+			sb.WriteString("\n   " + displaySummary + "\n")
+		}
+
+		sb.WriteString("\n   🔗 " + url + "\n")
+		sb.WriteString("\n" + strings.Repeat("-", 50) + "\n\n")
+
+		itemNum++
+	}
+
+	if itemNum == 1 {
+		sb.WriteString("La lista está vacía.\n")
+	}
+
+	sb.WriteString("\n📊 Total: " + fmt.Sprintf("%d", itemNum-1) + " noticias\n")
+	sb.WriteString("Generado por RSS2 News")
+
+	c.Header("Content-Type", "text/plain; charset=utf-8")
+	c.String(http.StatusOK, sb.String())
+}
+
 func AddToList(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	listID := c.Param("id")

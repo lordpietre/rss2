@@ -1,12 +1,14 @@
 import { Link } from 'react-router-dom'
-import { Heart, Globe } from 'lucide-react'
+import { Heart, Globe, MapPin } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { News } from '../../services/api'
+import { ShareButtons } from './ShareButtons'
 
 interface CompactNewsCardProps {
   news: News
   isFavorite?: boolean
+  countryName?: string
   onToggleFavorite?: (news: News) => void
   onAddToList?: (news: News) => void
   onClick?: () => void
@@ -15,6 +17,7 @@ interface CompactNewsCardProps {
 export function CompactNewsCard({
   news,
   isFavorite = false,
+  countryName,
   onToggleFavorite,
   onAddToList,
   onClick,
@@ -42,11 +45,17 @@ export function CompactNewsCard({
         <h3 className="font-medium text-sm line-clamp-2 mb-1 text-gray-900 dark:text-white">
           {news.title_translated || news.titulo}
         </h3>
-        <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
+        <div className="flex items-center gap-2 text-xs text-gray-500 mb-1 flex-wrap">
           {news.fuente_nombre && <span className="truncate">{news.fuente_nombre}</span>}
           {news.fecha && (
             <span>
               {formatDistanceToNow(new Date(news.fecha), { addSuffix: true, locale: es })}
+            </span>
+          )}
+          {countryName && (
+            <span className="flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400">
+              <MapPin className="h-3 w-3" />
+              {countryName}
             </span>
           )}
         </div>
@@ -72,6 +81,7 @@ export function CompactNewsCard({
             <Heart className={`h-4 w-4 ${isFavorite ? 'fill-current' : ''}`} />
           </button>
         )}
+        <ShareButtons news={news} size="sm" />
       </div>
     </Link>
   )

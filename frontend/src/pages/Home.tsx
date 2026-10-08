@@ -69,6 +69,13 @@ export function Home() {
     queryFn: apiService.getCountries,
   })
 
+  // Helper to get country name by ID
+  const getCountryName = (countryId: number | undefined) => {
+    if (!countryId || !countries) return undefined
+    const country = countries.find(c => c.id === countryId)
+    return country?.nombre
+  }
+
   const { data, isLoading, error } = useQuery({
     queryKey: ['news', page, q, categoryId, countryId, translatedOnly],
     queryFn: () => apiService.getNews({ 
@@ -332,6 +339,7 @@ export function Home() {
                   key={news.id}
                   news={news}
                   isFavorite={isFavorite(news.id)}
+                  countryName={getCountryName(news.pais_id)}
                   onToggleFavorite={toggleFavorite}
                   onAddToList={handleAddToList}
                   onClick={() => setExpandedNews(news)}
@@ -341,6 +349,7 @@ export function Home() {
                   key={news.id}
                   news={news}
                   isFavorite={isFavorite(news.id)}
+                  countryName={getCountryName(news.pais_id)}
                   onToggleFavorite={toggleFavorite}
                   onAddToList={handleAddToList}
                 />
@@ -385,6 +394,7 @@ export function Home() {
       <ExpandedNewsModal
         news={expandedNews}
         isFavorite={expandedNews ? isFavorite(expandedNews.id) : false}
+        countryName={expandedNews ? getCountryName(expandedNews.pais_id) : undefined}
         onClose={() => setExpandedNews(null)}
         onToggleFavorite={toggleFavorite}
         onAddToList={handleAddToList}
