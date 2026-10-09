@@ -41,7 +41,6 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 194,Algerie360 – Actualité,Un des plus grands portails généralistes du pays.,https://www.algerie360.com/feed,13,Sociedad,8,Argelia,fr,true,0
 200,Ennahar Online – Arabic,النهار أونلاين: أخبار، سياسة، رياضة.,https://www.ennaharonline.com/feed,13,Sociedad,8,Argelia,ar,true,0
 205,Observ'Algérie – Actualité,Actualité algérienne en continu.,https://www.observalgerie.com/feed,13,Sociedad,8,Argelia,fr,true,0
-208,Agencia CyTA – Fundación Leloir,Comunicados y avances científicos de la Fundación Leloir.,https://www.agenciacyta.org.ar/feed/,1,Ciencia,9,Argentina,es,true,0
 214,Ciencia del Sur – Divulgación,Portal científico argentino especializado en divulgación y opinión.,https://www.cienciasdelsur.com/feed/,1,Ciencia,9,Argentina,es,true,0
 225,Revista Exactas UBA,Divulgación científica de la Facultad de Ciencias Exactas UBA.,https://exactas.uba.ar/feed/,1,Ciencia,9,Argentina,es,true,0
 234,Clarín – Economía,"Economía argentina, dólar, inflación y mercados.",https://www.clarin.com/rss/economia/,4,Economía,9,Argentina,es,true,0
@@ -69,7 +68,6 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 384,ScienceAlert – Australia,Portal científico australiano reconocido mundialmente.,https://www.sciencealert.com/feed,1,Ciencia,11,Australia,en,true,0
 386,The Guardian Australia – Science,"Ciencia, salud y medio ambiente.",https://www.theguardian.com/science/rss,1,Ciencia,11,Australia,en,true,0
 389,Concrete Playground Sydney – Culture,Guía cultural y urbana de Sídney.,https://concreteplayground.com/sydney/feed,2,Cultura,11,Australia,en,true,0
-392,SBS – Culture,Cultura multicultural australiana.,https://www.sbs.com.au/guide/rss,2,Cultura,11,Australia,en,true,0
 398,AFL – Australian Football League,Fútbol australiano profesional.,https://www.afl.com.au/rss,3,Deportes,11,Australia,en,true,0
 403,Sydney Morning Herald – Sport,Deportes nacionales e internacionales.,https://www.smh.com.au/rss/sport.xml,3,Deportes,11,Australia,en,true,0
 406,The Guardian Australia – Sport,Cobertura deportiva australiana.,https://www.theguardian.com/au/sport/rss,3,Deportes,11,Australia,en,true,0
@@ -83,7 +81,6 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 449,The Guardian Australia – Politics,Política australiana y debates legislativos.,https://www.theguardian.com/australia-news/australian-politics/rss,11,Política,11,Australia,en,true,0
 451,The Medical Republic – Australia,Noticias médicas y de salud profesional.,https://www.medicalrepublic.com.au/feed,12,Salud,11,Australia,en,true,0
 452,7News Australia – Society,Noticias sociales de la cadena Seven.,https://7news.com.au/news/australia/rss,13,Sociedad,11,Australia,en,true,0
-456,SBS News – Australia,Noticias multicultural society.,https://www.sbs.com.au/news/feed,13,Sociedad,11,Australia,en,true,0
 458,Sydney Morning Herald – National,"Sociedad, temas humanos, comunidad.",https://www.smh.com.au/rss/national.xml,13,Sociedad,11,Australia,en,true,0
 459,Sydney Morning Herald – Top News,Uno de los periódicos más importantes de Australia.,https://www.smh.com.au/rss/feed.xml,13,Sociedad,11,Australia,en,true,0
 460,The Age – National,"Sociedad australiana, comunidad, crímenes.",https://www.theage.com.au/rss/national.xml,13,Sociedad,11,Australia,en,true,0
@@ -102,16 +99,12 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 507,Die Presse – Wirtschaft,Economía austríaca y global.,https://www.diepresse.com/rss/wirtschaft,4,Economía,12,Austria,de,true,0
 510,Der Standard – International,Internacional y Europa.,https://www.derstandard.at/rss/international,7,Internacional,12,Austria,de,true,0
 511,Die Presse – International,Noticias del mundo y diplomacia.,https://www.diepresse.com/rss/ausland,7,Internacional,12,Austria,de,true,0
-521,BUND – Klima & Umwelt Österreich,Protección ecológica y clima.,https://bund.at/feed/,8,Medio Ambiente,12,Austria,de,true,0
 523,Die Presse – Umwelt,"Medio ambiente, energía y políticas verdes.",https://www.diepresse.com/rss/klima,8,Medio Ambiente,12,Austria,de,true,0
 532,Die Presse – Meinung,"Columnas, editoriales, análisis críticos.",https://www.diepresse.com/rss/meinung,10,Opinión,12,Austria,de,true,0
-544,Die Grünen – Political News,Partido verde austríaco – actualidad política.,https://www.gruene.at/presse/rss,11,Política,12,Austria,de,true,0
 562,Der Standard – Gesundheit,"Salud, ciencia médica y bienestar.",https://www.derstandard.at/rss/gesundheit,12,Salud,12,Austria,de,true,0
-564,Gesundheit.gv.at – Offizielle Gesundheit,Portal oficial de salud del Gobierno de Austria.,https://www.gesundheit.gv.at/rss,12,Salud,12,Austria,de,true,0
 572,Der Standard – Österreich,Noticias nacionales de Austria.,https://www.derstandard.at/rss,13,Sociedad,12,Austria,de,true,0
 573,Die Presse – Panorama,"Sociedad, reportajes, estilo de vida.",https://www.diepresse.com/rss/panorama,13,Sociedad,12,Austria,de,true,0
 578,ORF News – Top News,Noticias oficiales de la radiotelevisión pública ORF.,https://rss.orf.at/news.xml,13,Sociedad,12,Austria,de,true,0
-584,Ars Electronica – Digital Art & Tech,Festival global de arte tecnológico con sede en Linz.,https://ars.electronica.art/feed/,14,Tecnología,12,Austria,en,true,0
 585,Der Brutkasten – Technologie,"Startups, innovación y tecnología.",https://brutkasten.com/feed,14,Tecnología,12,Austria,de,true,0
 599,Modern.az – Mədəniyyət,Cultura y eventos culturales.,https://modern.az/rss/medeniyyet,2,Cultura,13,Azerbaiyán,az,true,0
 608,Azerbaijan Wrestling Federation – News,Federación de lucha: deporte nacional.,https://awf.az/en/rss,3,Deportes,13,Azerbaiyán,en,true,0
@@ -124,17 +117,13 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 676,Modern.az – Cəmiyyət,"Sociedad, vida pública, educación.",https://modern.az/rss/cemiyyet,13,Sociedad,13,Azerbaiyán,az,true,0
 677,Modern.az – Life,Estilo de vida y sociedad.,https://modern.az/rss/life,13,Sociedad,13,Azerbaiyán,az,true,0
 686,Trend News Agency – Azerbaijan,Noticias nacionales en inglés.,https://en.trend.az/rss,13,Sociedad,13,Azerbaiyán,en,true,0
-705,Bahamas Press – Opinion,Opinión y análisis político-social.,https://bahamaspress.com/category/editorial/feed/,10,Opinión,14,Bahamas,en,true,0
-707,Bahamas Press – Government,Cobertura de actividades gubernamentales.,https://bahamaspress.com/tag/government/feed/,11,Política,14,Bahamas,en,true,0
 708,Bahamas Press – News,Blog político muy conocido en Bahamas.,https://bahamaspress.com/feed/,11,Política,14,Bahamas,en,true,0
-709,Bahamas Press – Politics,El blog político más influyente de Bahamas.,https://bahamaspress.com/category/politics/feed/,11,Política,14,Bahamas,en,true,0
 717,Office of the Prime Minister – News,Comunicados oficiales del Primer Ministro.,https://opm.gov.bs/feed/,11,Política,14,Bahamas,en,true,0
-719,Repeating Islands – Bahamas Politics,Política y sociedad caribeña (con sección Bahamas).,https://repeatingislands.com/category/bahamas-politics/feed/,11,Política,14,Bahamas,en,true,0
 738,Bangla Tribune – Culture,"Arte, eventos y medios culturales.",https://banglatribune.com/feed/entertainment,2,Cultura,15,Bangladés,bn,true,0
 807,Bangla Tribune (BN) – Politics,Política nacional en bengalí.,https://banglatribune.com/feed/politics,11,Política,15,Bangladés,bn,true,0
 826,Bangla Tribune (BN) – Lifestyle,"Moda, sociedad, tendencias (bn).",https://banglatribune.com/feed/lifestyle,13,Sociedad,15,Bangladés,bn,true,0
 834,Prothom Alo (BN) – News,Diario más leído del país (bengalí).,https://www.prothomalo.com/feed,13,Sociedad,15,Bangladés,bn,true,0
-853,CARPHA – Caribbean Health Science,"Epidemiología, ciencia médica del Caribe.",https://carpha.org/Portals/0/RSS.aspx,1,Ciencia,16,Barbados,en,true,2
+853,CARPHA – Caribbean Health Science,"Epidemiología, ciencia médica del Caribe.",https://carpha.org/Portals/0/RSS.aspx,1,Ciencia,16,Barbados,en,true,1
 856,Caribbean Development Bank – Research,"Ciencia aplicada, economía, desarrollo STEM.",https://www.caribank.org/rss.xml,1,Ciencia,16,Barbados,en,true,0
 862,Barbados Today – Entertainment,"Música, cine, cultura caribeña.",https://barbadostoday.bb/category/entertainment/feed/,2,Cultura,16,Barbados,en,true,0
 867,Barbados Cricket Association – News,Noticias oficiales del cricket barbadense.,https://barbadoscricket.org/feed/,3,Deportes,16,Barbados,en,true,0
@@ -160,36 +149,26 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 946,Barbados Today – Travel,"Noticias de turismo, vuelos, eventos.",https://barbadostoday.bb/category/lifestyle/travel/feed/,15,Viajes,16,Barbados,en,true,0
 948,Caribbean Hotel & Tourism Association – News,Turismo regional del Caribe.,https://www.caribbeanhotelandtourism.com/news-center/feed/,15,Viajes,16,Barbados,en,true,0
 950,Caribbean Travel Marketplace – Tourism,"Hotelería, vuelos, tendencias de viaje.",https://www.caribbeanhotelandtourism.com/feed/,15,Viajes,16,Barbados,en,true,0
-960,Visit Bahrain – Culture,"Cultura, monumentos y patrimonio de Baréin.",https://visitbahrain.bh/feed/,2,Cultura,17,Baréin,en,true,0
 972,Gulf Insider – Bahrain Sports,Resumen deportivo del Golfo incl. Baréin.,https://www.gulf-insider.com/feed/,3,Deportes,17,Baréin,en,true,0
-984,Amnesty International – Bahrain,Derechos humanos y política exterior.,https://www.amnesty.org/en/location/middle-east-and-north-africa/bahrain/feed/,7,Internacional,17,Baréin,en,true,0
+984,Amnesty International – Bahrain,Derechos humanos y política exterior.,https://www.amnesty.org/en/location/middle-east-and-north-africa/bahrain/feed/,7,Internacional,17,Baréin,en,false,10
 986,BBC Arabic – Middle East (incluye Bahrain),Análisis MENA y diplomacia.,https://www.bbc.com/arabic/index.xml,7,Internacional,17,Baréin,ar,true,0
 1006,crisisgroup.org Jordan,,https://www.crisisgroup.org/rss/86,11,Política,17,Baréin,,true,0
 1021,Statistical Institute of Belize – Publications RSS,"Datos, economía y sociedad.",https://sib.org.bz/rss/,4,Economía,19,Belice,en,true,0
 1024,University of Belize / BFREE – Educator News,Noticias de educación desde ONG’s y universidad.,https://www.bfreebz.org/category/educator/feed/,5,Educación,19,Belice,en,true,0
 1028,Breaking Belize News – Politics,Portal digital: noticias políticas y elecciones.,https://www.breakingbelizenews.com/category/politics/feed/,11,Política,19,Belice,en,true,0
-1035,Love FM – Politics & Government,Noticias de radio sobre política y gobierno.,https://lovefm.com/category/politics/feed/,11,Política,19,Belice,en,true,0
 1044,24h au Bénin – Santé & Science,"Salud, ciencia y medio ambiente.",https://24haubenin.info/spip.php?page=backend&mot=34,1,Ciencia,20,Benín,fr,true,0
-1059,Jeune Afrique – Culture (Benin),Cultura africana y del país.,https://www.jeuneafrique.com/feed/,2,Cultura,20,Benín,fr,true,0
 1062,AfrikMag – Sports Afrique,Cobertura deportiva africana.,https://www.afrikmag.com/feed/,3,Deportes,20,Benín,fr,true,0
-1064,Bénin Intelligent – Sports,Deporte nacional y resultados locales.,https://beninintelligent.com/category/sport/feed/,3,Deportes,20,Benín,fr,true,0
 1069,24h au Bénin – Économie,"Economía, emprendimiento, finanzas.",https://24haubenin.info/spip.php?page=backend&mot=11,4,Economía,20,Benín,fr,true,0
-1071,Benin Intelligent – Économie,Análisis económico y noticias financieras.,https://beninintelligent.com/category/economie/feed/,4,Economía,20,Benín,fr,true,0
 1079,Africa24 – Benin Politics,"Televisión panafricana, sección Benín.",https://africa24tv.com/feed/,11,Política,20,Benín,fr,true,0
 1090,24h au Bénin – Société,"Noticias sociales, educación, cultura local.",https://24haubenin.info/spip.php?page=backend&mot=5,13,Sociedad,20,Benín,fr,true,0
-1096,Bénin Intelligent – Actualités,Noticias generales y análisis.,https://beninintelligent.com/feed/,13,Sociedad,20,Benín,fr,true,0
-1097,Bénin Intelligent – Société,"Vida cotidiana, cultura, sociedad civil.",https://beninintelligent.com/category/societe/feed/,13,Sociedad,20,Benín,fr,true,0
-1104,Le Potentiel – Actualités,Periódico nacional muy leído.,https://lepotentiel.bj/feed/,13,Sociedad,20,Benín,fr,true,0
-1105,Le Potentiel – Société,Temas sociales y comunitarios en diario nacional.,https://lepotentiel.bj/category/societe/feed/,13,Sociedad,20,Benín,fr,true,0
+1104,Le Potentiel – Actualités,Periódico nacional muy leído.,https://lepotentiel.bj/feed/,13,Sociedad,20,Benín,fr,false,10
 1106,Matin Libre – News,Periódico digital importante del país.,https://matinlibre.com/feed/,13,Sociedad,20,Benín,fr,true,0
 1133,Myfin.by – Finance News,"Finanzas, créditos, bancos, tipos de cambio.",https://myfin.by/rss,4,Economía,21,Bielorrusia,ru,true,0
 1151,Onliner.by – People & Lifestyle,"Estilo de vida, cultura urbana.",https://people.onliner.by/feed,13,Sociedad,21,Bielorrusia,ru,true,0
-1154,VOA Russian – Society Belarus,"Sociedad, derechos humanos, cultura.",https://www.golosameriki.com/api/,13,Sociedad,21,Bielorrusia,ru,true,0
 1160,Onliner.by – Tech,"El mayor medio tech del país: gadgets, IT, startups.",https://tech.onliner.by/feed,14,Tecnología,21,Bielorrusia,ru,true,0
 1164,France24 – Myanmar,Cobertura internacional.,https://www.france24.com/en/tag/myanmar/rss,7,Internacional,22,Birmania,en,true,0
-1167,Amnesty International – Myanmar,Situación social y DDHH.,https://www.amnesty.org/en/location/asia-and-the-pacific/south-east-asia-and-the-pacific/myanmar/feed/,13,Sociedad,22,Birmania,en,true,0
+1167,Amnesty International – Myanmar,Situación social y DDHH.,https://www.amnesty.org/en/location/asia-and-the-pacific/south-east-asia-and-the-pacific/myanmar/feed/,13,Sociedad,22,Birmania,en,false,10
 1168,BBC Burmese – News,BBC en birmano.,http://www.bbc.co.uk/burmese/index.xml,13,Sociedad,22,Birmania,my,true,0
-1170,Eleven Media Group – Myanmar News,Uno de los portales nacionales más grandes.,https://elevenmyanmar.com/rss.xml,13,Sociedad,22,Birmania,en,true,0
 1176,Myanmar Now – News,Uno de los medios independientes más importantes.,https://myanmar-now.org/en/feed,13,Sociedad,22,Birmania,en,true,0
 1178,RFA Burmese – News,Radio Free Asia en birmano.,https://www.rfa.org/burmese/rss2.xml,13,Sociedad,22,Birmania,my,true,0
 1179,RFA English – Myanmar,Cobertura internacional sobre Myanmar.,https://www.rfa.org/english/news/myanmar/rss2.xml,13,Sociedad,22,Birmania,en,true,0
@@ -204,7 +183,6 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 1220,Opinión Bolivia – Salud,Noticias de salud pública bienestar y sistema sanitario boliviano,https://www.opinion.com.bo/rss/salud/,12,Salud,23,Bolivia,es,true,0
 1234,Opinión Bolivia – Ciencia,Noticias científicas y avances tecnológicos de interés nacional,https://www.opinion.com.bo/rss/ciencia/,14,Tecnología,23,Bolivia,es,true,0
 1235,Opinión Bolivia – Tecnología,Noticias de tecnología innovación y ciencia aplicadas en Bolivia,https://www.opinion.com.bo/rss/tecnologia/,14,Tecnología,23,Bolivia,es,true,0
-1236,Rincón Tecnológico,Portal boliviano especializado en noticias de móviles aplicaciones y gadgets,https://rincontecnologico.com.bo/feed/,14,Tecnología,23,Bolivia,es,true,0
 1237,TecnoBit Bolivia,Revista digital boliviana sobre tecnología móviles gaming e innovación,https://revistatecnobit.com/feed/,14,Tecnología,23,Bolivia,es,true,0
 1241,BiznisInfo – Najnovije,Portal especializado en economía y empresas de Bosnia,https://www.biznisinfo.ba/feed/,4,Economía,24,Bosnia y Herzegovina,bs,true,0
 1257,Radio Sarajevo – Svijet,Internacional desde el medio capitalino Radio Sarajevo,https://radiosarajevo.ba/rss/svijet,7,Internacional,24,Bosnia y Herzegovina,bs,true,0
@@ -217,45 +195,27 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 1305,Nexo Jornal – Ciência,Periodismo explicativo de ciencia y medio ambiente,https://www.nexojornal.com.br/rss.xml?tema=ciencia,1,Ciencia,26,Brasil,pt,true,0
 1307,Olhar Digital – Ciência e Espaço,Noticias de astronomía física biología y espacio,https://olhardigital.com.br/feed/,1,Ciencia,26,Brasil,pt,true,0
 1308,Revista FAPESP,Ciencia universitaria y proyectos de investigación,https://revistapesquisa.fapesp.br/feed/,1,Ciencia,26,Brasil,pt,true,0
-1311,CartaCapital – Cultura,Crónicas análisis culturales y arte,https://www.cartacapital.com.br/categoria/cultura/feed/,2,Cultura,26,Brasil,pt,true,0
 1317,Folha – Ilustrada,Cultura arte celebridades y eventos,https://feeds.folha.uol.com.br/ilustrada/rss091.xml,2,Cultura,26,Brasil,pt,true,0
-1318,G1 – Cinema,Noticias de cine estrenos y festivales,https://g1.globo.com/rss/g1/cinema/,2,Cultura,26,Brasil,pt,true,0
 1319,G1 – Cultura,Noticias de arte música cine TV y celebridades,https://g1.globo.com/rss/g1/pop-arte/,2,Cultura,26,Brasil,pt,true,0
-1320,G1 – Música,Actualidad musical conciertos y lanzamientos,https://g1.globo.com/rss/g1/musica/,2,Cultura,26,Brasil,pt,true,0
 1322,Nexo Jornal – Cultura,Análisis cultural literatura y arte,https://www.nexojornal.com.br/rss.xml?tema=cultura,2,Cultura,26,Brasil,pt,true,0
-1323,O Globo – Cultura,Arte literatura cine TV y música,https://oglobo.globo.com/cultura/rss.xml,2,Cultura,26,Brasil,pt,true,0
 1326,Revista Bula – Cultura,Críticas literarias cine arte y reportajes culturales,https://www.revistabula.com/feed/,2,Cultura,26,Brasil,pt,true,0
 1329,Rolling Stone Brasil,Música cultura pop cine y entretenimiento,https://rollingstone.uol.com.br/rss/,2,Cultura,26,Brasil,pt,true,0
-1335,CartaCapital – Esporte,Deporte y análisis social del deporte,https://www.cartacapital.com.br/categoria/esporte/feed/,3,Deportes,26,Brasil,pt,true,0
 1340,Folha – Esporte,Noticias deportivas de Folha de S.Paulo,https://feeds.folha.uol.com.br/esporte/rss091.xml,3,Deportes,26,Brasil,pt,true,0
-1341,G1 – Esportes,Sección deportiva principal de Globo,https://g1.globo.com/rss/g1/esportes/,3,Deportes,26,Brasil,pt,true,0
-1342,G1 – Futebol,Fútbol brasileño y mundial,https://g1.globo.com/rss/g1/futebol/,3,Deportes,26,Brasil,pt,true,0
-1353,Nexo Jornal – Esporte,Periodismo explicativo deportivo,https://www.nexojornal.com.br/rss.xml?tema=esporte,3,Deportes,26,Brasil,pt,true,0
-1354,O Globo – Esportes,Sección deportiva del diario O Globo,https://oglobo.globo.com/esportes/rss.xml,3,Deportes,26,Brasil,pt,true,0
 1362,Canal Rural – Agronegócio,Agronegocio agrícola ganadería y mercado rural,https://www.canalrural.com.br/feed/,4,Economía,26,Brasil,pt,true,0
 1364,Economia IG – Últimas,Noticias económicas del portal iG,https://economia.ig.com.br/rss.xml,4,Economía,26,Brasil,pt,true,0
 1368,Folha de S.Paulo – Mercado,Economía finanzas macroeconomía y negocios,https://feeds.folha.uol.com.br/mercado/rss091.xml,4,Economía,26,Brasil,pt,true,0
 1369,G1 – Economia,Economía brasileña empresas impuestos y mercados,https://g1.globo.com/rss/g1/economia/,4,Economía,26,Brasil,pt,true,0
-1370,Globo Rural – Agronegócio,Economía agrícola y producción agropecuaria,https://g1.globo.com/rss/g1/globo-rural/,4,Economía,26,Brasil,pt,true,0
 1371,Investing.com – Brasil,Estrategias financieras y mercados globales,https://br.investing.com/rss/news_301.rss,4,Economía,26,Brasil,pt,true,0
 1372,MoneyTimes – Economia,Noticias del mercado financiero y Cripto,https://www.moneytimes.com.br/feed/,4,Economía,26,Brasil,pt,true,0
-1373,O Globo – Economia,Sección económica del diario Globo,https://oglobo.globo.com/economia/rss.xml,4,Economía,26,Brasil,pt,true,0
 1389,Folha de S.Paulo – Mundo,Internacional y geopolítica desde Folha,https://feeds.folha.uol.com.br/mundo/rss091.xml,7,Internacional,26,Brasil,pt,true,0
 1390,G1 – Mundo,Noticias internacionales del mayor portal de Brasil,https://g1.globo.com/rss/g1/mundo/,7,Internacional,26,Brasil,pt,true,0
-1392,Nexo Jornal – Internacional,Periodismo explicativo internacional,https://www.nexojornal.com.br/rss.xml?tema=mundo,7,Internacional,26,Brasil,pt,true,0
-1393,O Globo – Mundo,Internacional del diario O Globo,https://oglobo.globo.com/mundo/rss.xml,7,Internacional,26,Brasil,pt,true,0
 1405,Folha – Ambiente e Clima,Medio ambiente clima sustentabilidade y ecología,https://feeds.folha.uol.com.br/ambiente/rss091.xml,8,Medio Ambiente,26,Brasil,pt,true,0
-1406,G1 – Meio Ambiente,Reportagens ambientais ecologia e clima,https://g1.globo.com/rss/g1/ciencia-e-saude/,8,Medio Ambiente,26,Brasil,pt,true,0
-1407,G1 – Natureza,Clima biodiversidade amazônia queimadas e meio ambiente,https://g1.globo.com/rss/g1/natureza/,8,Medio Ambiente,26,Brasil,pt,true,0
 1410,Mongabay Brasil – Meio Ambiente,Ambientalismo global y Amazonía,https://brasil.mongabay.com/feed/,8,Medio Ambiente,26,Brasil,pt,true,0
 1411,O Eco – Jornalismo Ambiental,Portal especializado en medio ambiente,https://oeco.org.br/feed/,8,Medio Ambiente,26,Brasil,pt,true,0
 1414,Projeto Colabora – Meio Ambiente,Periodismo ambiental investigación y sostenibilidad,https://projetocolabora.com.br/feed/,8,Medio Ambiente,26,Brasil,pt,true,0
-1419,CartaCapital – Política,Opiniones y reportajes políticos,https://www.cartacapital.com.br/categoria/politica/feed/,11,Política,26,Brasil,pt,true,0
 1422,Diário do Poder – Política,Noticias políticas del diario especializado,https://diariodopoder.com.br/feed,11,Política,26,Brasil,pt,true,0
 1425,Folha de S.Paulo – Poder,Sección política “Poder” de Folha,https://feeds.folha.uol.com.br/poder/rss091.xml,11,Política,26,Brasil,pt,true,0
 1426,G1 – Política,Sección política del mayor portal de Brasil,https://g1.globo.com/rss/g1/politica/,11,Política,26,Brasil,pt,true,0
-1428,Nexo Jornal – Política,Análisis profundo político,https://www.nexojornal.com.br/rss.xml?tema=politica,11,Política,26,Brasil,pt,true,0
-1440,CartaCapital – Sociedade,Análisis críticos sobre desigualdad salud y educación,https://www.cartacapital.com.br/categoria/sociedade/feed/,13,Sociedad,26,Brasil,pt,true,0
 1450,Folha de S.Paulo – Cotidiano,Sección de sociedad crimen transporte clima,https://feeds.folha.uol.com.br/cotidiano/rss091.xml,13,Sociedad,26,Brasil,pt,true,0
 1451,Folha de S.Paulo – Últimas,Uno de los diarios más importantes del país,https://feeds.folha.uol.com.br/emcimadahora/rss091.xml,13,Sociedad,26,Brasil,pt,true,0
 1452,Folha – Equilíbrio e Saúde,Salud pública bienestar y calidad de vida,https://feeds.folha.uol.com.br/equilibrioesaude/rss091.xml,13,Sociedad,26,Brasil,pt,true,0
@@ -263,23 +223,16 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 1454,G1 – Educação,Noticias del sistema educativo brasileño,https://g1.globo.com/rss/g1/educacao/,13,Sociedad,26,Brasil,pt,true,0
 1455,G1 – Saúde,Salud pública epidemias hospitales y bienestar,https://g1.globo.com/rss/g1/saude/,13,Sociedad,26,Brasil,pt,true,0
 1456,G1 – Últimas Notícias,Noticias generales de Brasil incluyendo sociedad salud educación y seguridad,https://g1.globo.com/rss/g1/,13,Sociedad,26,Brasil,pt,true,0
-1460,Nexo Jornal – Sociedade,Periodismo explicativo social,https://www.nexojornal.com.br/rss.xml?tema=sociedade,13,Sociedad,26,Brasil,pt,true,0
-1461,O Globo – Brasil,Noticias sociales nacionales,https://oglobo.globo.com/brasil/rss.xml,13,Sociedad,26,Brasil,pt,true,0
-1462,O Globo – Rio,Noticias locales de Río de Janeiro,https://oglobo.globo.com/rio/rss.xml,13,Sociedad,26,Brasil,pt,true,0
-1464,O Globo – Últimas Notícias,Diario tradicional de Río de Janeiro,https://oglobo.globo.com/rss.xml,13,Sociedad,26,Brasil,pt,true,0
 1472,Adrenaline – Hardware e Games,Tecnología hardware y gaming,https://adrenaline.com.br/feed/,14,Tecnología,26,Brasil,pt,true,0
-1475,Dfndr Lab – Cibersegurança,Seguridad digital alertas virus y estafas,https://www.psafe.com/dfndr-lab/feed/,14,Tecnología,26,Brasil,pt,true,0
 1478,Folha – Tec,Sección tecnológica de Folha de S.Paulo,https://feeds.folha.uol.com.br/tec/rss091.xml,14,Tecnología,26,Brasil,pt,true,0
 1479,G1 – Tecnologia,Tecnología innovación internet seguridad digital,https://g1.globo.com/rss/g1/tecnologia/,14,Tecnología,26,Brasil,pt,true,0
 1480,InfoMoney – Tech e Cripto,Tecnología financiera blockchain y criptomonedas,https://www.infomoney.com.br/feed/,14,Tecnología,26,Brasil,pt,true,0
 1481,Manual do Usuário – Tecnologia,Análisis críticas y reportajes tecnológicos,https://manualdousuario.net/feed/,14,Tecnología,26,Brasil,pt,true,0
 1482,Mundo Conectado – Tecnologias,Tecnología de consumo y dispositivos,https://mundoconectado.com.br/rss/,14,Tecnología,26,Brasil,pt,true,0
 1483,Neofeed – Tech,Economía digital empresas tecnológicas e innovación,https://neofeed.com.br/feed/,14,Tecnología,26,Brasil,pt,true,0
-1484,O Globo – Tecnologia,Noticias tecnológicas ciencia e innovación,https://oglobo.globo.com/economia/tecnologia/rss.xml,14,Tecnología,26,Brasil,pt,true,0
 1486,Startups.com.br – Startups,Innovación startups inversiones y tecnología,https://startups.com.br/feed/,14,Tecnología,26,Brasil,pt,true,0
 1488,Techenet Brasil,Computación tecnología global y ciencia aplicada,https://www.techenet.com/feed/,14,Tecnología,26,Brasil,pt,true,0
 1489,TudoCelular – Notícias,Portal especializado en móviles y hardware,https://www.tudocelular.com/rss/,14,Tecnología,26,Brasil,pt,true,0
-1501,The Scoop – Brunei News,Portal informativo independiente sobre Brunéi,https://thescoop.co/feed/,13,Sociedad,27,Brunéi,en,true,0
 1502,Brunei Tourism – Updates,Noticias culturales y turísticas oficiales,https://www.bruneitourism.com/feed/,15,Viajes,27,Brunéi,en,true,0
 1505,Capital.bg – RSS,Semanario económico y de análisis más influyente de Bulgaria,https://www.capital.bg/rss/,4,Economía,28,Bulgaria,bg,true,0
 1515,BTA – Noticias en búlgaro,Agencia nacional (versión búlgara) con actualidad del país,https://bta.bg/bg/rss/free,13,Sociedad,28,Bulgaria,bg,true,0
@@ -288,14 +241,9 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 1524,TechNews.bg,Tecnología TI en Bulgaria,https://technews.bg/feed/,14,Tecnología,28,Bulgaria,bg,true,0
 1530,Sahelien.com – Burkina Faso Politics,Cobertura política y seguridad en Burkina Faso,https://sahelien.com/feed/,11,Política,29,Burkina Faso,fr,true,0
 1532,WADR – West Africa Democracy Radio – Burkina,Radio regional centrada en política,https://wadr.org/feed/,11,Política,29,Burkina Faso,en,true,0
-1533,AllAfrica – Burkina Faso News,Agregador pan-africano con noticias exclusivas de Burkina,https://allafrica.com/tools/headlines/rdf/burkinafaso/headlines.rdf,13,Sociedad,29,Burkina Faso,fr,true,0
 1534,Burkina24 – Infos,Portal informativo con noticias nacionales,https://burkina24.com/feed/,13,Sociedad,29,Burkina Faso,fr,true,0
 1535,LeFaso.net – Actualité,Principal portal de noticias de Burkina Faso,https://lefaso.net/spip.php?page=backend,13,Sociedad,29,Burkina Faso,fr,true,0
-1542,Burundi Eco,Semanal socioeconomico con mucha informacion politica y de gobierno,https://burundi-eco.com/feed,11,Política,30,Burundi,fr,true,0
 1543,Burundi Forum,Portal de noticias de Burundi con fuerte enfoque politico y de actualidad,https://burundi-forum.org/feed,11,Política,30,Burundi,fr,true,0
-1544,IWACU English News,Version en ingles de Iwacu con amplia cobertura politica de Burundi,https://www.iwacu-burundi.org/englishnews/feed,11,Política,30,Burundi,en,true,0
-1545,Radio Isanganiro,Radio privada con programas de debate y noticias politicas,https://isanganiro.org/feed,11,Política,30,Burundi,fr,true,0
-1547,AllAfrica – Burundi News,Agregador panafricano con selección exclusiva de noticias sobre Burundi,https://allafrica.com/tools/headlines/rdf/burundi/headlines.rdf,13,Sociedad,30,Burundi,en,true,0
 1548,Iwacu Burundi – Actualités,Principal medio independiente con noticias nacionales y reportajes de actualidad,https://www.iwacu-burundi.org/feed/,13,Sociedad,30,Burundi,fr,true,0
 1550,OCHA – Burundi,Boletines de la oficina humanitaria de la ONU con foco en emergencias en Burundi,https://www.unocha.org/rss.xml,13,Sociedad,30,Burundi,en,true,0
 1557,Druk Journal Politica,Analisis politico y de gobernanza en Butan,https://drukjournal.bt/feed,11,Política,31,Bután,en,true,0
@@ -309,24 +257,19 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 1579,La Libre Belgique – Belgique,Diario francofono historico con noticias politicas y de sociedad centradas en Belgica,https://www.lalibre.be/arc/outboundfeeds/rss/section/belgique/?outputType=xml,7,Internacional,18,Bélgica,fr,true,0
 1581,RTBF Info – Destacados,Servicio publico de radio y television con resumen de las principales noticias informativas de Belgica,https://rss.rtbf.be/article/rss/highlight_rtbf_info.xml?source=internal,7,Internacional,18,Bélgica,fr,true,0
 1583,De Morgen Politiek,Cobertura politica y analisis critico de la actualidad belga,https://www.demorgen.be/politiek/rss.xml,11,Política,18,Bélgica,nl,true,0
-1586,La Libre Politique,Noticias y analisis politicos de Belgica con enfoque en instituciones y partidos,https://www.lalibre.be/arc/outboundfeeds/rss/section/politique/?outputType=xml,11,Política,18,Bélgica,fr,true,0
-1593,Cambodia Investment Review,Medio especializado en negocios inversiones banca y empresas en Camboya,https://www.cambodiainvestmentreview.com/feed/,4,Economía,33,Camboya,en,true,0
 1603,Khmer Breaking News,Sitio de noticias en jemer con cobertura de economia salud tecnologia y actualidad,https://kbn.news/feed,7,Internacional,33,Camboya,km,true,0
 1604,Khmer Times News,Periodico en ingles con cobertura de politica economia negocios y sociedad en Camboya,https://www.khmertimeskh.com/feed/,7,Internacional,33,Camboya,en,true,0
 1605,Koh Santepheap Daily,Diario en jemer con noticias generales y actualizacion constante,https://kohsantepheapdaily.com.kh/feed,7,Internacional,33,Camboya,km,true,0
 1606,Koh Santepheap Daily,Diario en jemer con noticias generales y actualizacion constant,https://www.kohsantepheapdaily.com.kh/feed,7,Internacional,33,Camboya,km,true,0
 1609,Open Development Cambodia News,Plataforma de datos y noticias de desarrollo economico y social en Camboya,https://opendevelopmentcambodia.net/feed/,7,Internacional,33,Camboya,en,true,0
-1611,RFA Khmer Service,Servicio en jemer de Radio Free Asia con noticias politicas sociales de Camboya,https://www.rfa.org/khmer/rss2.xml,7,Internacional,33,Camboya,km,true,0
-1613,The Cambodia Daily News (EN),Medio historico en ingles sobre noticias y negocios en Camboya,https://english.cambodiadaily.com/rss,7,Internacional,33,Camboya,en,true,0
 1615,VOD Cambodia English,Medio independiente en ingles con noticias politicas sociales y economicas de Camboya,https://vodenglish.news/feed/,7,Internacional,33,Camboya,en,true,0
 1621,237 Online News,Portal de noticias de Camerun en frances con economia deportes politica y cultura,https://www.237online.com/feed/,7,Internacional,34,Camerún,fr,true,0
 1622,Actu Cameroun Actualite,Portal de noticias de Camerun con politica deportes economia y sociedad,https://actucameroun.com/feed/,7,Internacional,34,Camerún,fr,true,0
 1623,AllAfrica Cameroun News,Agregador con noticias politicas economicas y sociales de Camerun,https://allafrica.com/tools/headlines/rdf/cameroon/headlines.rdf,7,Internacional,34,Camerún,en,true,0
 1625,Cameroon Online News,Portal con noticias generales de politica economia seguridad y sociedad en Camerun,https://cameroononlinenews.com/feed/,7,Internacional,34,Camerún,en,true,0
-1630,Actu Cameroun Politique,Seccion politica del portal de noticias Actu Cameroun,https://actucameroun.com/category/politique/feed/,11,Política,34,Camerún,fr,true,0
 1631,Cameroon Concord News,Medio con fuerte cobertura politica incluyendo crisis anglofona y gobierno,https://www.cameroonconcordnews.com/feed/,11,Política,34,Camerún,en,true,0
 1633,Cameroon Intelligence Report,Portal especializado en politica conflictos y analisis del gobierno de Camerun,https://www.cameroonintelligencereport.com/feed/,11,Política,34,Camerún,en,true,0
-1634,Cameroon News Agency Politics,Agencia independiente con cobertura politica nacional y regional de Camerun,https://cameroonnewsagency.com/feed/,11,Política,34,Camerún,en,true,0
+1634,Cameroon News Agency Politics,Agencia independiente con cobertura politica nacional y regional de Camerun,https://cameroonnewsagency.com/feed/,11,Política,34,Camerún,en,true,5
 1637,Mimimefo Infos Politics,Medio anglofono con noticias de politica derechos humanos y sociedad en Camerun,https://mimimefoinfos.com/feed/,11,Política,34,Camerún,en,true,0
 1646,Global News Entertainment,Cultura entretenimiento television y cine en Canada,https://globalnews.ca/entertainment/feed/,2,Cultura,35,Canadá,en,true,0
 1652,Museum of Contemporary Art Toronto,Noticias y exposiciones del museo de arte contemporaneo,https://moca.ca/feed/,2,Cultura,35,Canadá,en,true,0
@@ -344,27 +287,21 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 1699,BetaKit Canada Tecnologia,Portal canadiense especializado en startups innovacion IA y empresas tech,https://betakit.com/feed/,14,Tecnología,35,Canadá,en,true,0
 1706,Financial Post FP Tech Desk,Seccion de negocios tecnologicos fintech y startups,https://financialpost.com/category/technology/feed,14,Tecnología,35,Canadá,en,true,0
 1707,Global News Tecnologia,Noticias tech de Canada incluyendo redes sociales IA y ciencia,https://globalnews.ca/tech/feed/,14,Tecnología,35,Canadá,en,true,0
-1711,National Post Tecnologia,Seccion tech del diario canadiense National Post,https://nationalpost.com/category/technology/feed,14,Tecnología,35,Canadá,en,true,0
-1713,TechCrunch Canada,Noticias de tecnologia startups y empresas tech en Canada,https://techcrunch.com/tag/canada/feed/,14,Tecnología,35,Canadá,en,true,0
 1716,University of Toronto Engineering News,Innovacion investigacion y avances tecnologicos universitarios,https://news.engineering.utoronto.ca/feed/,14,Tecnología,35,Canadá,en,true,0
 1731,Hamad Bin Khalifa University News,Noticias academicas e investigacion,https://www.hbku.edu.qa/en/rss.xml,5,Educación,36,Catar,en,true,0
 1732,Al Jazeera Arabic International,Noticias globales en arabe desde Qatar,https://www.aljazeera.net/aljazeerarss/ar-all-news,7,Internacional,36,Catar,ar,true,0
-1737,Arab Center for Research Qatar,Think tank politico y geopolitico con sede en Doha,https://arabcenterdc.org/feed/,11,Política,36,Catar,en,true,0
 1748,Doha News Health,Noticias de salud seguridad alimentaria y bienestar,https://www.dohanews.co/feed/,12,Salud,36,Catar,en,true,0
 1760,Marhaba Qatar Travel,Guia de viajes hoteles destinos y actividades,https://www.marhaba.qa/feed/,15,Viajes,36,Catar,en,true,0
 1763,BBC Afrique Culture,Cobertura cultural africana y reportajes sobre tradiciones y artes del Sahel,https://www.bbc.com/afrique/index.xml,2,Cultura,37,Chad,fr,true,0
 1765,OCHA Sahel Cultural Heritage,Informes sobre patrimonio cultural y comunidades del Sahel,https://reliefweb.int/updates/rss.xml,2,Cultura,37,Chad,en,true,0
 1771,AllAfrica Tchad Business,Noticias economicas y empresariales del Chad via AllAfrica,https://allafrica.com/tools/headlines/rdf/chad/headlines.rdf,4,Economía,37,Chad,en,true,0
-1777,Amnesty International Chad,Reportes politicos y sociales sobre el Chad,https://www.amnesty.org/en/latest/feed/,11,Política,37,Chad,en,true,0
+1777,Amnesty International Chad,Reportes politicos y sociales sobre el Chad,https://www.amnesty.org/en/latest/feed/,11,Política,37,Chad,en,false,10
 1778,Human Rights Watch Chad,Informes y noticias sobre derechos humanos en Chad,https://www.hrw.org/rss/news,11,Política,37,Chad,en,true,0
-1790,SOCHIAS Sociedad Chilena de Astronomia,Noticias de astronomia chilena e investigacion,https://sochias.cl/feed/,1,Ciencia,38,Chile,es,true,0
 1792,Universidad Catolica Ciencia,Noticias de ciencia y tecnologia de la UC,https://www.uc.cl/rss/,1,Ciencia,38,Chile,es,true,0
 1805,Ministerio de las Culturas Chile,Patrimonio arte literatura y politicas culturales,https://www.cultura.gob.cl/feed/,2,Cultura,38,Chile,es,true,0
 1807,Santiago Cultura,Agenda cultural oficial de Santiago de Chile,https://www.santiagocultura.cl/feed/,2,Cultura,38,Chile,es,true,0
-1814,Futbol Chile News,Portal enfocado en futbol chileno selecciones y ligas,https://www.futbolchileno.com/feed/,3,Deportes,38,Chile,es,true,0
 1816,La Nacion Deportes,Seccion deportiva de La Nacion Chile,https://www.lanacion.cl/feed/,3,Deportes,38,Chile,es,true,0
 1819,Prensa Futbol,Noticias futboleras de Chile y mundo,https://www.prensafutbol.cl/feed/,3,Deportes,38,Chile,es,true,0
-1825,AmCham Chile,Comercio inversiones y negocios Chile Estados Unidos,https://amchamchile.cl/feed/,4,Economía,38,Chile,es,true,0
 1830,Colegio Ingenieros Chile,Ingenieria industria productividad y economia,https://www.ingenieros.cl/feed/,4,Economía,38,Chile,es,true,0
 1836,Revista Edifica Construccion,Construccion arquitectura industria y proyectos nacionales,https://www.revistaenconcreto.cl/feed/,4,Economía,38,Chile,es,true,0
 1839,Sofofa News,Industria manufactura comercio exterior e innovacion,https://sofofa.cl/feed/,4,Economía,38,Chile,es,true,0
@@ -376,31 +313,21 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 1864,Parques Nacionales Chile CONAF,Noticias de parques bosques incendios y naturaleza,https://www.conaf.cl/feed/,8,Medio Ambiente,38,Chile,es,true,0
 1883,Diario UChile Sociedad,Reportajes humanos sociedad politica y educacion,https://radio.uchile.cl/feed/,13,Sociedad,38,Chile,es,true,0
 1889,La Voz de los que Sobran Sociedad,Reportajes sociales enfoque en desigualdad y comunidades,https://lavozdelosquesobran.cl/feed/,13,Sociedad,38,Chile,es,true,0
-1891,Observatorio Ciudadano Chile,Derechos humanos pueblos originarios y sociedad civil,https://www.observatorio.cl/feed/,13,Sociedad,38,Chile,es,true,0
 1893,The Clinic Sociedad,Reportajes ciudadanos cultura social y vida cotidiana,https://www.theclinic.cl/feed/,13,Sociedad,38,Chile,es,true,0
 1899,FayerWayer Chile,Medio tecnologico con noticias de ciencia apps moviles y cultura digital,https://www.fayerwayer.com/feed/,14,Tecnología,38,Chile,es,true,0
-1903,Microsoft Chile News,Innovacion IA computacion nube ecosistema digital,https://news.microsoft.com/feed/,14,Tecnología,38,Chile,en,true,0
-1904,Startups Latam Chile,Emprendimiento innovacion y startups tecnológicas en Chile,https://startupslatam.com/feed/,14,Tecnología,38,Chile,es,true,0
 1942,CEEW Asia China Energy,Investigacion economica de energia en Asia,https://www.ceew.in/rss.xml,4,Economía,39,China,en,true,0
 1945,China Banking News,Noticias de bancos regulacion crediticia y yuan digital,https://www.chinabankingnews.com/feed/,4,Economía,39,China,en,true,0
-1948,China Economic Review,Analisis de mercados chinos industria y empresas,https://chinaeconomicreview.com/feed/,4,Economía,39,China,en,true,0
 1949,China Logistics News,Logistica puertos rutas y comercio internacional,https://www.logisticsmanager.com/feed/,4,Economía,39,China,en,true,0
-1954,Energy China News,Energia renovable carbon petroleo y politica energetica china,https://www.energyportal.eu/feed/,4,Economía,39,China,en,true,0
 1959,Oil Price China Market,Mercados energeticos y petroleo en China,https://oilprice.com/rss/main,4,Economía,39,China,en,true,0
-1972,China Film Insider,Cine chino industria filmica y mercado,https://chinafilminsider.com/feed/,6,Entretenimiento,39,China,en,true,0
 1975,DramaPanda China,Series chinas dramas y entretenimiento digital,https://www.dramapanda.com/feeds/posts/default,6,Entretenimiento,39,China,en,true,0
 1985,Variety Asia,Entretenimiento cine TV musica con foco en China,https://variety.com/feed/,6,Entretenimiento,39,China,en,true,0
 1987,Yahoo HK Entertainment,Cobertura hongkonesa de cine musica y celebridades chinas,https://hk.news.yahoo.com/rss/entertainment,6,Entretenimiento,39,China,en,true,0
 1989,Carbon Brief China,Analisis de emisiones energia y clima en China,https://www.carbonbrief.org/rss,8,Medio Ambiente,39,China,en,true,0
-1993,China Energy Portal,Datos energia renovables carbon y emisiones,https://chinaenergyportal.org/feed/,8,Medio Ambiente,39,China,en,true,0
 2003,Sixth Tone Environment,Reportajes ambientales contaminacion y biodiversidad,https://www.sixthtone.com/rss,8,Medio Ambiente,39,China,en,true,0
-2006,The China Project Environment,Politicas verdes energia renovable y clima,https://thechinaproject.com/feed/,8,Medio Ambiente,39,China,en,true,0
-2009,BBC News China Politics,Cobertura politica independiente sobre China,https://feeds.bbci.co.uk/news/world/asia/china/rss.xml,11,Política,39,China,en,true,0
 2018,RFA Radio Free Asia China,Medio enfocado en derechos humanos y politica interna,https://www.rfa.org/english/rss,11,Política,39,China,en,true,0
 2019,The Guardian China Politics,Analisis occidental de la politica china,https://www.theguardian.com/world/china/rss,11,Política,39,China,en,true,0
-2028,China Pharmaceutical News,Industria farmaceutica regulacion y medicamentos,https://www.cphmedia.com/rss,12,Salud,39,China,zh,true,0
-2042,Amnesty International China,Politicas sociales derechos y poblacion,https://www.amnesty.org/en/location/asia-and-the-pacific/east-asia/china/feed/,13,Sociedad,39,China,en,true,0
-2073,China TechNews,Portal especializado en noticias de tecnologia china,https://technews.tw/feed/,14,Tecnología,39,China,zh,true,1
+2042,Amnesty International China,Politicas sociales derechos y poblacion,https://www.amnesty.org/en/location/asia-and-the-pacific/east-asia/china/feed/,13,Sociedad,39,China,en,false,10
+2073,China TechNews,Portal especializado en noticias de tecnologia china,https://technews.tw/feed/,14,Tecnología,39,China,zh,true,0
 2078,GSMArena Moviles China,Noticias y fichas de moviles relevantes para marcas chinas,https://www.gsmarena.com/rss-news-reviews.php3,14,Tecnología,39,China,en,true,0
 2081,GizmoChina,Moviles tecnologia de consumo y ecosistema de marcas chinas,https://www.gizmochina.com/feed/,14,Tecnología,39,China,en,true,0
 2086,Lenovo Tech News,Innovacion IA hardware PC y cloud,https://news.lenovo.com/feed/,14,Tecnología,39,China,en,true,0
@@ -408,52 +335,40 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 2092,Semiconductor Digest Asia,Informacion sobre semiconductores litografia y hardware,https://www.semiconductor-digest.com/feed/,14,Tecnología,39,China,en,true,0
 2108,European Space Agency Cyprus,Colaboracion espacial con Chipre y ciencia espacial,https://www.esa.int/rssfeed/Our_Activities/Space_Science,1,Ciencia,40,Chipre,en,true,0
 2123,Anorthosis Famagusta News,Club de futbol noticias y resultados,https://anorthosisfc.com.cy/rss,3,Deportes,40,Chipre,en,true,0
-2124,Cyprus Athletic Federation,Atletismo carreras maraton y competiciones,https://www.koeas.org.cy/rss,3,Deportes,40,Chipre,en,true,0
 2133,Cyprus Investment Promotion Agency,Inversiones comercio y desarrollo economico,https://www.investcyprus.org.cy/rss,4,Economía,40,Chipre,en,true,0
 2136,Cyprus Shipping News,Economia maritima barcos puertos y comercio,https://cyprusshippingnews.com/feed/,4,Economía,40,Chipre,en,true,0
 2137,EuroNews Cyprus Economy,Economia europea y su impacto en Chipre,https://www.euronews.com/rss?level=theme&name=business,4,Economía,40,Chipre,en,true,0
-2143,UN Cyprus Development,Desarrollo economico comercio y sostenibilidad,https://china.un.org/rss.xml,4,Economía,40,Chipre,en,true,0
 2144,AlphaNews Entertainment,Entretenimiento TV musica vida nocturna y espectaculos,https://www.alphanews.live/rss,6,Entretenimiento,40,Chipre,el,true,0
-2146,Cyprus Events Guide,Eventos culturales conciertos festivales y ocio,https://www.cyprusevents.net/feed/,6,Entretenimiento,40,Chipre,en,true,0
 2147,Cyprus Mail Entertainment,Cine musica eventos y ocio en Chipre,https://cyprus-mail.com/feed/,6,Entretenimiento,40,Chipre,en,true,0
 2151,Cyprus Times Entertainment,Música TV espectáculos y ocio urbano,https://cyprustimes.com/feed/,6,Entretenimiento,40,Chipre,en,true,0
 2152,European University Cyprus Arts,Actividades culturales teatro musica y exposiciones,https://www.euc.ac.cy/rss,6,Entretenimiento,40,Chipre,en,true,0
 2153,InCyprus Entertainment,Entretenimiento local cine TV y vida nocturna,https://in-cyprus.philenews.com/feed/,6,Entretenimiento,40,Chipre,en,true,0
-2156,Leventis Municipal Museum Events,Eventos culturales exposiciones y actividades,https://www.leventismuseum.org.cy/rss,6,Entretenimiento,40,Chipre,en,true,0
 2160,Phileleftheros Entertainment,Cine TV musica y agenda de ocio,https://www.philenews.com/rss,6,Entretenimiento,40,Chipre,el,true,0
 2161,Politis Entertainment,Entretenimiento local eventos y cultura pop,https://politis.com.cy/feed/,6,Entretenimiento,40,Chipre,el,true,0
 2162,SigmaLive Entertainment,Espectaculos TV musica y entretenimiento digital,https://www.sigmalive.com/rss,6,Entretenimiento,40,Chipre,el,true,0
-2167,EuroHealthNet Cyprus,Salud publica bienestar y politicas sanitarias,https://eurohealthnet.eu/feed/,12,Salud,40,Chipre,en,true,0
 2170,European Public Health Alliance Cyprus,Politicas sanitarias y salud europea,https://epha.org/feed/,12,Salud,40,Chipre,en,true,0
-2176,Cyprus Refugee Council,Refugiados migracion derechos y sociedad civil,https://cyrefugeecouncil.org/feed/,13,Sociedad,40,Chipre,en,true,0
 2180,UN Cyprus Social Issues,Derechos humanos igualdad migracion y sociedad,https://www.un.org/press/en/rss.xml,13,Sociedad,40,Chipre,en,true,0
 2188,Financial Mirror Tech,Tecnologia negocios fintech y ciberseguridad,https://www.financialmirror.com/feed/,14,Tecnología,40,Chipre,en,true,0
 2189,Research and Innovation Foundation Cyprus,Tecnologia investigacion IA y proyectos digitales,https://www.research.org.cy/feed/,14,Tecnología,40,Chipre,en,true,0
 2201,MinCiencias Colombia,Ciencia innovacion becas y programas nacionales,https://minciencias.gov.co/rss.xml,1,Ciencia,41,Colombia,es,true,0
-2214,Amnesty International Global,DDHH crisis y conflictos internacionales,https://www.amnesty.org/en/latest/rss/,7,Internacional,41,Colombia,en,true,0
+2214,Amnesty International Global,DDHH crisis y conflictos internacionales,https://www.amnesty.org/en/latest/rss/,7,Internacional,41,Colombia,en,false,10
 2215,BBC Mundo Internacional,Noticias globales en español,https://www.bbc.com/mundo/ultimas_noticias/index.xml,7,Internacional,41,Colombia,es,true,0
 2221,El Colombiano Internacional,Noticias internacionales y panorama global,https://www.elcolombiano.com/rss/internacional,7,Internacional,41,Colombia,es,true,0
-2228,ONU Colombia Internacional,Acciones globales y cooperacion internacional,https://colombia.un.org/rss.xml,7,Internacional,41,Colombia,en,true,0
 2233,Amazon Conservation Team Colombia,Amazonia pueblos indigenas y conservacion,https://www.amazonteam.org/feed/,8,Medio Ambiente,41,Colombia,en,true,0
 2239,El Colombiano Medio Ambiente,Ecosistemas clima y sostenibilidad,https://www.elcolombiano.com/rss/medio-ambiente,8,Medio Ambiente,41,Colombia,es,true,0
-2242,Fundacion Natura Colombia,Fauna flora restauracion y ecosistemas,https://www.natura.org.co/rss,8,Medio Ambiente,41,Colombia,es,true,0
-2243,GAIA Amazonia,Medio ambiente amazonia y comunidades,https://gaiaamazonas.org/rss,8,Medio Ambiente,41,Colombia,es,true,0
 2247,MinAmbiente Colombia,Politica ambiental clima sostenibilidad y ecosistemas,https://www.minambiente.gov.co/rss,8,Medio Ambiente,41,Colombia,es,true,0
 2248,Oceana Colombia,Proteccion marina pesca y ecosistemas oceanicos,https://oceana.org/rss,8,Medio Ambiente,41,Colombia,en,true,0
 2249,Parques Nacionales Naturales Colombia,Conservacion fauna ecosistemas y naturaleza,https://www.parquesnacionales.gov.co/rss,8,Medio Ambiente,41,Colombia,es,true,0
-2254,Amnesty Comoros Politics,DDHH y politica en Comoras,https://www.amnesty.org/en/location/africa/east-africa/comoros/feed/,11,Política,42,Comoras,en,true,0
+2254,Amnesty Comoros Politics,DDHH y politica en Comoras,https://www.amnesty.org/en/location/africa/east-africa/comoros/feed/,11,Política,42,Comoras,en,false,10
 2255,COMESA Regional Politics,Politica regional del mercado comun,https://www.comesa.int/feed/,11,Política,42,Comoras,en,true,0
 2257,France24 Afrique Politique,Politica africana y Comoras,https://www.france24.com/fr/tag/afrique/rss,11,Política,42,Comoras,fr,true,0
-2259,Africa Business Tech,Innovacion africana empresas y startups,https://africabusiness.com/feed/,14,Tecnología,42,Comoras,en,true,0
 2261,Al Watwan Tech,Noticias locales de tecnologia y sociedad,https://www.alwatanpress.com/feed/,14,Tecnología,42,Comoras,fr,true,0
 2263,Comision Oceano Indico Tech,Digitalizacion regional y telecom,https://www.commissionoceanindien.org/feed/,14,Tecnología,42,Comoras,fr,true,0
 2264,Comores Infos Tech,Tecnologia digital y noticias locales,https://comoresinfos.net/feed/,14,Tecnología,42,Comoras,fr,true,0
 2266,Habariza Comores Tech,Tecnologia telefonia y servicios digitales,https://www.habarizacomores.com/feeds/posts/default,14,Tecnología,42,Comoras,fr,true,0
-2268,Masiwa Comores Tech,Innovacion local y tecnologia social,https://masiwa-comores.com/feed/,14,Tecnología,42,Comoras,fr,true,0
 2273,AllAfrica – North Korea,Noticias Pan-Africa y Corea del Norte,https://allafrica.com/tools/headlines/rdf/comoros/headlines.rdf,11,Política,43,Corea del Norte,en,true,0
-2274,Amnesty NK Politics,DDHH y politica sobre Corea del Norte,https://www.amnesty.org/en/location/asia-and-the-pacific/north-korea/feed/,11,Política,43,Corea del Norte,en,true,0
+2274,Amnesty NK Politics,DDHH y politica sobre Corea del Norte,https://www.amnesty.org/en/location/asia-and-the-pacific/north-korea/feed/,11,Política,43,Corea del Norte,en,false,10
 2275,Daily NK,Noticias sobre Corea del Norte desde el interior y exiliados,https://dailynk.com/english/feed,11,Política,43,Corea del Norte,en,true,0
-2276,Human Rights Watch NK,Analisis politico y violacion de derechos,https://www.hrw.org/rss,11,Política,43,Corea del Norte,en,true,0
 2279,RFI Afrique – Coree du Nord,Politica norcoreana desde medio africano francofono,https://www.rfi.fr/fr/afrique/rss,11,Política,43,Corea del Norte,fr,true,0
 2282,Cybersecurity Asia,Seguridad digital en Asia Este,https://www.cybersecasia.net/feed,14,Tecnología,43,Corea del Norte,en,true,0
 2283,DailyNK Tech,Tecnologia digital y telecomunicaciones internas,https://www.dailynk.com/english/feed/,14,Tecnología,43,Corea del Norte,en,true,0
@@ -471,17 +386,15 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 2344,Greenpeace East Asia,Clima energia activismo y medio ambiente,https://www.greenpeace.org/eastasia/feed/,8,Medio Ambiente,44,Corea del Sur,en,true,0
 2345,Hankyoreh Environment,Medio ambiente justicia climatica y biodiversidad,https://english.hani.co.kr/rss,8,Medio Ambiente,44,Corea del Sur,en,true,0
 2354,Korea Times Environment,Medio ambiente clima y politicas ecologicas,https://www.koreatimes.co.kr/www/rss/nation.xml,8,Medio Ambiente,44,Corea del Sur,en,true,0
-2359,UNEP Asia Environment,Medio ambiente y sostenibilidad en Asia,https://www.unep.org/rss.xml,8,Medio Ambiente,44,Corea del Sur,en,true,0
 2361,Yonhap Environment,Clima contaminacion y politica ambiental,https://en.yna.co.kr/RSS/news.xml,8,Medio Ambiente,44,Corea del Sur,en,true,0
 2376,GSMA Asia Tech,Moviles redes y telecomunicaciones,https://www.gsma.com/newsroom/feed/,14,Tecnología,44,Corea del Sur,en,true,0
 2379,Korea Times Tech,Tecnologia digital ciberseguridad y startups,https://www.koreatimes.co.kr/www/rss/tech.xml,14,Tecnología,44,Corea del Sur,en,true,0
 2381,The Register Asia Tech,Analisis TI con cobertura coreana,https://www.theregister.com/headlines.atom,14,Tecnología,44,Corea del Sur,en,true,0
 2393,Ciclismo Costa Rica,Ciclismo nacional y eventos,https://crciclismo.com/rss,3,Deportes,46,Costa Rica,es,true,0
 2405,Procomer Comercio,Exportaciones e inversion extranjera,https://www.procomer.com/rss,4,Economía,46,Costa Rica,es,true,0
-2407,1047 Hit Radio,Musica entretenimiento y artistas,https://1047hit.com/feed/,6,Entretenimiento,46,Costa Rica,es,true,0
 2408,Canal 6 Repretel Espectaculos,TV famosos y espectaculos,https://www.repretel.com/feed/,6,Entretenimiento,46,Costa Rica,es,true,0
 2410,Museos del Banco Central,Arte cine eventos y exposiciones,https://museosdelbancocentral.org/rss,6,Entretenimiento,46,Costa Rica,es,true,0
-2424,El Mundo CR Politica,Politica nacional y asamblea,https://www.elmundo.cr/feed/,11,Política,46,Costa Rica,es,true,0
+2424,El Mundo CR Politica,Politica nacional y asamblea,https://www.elmundo.cr/feed/,11,Política,46,Costa Rica,es,false,10
 2425,El Observador Politica,Politica economia publica y decisiones,https://observador.cr/feed/,11,Política,46,Costa Rica,es,true,0
 2426,La Nacion Politica,Politica costarricense y asamblea legislativa,https://www.nacion.com/rss/,11,Política,46,Costa Rica,es,true,0
 2432,Semanario Universidad Politica,Politica sociedad y analisis critico,https://semanariouniversidad.com/feed/,11,Política,46,Costa Rica,es,true,0
@@ -499,9 +412,6 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 2466,RFI Afrique Politique,Politica africana y relaciones internacionales,https://www.rfi.fr/fr/rss,11,Política,45,Costa de Marfil,fr,true,0
 2469,Union Africaine Politique,Politica continental africana,https://au.int/en/rss.xml,11,Política,45,Costa de Marfil,en,true,0
 2470,24sata Znanost,Noticias de ciencia y descubrimientos publicadas por 24sata,https://www.24sata.hr/feeds/znanost.xml,1,Ciencia,47,Croacia,hr,true,0
-2475,Nacional Znanost,Informacion sobre ciencia e innovacion en Croacia desde Nacional hr,https://www.nacional.hr/category/znanost/feed/,1,Ciencia,47,Croacia,hr,true,0
-2479,Croatia Week Culture,Portal en ingles con informacion cultural de Croacia,https://www.croatiaweek.com/category/culture/feed/,2,Cultura,47,Croacia,en,true,0
-2483,Nacional Kultura,Seccion cultural del portal Nacional hr,https://www.nacional.hr/category/kultura/feed/,2,Cultura,47,Croacia,hr,true,0
 2486,24sata Sport,Cobertura deportiva de 24sata,https://www.24sata.hr/feeds/sport.xml,3,Deportes,47,Croacia,hr,true,0
 2487,Croatia Week Sports,Portal en ingles con noticias deportivas de Croacia,https://www.croatiaweek.com/category/sport/feed/,3,Deportes,47,Croacia,en,true,0
 2489,Index hr Sport,Seccion deportiva del portal Index hr con noticias y resultados,https://www.index.hr/rss/sport,3,Deportes,47,Croacia,hr,true,0
@@ -509,12 +419,8 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 2494,Croatia Week Business,Portal en ingles con economia y negocios en Croacia,https://www.croatiaweek.com/category/business/feed/,4,Economía,47,Croacia,en,true,0
 2500,24sata Show,Articulos de espectaculos y ocio del medio 24sata,https://www.24sata.hr/feeds/show.xml,6,Entretenimiento,47,Croacia,hr,true,0
 2501,Croatia Week Entertainment,Portal en ingles con noticias de entretenimiento de Croacia,https://www.croatiaweek.com/category/entertainment/feed/,6,Entretenimiento,47,Croacia,en,true,0
-2505,Nacional Zabava,Noticias de ocio y espectaculos del portal Nacional hr,https://www.nacional.hr/category/zabava/feed/,6,Entretenimiento,47,Croacia,hr,true,0
 2508,24sata Svijet,Actualidad internacional de 24sata,https://www.24sata.hr/feeds/svijet.xml,7,Internacional,47,Croacia,hr,true,0
-2509,Croatia Week World,Portal en ingles con noticias internacionales relevantes para Croacia,https://www.croatiaweek.com/category/news/feed/,7,Internacional,47,Croacia,en,true,0
 2511,Index hr Vijesti Svijet,Noticias internacionales del portal Index hr,https://www.index.hr/rss/vijesti-svijet,7,Internacional,47,Croacia,hr,true,0
-2516,Croatia Week Environment,Portal en ingles con noticias ambientales de Croacia y la region,https://www.croatiaweek.com/category/environment/feed/,8,Medio Ambiente,47,Croacia,en,true,0
-2520,Nacional Okolis,Noticias sobre medio ambiente en el portal Nacional hr,https://www.nacional.hr/category/okolis/feed/,8,Medio Ambiente,47,Croacia,hr,true,0
 2523,24sata Politika,Seccion politica del medio 24sata,https://www.24sata.hr/feeds/politika.xml,11,Política,47,Croacia,hr,true,0
 2529,N1 HR Politika,Noticias politicas del canal N1 Croacia,https://n1info.hr/feed/,11,Política,47,Croacia,hr,true,0
 2533,Index hr Najnovije,Portal general con ultimas noticias de Croacia en linea,https://www.index.hr/rss,13,Sociedad,47,Croacia,hr,true,0
@@ -535,8 +441,6 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 2656,Egypt Independent Tech,Noticias de tecnologia y ciencia aplicada en Egipto,https://egyptindependent.com/feed/,14,Tecnología,52,Egipto,en,true,0
 2658,Egyptian Streets – Main,Medio independiente joven de noticias egipcias,https://egyptianstreets.com/feed/,13,Sociedad,52,Egipto,en,true,0
 2662,La Página - Noticias,Portal digital salvadoreño con noticias de política deportes sociedad seguridad y actualidad.,https://lapagina.com.sv/feed/,1,Ciencia,53,El Salvador,es,true,0
-2667,El Blog - Tecnología,"Artículos sobre tecnología, redes sociales, gadgets y cultura digital.",https://elblog.com/tag/tecnologia/feed/,14,Tecnología,53,El Salvador,es,true,0
-2669,La Página - Tecnología,"Cobertura de novedades tecnológicas, redes sociales y tendencias digitales.",https://lapagina.com.sv/category/tecnologia/feed/,14,Tecnología,53,El Salvador,es,true,0
 2675,The Arabian Post – Business & Gulf,"Medio digital centrado en economía y negocios del Golfo, con noticias sobre banca, energía, tecnología, marketing y política económica.",https://thearabianpost.com/feed,4,Economía,54,Emiratos Árabes Unidos,en,true,0
 2684,AllAfrica – Eritrea News,"Agregador consolidado de noticias africanas con sección dedicada a Eritrea, cubriendo política, sociedad y economía.",https://allafrica.com/tools/headlines/rdf/eritrea/headlines.rdf,7,Internacional,55,Eritrea,en,true,0
 2686,Eritrea Ministry of Information – General News,"Noticias generales, declaraciones oficiales y artículos del Ministerio de Información de Eritrea.",https://shabait.com/category/news/feed/,7,Internacional,55,Eritrea,en,true,0
@@ -571,10 +475,6 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 2800,Revista BYTE TI,"Tecnología profesional, digitalización, cloud, software empresarial e innovación IT.",https://revistabyte.es/feed/,14,Tecnología,58,España,es,true,0
 2805,TreceBits – Redes Sociales y Tecnología,"Redes sociales, social media, aplicaciones, plataformas y tendencias digitales.",https://www.trecebits.com/feed/,14,Tecnología,58,España,es,true,0
 2807,Universidad Politécnica de Madrid – Innovación,"Noticias de investigación, ingeniería, robótica, IA y desarrollo tecnológico.",https://www.upm.es/e-politecnica/feed,14,Tecnología,58,España,es,true,0
-2809,Xataka - Tecnología,"Noticias y análisis de tecnología, gadgets e innovación de Xataka.",https://www.xataka.com/tag/xataka/rss2.xml,14,Tecnología,58,España,es,true,0
-2810,Xataka Android,"Noticias y análisis de Android, móviles, apps y Google.",https://www.xatakandroid.com/feedburner.xml,14,Tecnología,58,España,es,true,0
-2811,Xataka Ciencia,"Divulgación científica, física, biología, espacio e innovación.",https://www.xatakaciencia.com/feedburner.xml,14,Tecnología,58,España,es,true,0
-2812,Xataka Foto,"Fotografía digital, cámaras, edición y cultura visual.",https://www.xatakafoto.com/feedburner.xml,14,Tecnología,58,España,es,true,0
 2814,Xataka Móvil,"Telefonía, tarifas, 5G, redes y operadores móviles en España.",https://www.xatakamovil.com/feedburner.xml,14,Tecnología,58,España,es,true,0
 2816,Xataka – Tecnología,"Noticias tecnológicas, análisis, ciencia, movilidad, innovación y cultura digital.",https://www.xataka.com/feedburner.xml,14,Tecnología,58,España,es,true,0
 2821,MIT News Research,Research and science news from MIT.,https://news.mit.edu/rss/research,1,Ciencia,59,Estados Unidos,en,true,0
@@ -617,9 +517,7 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 2892,Gizmodo,Consumer technology science and digital culture news.,https://gizmodo.com/rss,14,Tecnología,59,Estados Unidos,en,true,0
 2893,Hacker News,Technology and startup discussions from Y Combinator.,https://news.ycombinator.com/rss,14,Tecnología,59,Estados Unidos,en,true,0
 2895,Mashable Tech,Technology trends social media and digital innovation.,https://mashable.com/feeds/rss/tech,14,Tecnología,59,Estados Unidos,en,true,0
-2897,Recode Technology,Technology industry and Silicon Valley analysis.,https://www.vox.com/rss/recode/index.xml,14,Tecnología,59,Estados Unidos,en,true,0
 2899,Tomshardware,Computer hardware reviews benchmarks and analysis.,https://www.tomshardware.com/feeds/all,14,Tecnología,59,Estados Unidos,en,true,0
-2900,VentureBeat,Technology business artificial intelligence and gaming news.,https://venturebeat.com/feed/,14,Tecnología,59,Estados Unidos,en,true,4
 2901,ZDNet Technology,Enterprise technology IT and business tech news.,https://www.zdnet.com/news/rss.xml,14,Tecnología,59,Estados Unidos,en,true,0
 2902,ERR Science News,Science research and innovation news from Estonia.,https://news.err.ee/rss?cat=science,1,Ciencia,60,Estonia,en,true,0
 2904,Estonian Academy of Sciences News,Scientific institutions research and academic news.,https://www.akadeemia.ee/en/rss,1,Ciencia,60,Estonia,en,true,0
@@ -633,14 +531,10 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 2925,Riigikogu News,Parliament news laws and political activity.,https://www.riigikogu.ee/en/rss/,11,Política,60,Estonia,en,true,0
 2927,ERR Technology News,Technology digital government and innovation news from Estonia.,https://news.err.ee/rss?cat=technology,14,Tecnología,60,Estonia,en,true,0
 2931,Latitude59 News,Technology conference startups and digital innovation.,https://latitude59.ee/feed/,14,Tecnología,60,Estonia,en,true,0
-2935,e-Estonia News,Digital government e-residency and e-services news.,https://e-estonia.com/feed/,14,Tecnología,60,Estonia,en,true,0
-2942,Independent News Eswatini Economy,Economic analysis public finance and business news.,https://independentnews.co.sz/category/business/feed/,4,Economía,61,Esuatini,en,true,0
 2957,Independent News Eswatini,Independent reporting on politics economy and society.,https://independentnews.co.sz/feed/,13,Sociedad,61,Esuatini,en,true,0
 2958,Eswatini Tourism News,Travel tourism culture and national heritage.,https://www.thekingdomofeswatini.com/feed/,15,Viajes,61,Esuatini,en,true,0
 2969,Capital Ethiopia Economy,Ethiopian economy business finance and market analysis.,https://www.capitalethiopia.com/feed/,4,Economía,62,Etiopía,en,true,0
 2978,AllAfrica Ethiopia Politics,Aggregated political news and regional context.,https://allafrica.com/tools/headlines/rdf/ethiopia/headlines.rdf,11,Política,62,Etiopía,en,true,0
-2985,ZeHabesha Politics,Political commentary and Ethiopian current affairs.,https://zehabesha.com/feed/,11,Política,62,Etiopía,en,true,0
-2989,IceAddis Innovation Hub News,Startup ecosystem technology and innovation news.,https://iceaddis.com/feed/,14,Tecnología,62,Etiopía,en,true,0
 3008,BusinessWorld Politics,Political economy and policy impact analysis.,https://www.bworldonline.com/feed/,11,Política,63,Filipinas,en,true,0
 3013,Inquirer Politics,Political news government and public affairs coverage.,https://newsinfo.inquirer.net/feed,11,Política,63,Filipinas,en,true,0
 3022,Rappler Politics,Independent political analysis governance and accountability.,https://www.rappler.com/rss,11,Política,63,Filipinas,en,true,0
@@ -652,7 +546,6 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 3053,Yle Sports News,Sports news results and national competitions in Finland.,https://feeds.yle.fi/uutiset/v1/recent.rss?publisherIds=YLE_URHEILU,3,Deportes,64,Finlandia,en,true,0
 3054,Yle Urheilu,Suomen urheilu uutiset kilpailut ja liitot.,https://feeds.yle.fi/uutiset/v1/majorHeadlines/YLE_URHEILU.rss,3,Deportes,64,Finlandia,fi,true,0
 3055,Helsingin Sanomat World News,International politics conflicts and global affairs coverage.,https://www.hs.fi/rss/maailma.xml,7,Internacional,64,Finlandia,fi,true,0
-3056,UN Association of Finland,United Nations international cooperation and peacekeeping.,https://www.ykliitto.fi/rss,7,Internacional,64,Finlandia,en,true,0
 3064,Helsingin Sanomat Politics,Political news and policy analysis from Finland.,https://www.hs.fi/rss/politiikka.xml,11,Política,64,Finlandia,fi,true,0
 3066,Ilta Sanomat Politics,Daily political news and public affairs coverage.,https://www.is.fi/rss/politiikka.xml,11,Política,64,Finlandia,fi,true,0
 3067,Iltalehti Politics,Political headlines parliament and government news.,https://www.iltalehti.fi/rss/politiikka.xml,11,Política,64,Finlandia,fi,true,0
@@ -663,15 +556,11 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 3081,Helsingin Sanomat Technology,Technology innovation startups and digital society.,https://www.hs.fi/rss/teknologia.xml,14,Tecnología,64,Finlandia,fi,true,0
 3082,ICEYE News,Space technology satellite data and earth observation.,https://www.iceye.com/blog/rss.xml,14,Tecnología,64,Finlandia,en,true,0
 3087,Rovio Developer News,Mobile gaming technology and development updates.,https://www.rovio.com/articles/feed/,14,Tecnología,64,Finlandia,en,true,0
-3095,Fiji Broadcasting Corporation Science,Science environment climate and research news in Fiji.,https://www.fbcnews.com.fj/category/news/science/feed/,1,Ciencia,65,Fiyi,en,true,0
 3098,Fiji Ministry of Health Research,Public health research science and epidemiology updates.,https://www.health.gov.fj/feed/,1,Ciencia,65,Fiyi,en,true,0
-3107,Fiji Broadcasting Corporation Sports,Sports football rugby and national competitions.,https://www.fbcnews.com.fj/category/sports/feed/,3,Deportes,65,Fiyi,en,true,0
-3112,Fiji Broadcasting Corporation Business,Economic policy business and market developments.,https://www.fbcnews.com.fj/category/business/feed/,4,Economía,65,Fiyi,en,true,0
 3113,Fiji Bureau of Statistics Releases,Official statistics indicators and economic data.,https://www.statsfiji.gov.fj/rss,4,Economía,65,Fiyi,en,true,0
 3118,Reserve Bank of Fiji News,Monetary policy banking and financial stability updates.,https://www.rbf.gov.fj/feed/,4,Economía,65,Fiyi,en,true,0
 3123,Fiji Broadcasting Corporation News,Political news government activity and national affairs.,https://www.fbcnews.com.fj/feed/,11,Política,65,Fiyi,en,true,0
 3127,Ministry of Foreign Affairs Fiji,Foreign policy diplomacy and international relations.,https://www.foreignaffairs.gov.fj/rss,11,Política,65,Fiyi,en,true,0
-3133,Fiji Broadcasting Corporation Technology,Technology digital services and innovation news in Fiji.,https://www.fbcnews.com.fj/category/news/technology/feed/,14,Tecnología,65,Fiyi,en,true,0
 3135,Fiji National University Technology,Applied technology engineering and research news.,https://www.fnu.ac.fj/feed/,14,Tecnología,65,Fiyi,en,true,0
 3139,Pacific ICT Alliance News,Regional ICT technology policy and innovation.,https://www.picisoc.org/feed/,14,Tecnología,65,Fiyi,en,true,0
 3140,Telecom Fiji News,Telecommunications infrastructure and digital services.,https://www.telecom.com.fj/feed/,14,Tecnología,65,Fiyi,en,true,0
@@ -689,7 +578,6 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 3184,Le Figaro Environnement,Informations environnement ecologie energie et climat.,https://www.lefigaro.fr/rss/figaro_environnement.xml,8,Medio Ambiente,66,Francia,fr,true,0
 3185,Le Monde Planete,Actualite environnement climat et biodiversite.,https://www.lemonde.fr/planete/rss_full.xml,8,Medio Ambiente,66,Francia,fr,true,0
 3188,Reporterre Ecologie,Journal independant ecologie climat et environnement.,https://reporterre.net/spip.php?page=backend,8,Medio Ambiente,66,Francia,fr,true,0
-3189,WWF France Environnement,Conservation biodiversite climat et nature.,https://www.wwf.fr/rss.xml,8,Medio Ambiente,66,Francia,fr,true,0
 3194,Le Figaro Vox,Opinion columns debates and viewpoints from Le Figaro.,https://www.lefigaro.fr/rss/figaro_vox.xml,10,Opinión,66,Francia,fr,true,0
 3195,Le Monde Opinions,Opinions editorials and commentary on French and global affairs.,https://www.lemonde.fr/idees/rss_full.xml,10,Opinión,66,Francia,fr,true,0
 3200,20 Minutes Politique,Actualite politique accessible et debats publics.,https://www.20minutes.fr/feeds/rss-politique.xml,11,Política,66,Francia,fr,true,0
@@ -701,23 +589,18 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 3233,Le Monde Technologies,Actualite technologie numerique internet et innovation.,https://www.lemonde.fr/pixels/rss_full.xml,14,Tecnología,66,Francia,fr,true,0
 3237,Usine Digitale,Industrie numerique innovation et technologies avancees.,https://www.usine-digitale.fr/rss,14,Tecnología,66,Francia,fr,true,0
 3246,Centre Culturel Francais Libreville,Evenements culturels spectacles et expositions.,https://institutfrancais-gabon.com/feed/,2,Cultura,67,Gabón,fr,true,0
-3269,AllAfrica Gabon Politics,Actualite politique gabonaise et regionale agregee.,https://allafrica.com/tools/headlines/rdf/gabon/headlines.rdf,11,Política,67,Gabón,fr,true,0
 3272,Gabon Review Politique,Analyse politique gouvernance et pouvoir au Gabon.,https://www.gabonreview.com/feed/,11,Política,67,Gabón,fr,true,0
 3288,ECOWAS Gambia News,Regional cooperation west africa diplomacy and policy.,https://ecowas.int/rss,7,Internacional,68,Gambia,en,true,0
 3296,AllAfrica Gambia Politics,Aggregated political news and regional context.,https://allafrica.com/tools/headlines/rdf/gambia/headlines.rdf,11,Política,68,Gambia,en,true,0
-3297,Foroyaa Newspaper Politics,Independent political reporting democracy and governance.,https://foroyaa.net/feed/,11,Política,68,Gambia,en,true,0
+3297,Foroyaa Newspaper Politics,Independent political reporting democracy and governance.,https://foroyaa.net/feed/,11,Política,68,Gambia,en,true,3
 3300,Independent Electoral Commission Gambia,Elections voter registration and political process updates.,https://iec.gm/rss,11,Política,68,Gambia,en,true,0
 3305,The Standard Gambia Politics,Political developments parliament and elections.,https://standard.gm/feed/,11,Política,68,Gambia,en,true,0
 3317,Civil Georgia Science,Science policy research health and environment analysis.,https://civil.ge/feed/,1,Ciencia,69,Georgia,en,true,0
-3330,Tbilisi International Film Festival News,Cinema culture film festivals and creative industry.,https://tbilisifilmfestival.ge/feed/,2,Cultura,69,Georgia,en,true,0
 3336,Forbes Georgia Business,Business economy startups and corporate news.,https://forbes.ge/feed/,4,Economía,69,Georgia,ka,true,0
-3345,Georgian Institute of Politics Foreign Affairs,International security democracy and foreign policy analysis.,https://gip.ge/feed/,7,Internacional,69,Georgia,en,true,0
 3354,Netgazeti Opinion,Investigative opinion columns and civic debate.,https://netgazeti.ge/feed/,10,Opinión,69,Georgia,en,true,0
 3356,Transparency International Georgia Opinion,Governance anti corruption and policy opinion analysis.,https://transparency.ge/en/rss.xml,10,Opinión,69,Georgia,en,true,0
-3377,Ghana Investment Promotion Centre,Investment climate trade and economic development.,https://gipc.gov.gh/rss,4,Economía,70,Ghana,en,true,0
 3388,AllAfrica Ghana Politics,Aggregated political news and regional context.,https://allafrica.com/tools/headlines/rdf/ghana/headlines.rdf,11,Política,70,Ghana,en,true,0
 3390,Daily Guide Politics,Political reporting government and party politics.,https://dailyguidenetwork.com/feed/,11,Política,70,Ghana,en,true,0
-3391,Electoral Commission of Ghana,Elections voter registration and political process.,https://ec.gov.gh/rss,11,Política,70,Ghana,en,true,0
 3397,MyJoyOnline Politics,Political developments parliament and elections.,https://www.myjoyonline.com/feed/,11,Política,70,Ghana,en,true,0
 3398,Office of the President Ghana,Official presidential statements and political agenda.,https://www.presidency.gov.gh/rss,11,Política,70,Ghana,en,true,0
 3401,The Chronicle Politics,Political analysis governance and institutions.,https://thechronicle.com.gh/feed/,11,Política,70,Ghana,en,true,0
@@ -733,19 +616,13 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 3460,Naftemporiki Economy,Economy shipping finance and markets analysis.,https://www.naftemporiki.gr/rss,4,Economía,72,Grecia,el,true,0
 3462,Ta Nea Economy,Business economy banking and market developments.,https://www.tanea.gr/feed/?cat=economy,4,Economía,72,Grecia,el,true,0
 3463,To Vima Economy,Economic policy markets and public finance reporting.,https://www.tovima.gr/feed/?cat=economy,4,Economía,72,Grecia,el,true,0
-3469,Ta Nea International,World affairs diplomacy and international politics.,https://www.tanea.gr/feed/?cat=international,7,Internacional,72,Grecia,el,true,0
 3470,To Vima International,International politics diplomacy and global events.,https://www.tovima.gr/feed/?cat=international,7,Internacional,72,Grecia,el,true,0
 3480,Proto Thema Politics,Political news analysis and government affairs.,https://www.protothema.gr/rss,11,Política,72,Grecia,el,true,0
 3481,Ta Nea Politics,Political reporting parties parliament and government.,https://www.tanea.gr/feed/?cat=politics,11,Política,72,Grecia,el,true,0
 3482,Ta Nea Politics,Political reporting parties parliament and government.,https://www.tanea.gr/feed/,11,Política,72,Grecia,el,true,0
 3483,To Vima Politics,Political developments elections and public policy.,https://www.tovima.gr/feed/,11,Política,72,Grecia,el,true,0
 3484,To Vima Politics,Political developments elections and public policy.,https://www.tovima.gr/feed/?cat=politics,11,Política,72,Grecia,el,true,0
-3491,Ta Nea Society,Social news welfare education and community issues.,https://www.tanea.gr/feed/?cat=society,13,Sociedad,72,Grecia,el,true,0
-3492,To Vima Society,Social affairs education health and public debate.,https://www.tovima.gr/feed/?cat=society,13,Sociedad,72,Grecia,el,true,0
 3497,ERT News Technology,Public broadcaster technology science and innovation.,https://www.ertnews.gr/feed/,14,Tecnología,72,Grecia,el,true,0
-3506,Ta Nea Technology,Technology startups internet and digital transformation.,https://www.tanea.gr/feed/?cat=technology,14,Tecnología,72,Grecia,el,true,0
-3507,To Vima Technology,Technology innovation research and digital society.,https://www.tovima.gr/feed/?cat=technology,14,Tecnología,72,Grecia,el,true,0
-3515,Guatevision Politica,Noticias politicas nacionales entrevistas y analisis.,https://www.guatevision.com/feed/,11,Política,73,Guatemala,es,true,0
 3517,InSight Crime Guatemala,Analisis politico crimen organizado y seguridad.,https://insightcrime.org/feed/,11,Política,73,Guatemala,es,true,0
 3520,ConakryInfos Internacional,Actualidad internacional regional y africana.,https://conakryinfos.com/feed,7,Internacional,74,Guinea,fr,true,0
 3521,GuineeNews Opinion,Analisis opinion politica y social.,https://guineenews.org/feed,10,Opinión,74,Guinea,fr,true,0
@@ -759,10 +636,8 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 3542,DPI Guyana Internacional,Foreign affairs diplomacy and regional relations.,https://dpi.gov.gy/feed/,7,Internacional,77,Guyana,en,true,0
 3548,Demerara Waves Politica,Political analysis government and public affairs.,https://demerarawaves.com/feed/,11,Política,77,Guyana,en,true,0
 3553,Guyana Tourism Authority,Travel tourism culture and destinations.,https://guyanatourism.com/feed/,15,Viajes,77,Guyana,en,true,0
-3565,Haiti Press Network Opinion,Opinion columns commentary and debate.,https://www.hpnhaiti.com/feed/,10,Opinión,78,Haití,fr,true,0
 3568,AlterPresse Sociedad,Societe droits humains et mouvements sociaux.,https://www.alterpresse.org/spip.php?page=backend,13,Sociedad,78,Haití,fr,true,0
 3573,Criterio HN Economia,Investigacion economica corrupcion y desarrollo.,https://criterio.hn/feed/,4,Economía,79,Honduras,es,true,0
-3575,Secretaria de Desarrollo Economico,Politicas publicas comercio e industria.,https://www.sde.gob.hn/rss,4,Economía,79,Honduras,es,true,0
 3579,Confidencial Honduras Politica,Investigacion politica y corrupcion.,https://confidencialhn.com/feed/,11,Política,79,Honduras,es,true,0
 3589,Proceso Digital Tecnologia,Analisis tecnologia gobierno digital y ciberseguridad.,https://proceso.hn/feed/,14,Tecnología,79,Honduras,es,true,0
 3594,ELKH Research Network Ciencia,National research network science and technology.,https://elkh.org/rss,1,Ciencia,80,Hungría,en,true,0
@@ -781,10 +656,8 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 3642,NDTV World Internacional,World news diplomacy conflicts and global affairs.,https://feeds.feedburner.com/ndtvnews-world-news,7,Internacional,81,India,en,true,0
 3646,The Hindu Internacional,International affairs diplomacy and global policy.,https://www.thehindu.com/news/international/?service=rss,7,Internacional,81,India,en,true,0
 3648,Times of India Internacional,Global news diplomacy conflicts and geopolitics.,https://timesofindia.indiatimes.com/rssfeeds/296589292.cms,7,Internacional,81,India,en,true,0
-3654,India Today Politica,Political developments government and elections.,https://www.indiatoday.in/rss/1206514,11,Política,81,India,en,true,0
 3657,NDTV Politica,Political news government and parliament.,https://feeds.feedburner.com/ndtvnews-india-news,11,Política,81,India,en,true,0
 3664,Rediff India Politica,Politics government and national debate.,https://www.rediff.com/rss/newsrss.xml,11,Política,81,India,en,true,0
-3665,Republic World Politica,Political debate government and policy.,https://www.republicworld.com/rss/politics.xml,11,Política,81,India,en,true,0
 3666,The Hindu Politica,Political news government parliament and policy.,https://www.thehindu.com/news/national/?service=rss,11,Política,81,India,en,true,0
 3676,Digit India Tecnologia,Consumer technology reviews and innovation.,https://www.digit.in/rss,14,Tecnología,81,India,en,true,0
 3677,ET Telecom Tecnologia,Telecom policy networks and digital infrastructure.,https://telecom.economictimes.indiatimes.com/rss/topstories,14,Tecnología,81,India,en,true,0
@@ -793,7 +666,6 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 3681,Government of India Digital,Digital government policy and technology.,https://www.digitalindia.gov.in/rss,14,Tecnología,81,India,en,true,0
 3684,Inc42 Tecnologia,Startup technology funding and innovation.,https://inc42.com/feed/,14,Tecnología,81,India,en,true,0
 3687,Medianama Tecnologia,Technology policy telecom and digital rights.,https://www.medianama.com/feed/,14,Tecnología,81,India,en,true,0
-3689,NASSCOM Tecnologia,IT industry policy outsourcing and innovation.,https://nasscom.in/rss.xml,14,Tecnología,81,India,en,true,0
 3690,NDTV Gadgets Tecnologia,Technology gadgets internet and digital trends.,https://feeds.feedburner.com/gadgets360-latest,14,Tecnología,81,India,en,true,0
 3691,OpenGov Asia India Tecnologia,Digital government smart cities and policy.,https://opengovasia.com/feed/,14,Tecnología,81,India,en,true,0
 3695,TechCrunch India Tecnologia,Startup technology venture capital and innovation.,https://techcrunch.com/tag/india/feed/,14,Tecnología,81,India,en,true,0
@@ -810,30 +682,23 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 3729,Antara News Politika,National news agency political coverage.,https://www.antaranews.com/rss/politik.xml,11,Política,82,Indonesia,id,true,0
 3732,Detik News Politika,Political reporting government and public affairs.,https://news.detik.com/rss,11,Política,82,Indonesia,id,true,0
 3735,Media Indonesia Politika,Government policy politics and institutions.,https://mediaindonesia.com/rss,11,Política,82,Indonesia,id,true,0
-3737,Republika Politika,Political commentary policy and governance.,https://www.republika.co.id/rss/politik,11,Política,82,Indonesia,id,true,0
 3740,Antara News Teknologi,National technology science and innovation news.,https://www.antaranews.com/rss/tekno.xml,14,Tecnología,82,Indonesia,id,true,0
 3743,CNN Indonesia Teknologi,Technology innovation startups and digital economy.,https://www.cnnindonesia.com/teknologi/rss,14,Tecnología,82,Indonesia,id,true,0
 3745,Detik Inet Teknologi,Internet technology gadgets and digital life.,https://inet.detik.com/rss,14,Tecnología,82,Indonesia,id,true,0
 3754,Iraqi Red Crescent Science,Health research disasters and response.,https://www.ircs.org.iq/rss,1,Ciencia,83,Irak,en,true,0
 3767,Al Jazeera Palestine,Noticias y actualidad internacional relacionadas con Palestina.,https://www.aljazeera.com/xml/rss/all.xml,7,Internacional,137,Palestina,en,true,0
 3768,Al-Monitor Middle East,Noticias y análisis sobre Egipto Oriente Medio y política regional,https://www.al-monitor.com/rss,2,Cultura,52,Egipto,en,true,0
-3771,BBC News Iraq Internacional,Global coverage conflicts and diplomacy.,https://feeds.bbci.co.uk/news/world/middle_east/rss.xml,7,Internacional,83,Irak,en,true,0
 3772,Baghdad Today Internacional,International affairs security and geopolitics.,https://baghdadtoday.news/rss,7,Internacional,83,Irak,ar,true,0
 3773,Foreign Policy Iraq Internacional,Global analysis policy and security.,https://foreignpolicy.com/feed/,7,Internacional,83,Irak,en,true,0
 3782,crisisgroup.org Irak,,https://www.crisisgroup.org/rss/87,11,Política,83,Irak,,true,0
 3798,Silicon Republic Ciencia,Science research innovation and technology.,https://www.siliconrepublic.com/feed,1,Ciencia,85,Irlanda,en,true,0
 3799,Teagasc Ciencia,Agricultural science food research and innovation.,https://www.teagasc.ie/rss,1,Ciencia,85,Irlanda,en,true,0
-3815,BBC News Ireland Internacional,UK Ireland global affairs and diplomacy.,https://feeds.bbci.co.uk/news/northern_ireland/rss.xml,7,Internacional,85,Irlanda,en,true,0
 3833,Donegal Daily Politica,Political reporting Donegal councils and policy.,https://www.donegaldaily.com/feed/,11,Política,85,Irlanda,en,true,0
 3852,AI Ireland Tecnologia,Artificial intelligence research and events.,https://www.aiireland.ie/feed/,14,Tecnología,85,Irlanda,en,true,0
 3854,Blockchain Ireland Tecnologia,Blockchain technology innovation and policy.,https://blockchainireland.ie/feed/,14,Tecnología,85,Irlanda,en,true,0
-3857,Cloud Industry Forum Ireland Tecnologia,Cloud computing industry and standards.,https://www.cloudindustryforum.org/feed/,14,Tecnología,85,Irlanda,en,true,0
 3858,Cyber Ireland Tecnologia,Cybersecurity innovation startups and policy.,https://www.cyberireland.ie/feed/,14,Tecnología,85,Irlanda,en,true,0
-3866,ITAG Ireland Tecnologia,Technology industry policy and innovation.,https://itag.ie/feed/,14,Tecnología,85,Irlanda,en,true,0
-3867,Insight Centre Ireland Tecnologia,Data analytics AI and research.,https://www.insight-centre.org/feed/,14,Tecnología,85,Irlanda,en,true,0
 3870,Irish Tech News Tecnologia,Technology startups AI and innovation.,https://irishtechnews.ie/feed/,14,Tecnología,85,Irlanda,en,true,0
 3874,Smart Dublin Tecnologia,Smart city technology and innovation.,https://smartdublin.ie/feed/,14,Tecnología,85,Irlanda,en,true,0
-3875,StartupBlink Ireland Tecnologia,Startup data innovation and technology.,https://www.startupblink.com/blog/feed/,14,Tecnología,85,Irlanda,en,true,0
 3879,Tyndall National Institute Tecnologia,Microelectronics photonics and research.,https://www.tyndall.ie/feed/,14,Tecnología,85,Irlanda,en,true,0
 3882,IRNA Ciencia,Official science research and development news.,https://www.irna.ir/rss,1,Ciencia,84,Irán,en,true,0
 3883,ISNA Ciencia,Science research universities and innovation.,https://www.isna.ir/rss,1,Ciencia,84,Irán,en,true,0
@@ -843,9 +708,8 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 3929,RUV Internacional,International news diplomacy and global affairs.,https://www.ruv.is/rss/frettir,7,Internacional,86,Islandia,is,true,0
 3932,Stundin Internacional,Investigative international reporting and policy.,https://stundin.is/rss,7,Internacional,86,Islandia,is,true,0
 3939,Hafnarfjordur Municipality Politica,City council local governance and policy.,https://www.hafnarfjordur.is/rss,11,Política,86,Islandia,is,true,0
-3948,Arctic Green Energy Tecnologia,Renewable energy geothermal technology.,https://www.arcticgreenenergy.com/feed/,14,Tecnología,86,Islandia,en,true,0
 3953,Reykjavik Grapevine Tecnologia,Technology startups digital culture and science.,https://grapevine.is/feed/,14,Tecnología,86,Islandia,en,true,0
-3961,Marshall Islands Journal Economia,Economy business trade and public finance.,https://marshallislandsjournal.com/feed/,4,Economía,87,Islas Marshall,en,true,0
+3961,Marshall Islands Journal Economia,Economy business trade and public finance.,https://marshallislandsjournal.com/feed/,4,Economía,87,Islas Marshall,en,false,10
 3967,ABC Pacific RMI Politica,Pacific politics governance and regional affairs.,https://www.abc.net.au/news/feed/51120/rss.xml,11,Política,87,Islas Marshall,en,true,0
 3973,Pacific Islands News RMI Politica,Regional political news Marshall Islands.,https://www.pina.com.fj/feed/,11,Política,87,Islas Marshall,en,true,0
 3985,Meteorology Service Solomon,Weather and climate science data.,https://www.met.gov.sb/rss,1,Ciencia,88,Islas Salomón,en,true,0
@@ -858,7 +722,6 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 4108,Radio Irie FM - News,News coverage from popular Jamaican radio station.,https://www.iriefm.net/category/news/feed/,11,Política,91,Jamaica,en,true,0
 4120,United Nations Jamaica,UN development programs and social initiatives in Jamaica.,https://jamaica.un.org/en/rss.xml,13,Sociedad,91,Jamaica,en,true,0
 4135,Financial Times Japan,Economic analysis and news on Japan.,https://www.ft.com/japan?format=rss,4,Economía,92,Japón,en,true,0
-4139,Japan Center for Economic Research,Economic research and analysis.,https://www.jcer.or.jp/en/rss,4,Economía,92,Japón,en,true,0
 4177,日本経済研究,日本経済研究センターの経済分析,https://www.jcer.or.jp/rss,4,Economía,92,Japón,ja,true,0
 4217,公明党ニュース,与党・公明党の最新情報,https://www.komei.or.jp/news/rss/,11,Política,92,Japón,ja,true,0
 4233,ASCII.jp,アスキーのテクノロジーニュース,https://ascii.jp/rss.xml,14,Tecnología,92,Japón,ja,true,0
@@ -868,40 +731,27 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 4239,ITmedia,ITメディアの最新ニュース,https://rss.itmedia.co.jp/rss/2.0/itmedia_all.xml,14,Tecnología,92,Japón,ja,true,0
 4255,週刊アスキー,週刊アスキーの最新号,https://weekly.ascii.jp/rss.xml,14,Tecnología,92,Japón,ja,true,0
 4357,International Livestock Research Institute,ILRI agricultural research.,https://www.ilri.org/rss,1,Ciencia,95,Kenia,en,true,0
-4418,National Academy of Sciences,Academia Nacional de Ciencias de Kirguistan.,https://www.nas.kg/rss,1,Ciencia,96,Kirguistán,ru,true,0
 4575,The Guardian Pacific Kiribati Economy,Guardian economic coverage of Kiribati.,https://www.theguardian.com/rss/kiribati-economy,4,Economía,97,Kiribati,en,true,0
 4599,The Guardian Pacific Kiribati,Guardian coverage of Kiribati.,https://www.theguardian.com/rss/kiribati,11,Política,97,Kiribati,en,true,0
 4622,The Guardian Pacific Kiribati Society,Guardian society coverage of Kiribati.,https://www.theguardian.com/rss/kiribati-society,13,Sociedad,97,Kiribati,en,true,0
-4633,Dasman Diabetes Institute,Diabetes and medical research.,https://www.dasmaninstitute.org/rss,1,Ciencia,98,Kuwait,en,true,0
 4678,crisisgroup.org Kuwait,,https://www.crisisgroup.org/rss/163,11,Política,98,Kuwait,,true,0
 4704,Al Anbaa Kuwait Technology,Arabic newspaper technology focus.,https://www.alanba.com.kw/rss/technology,14,Tecnología,98,Kuwait,ar,true,0
 4795,Radio Free Asia Lao,Noticias de Laos en idioma lao,https://www.rfa.org/lao/rss,11,Política,99,Laos,lo,true,0
-4843,National University of Lesotho,University research and science news.,https://www.nul.ls/rss,1,Ciencia,100,Lesoto,en,true,0
 4865,Parliament of Lesotho,Parliamentary proceedings.,https://www.parliament.ls/rss,11,Política,100,Lesoto,en,true,0
 4872,The Guardian Africa Lesotho,Guardian coverage of Lesotho.,https://www.theguardian.com/rss/lesotho,11,Política,100,Lesoto,en,true,0
-4886,Lesotho ICT Association,ICT industry association.,https://www.licta.org.ls/rss,14,Tecnología,100,Lesoto,en,true,0
 4901,Apollo Latvia Economy,News and opinion portal economy.,https://www.apollo.lv/rss/economy,4,Economía,101,Letonia,lv,true,0
 4926,Apollo Latvia Society,News and opinion portal society.,https://www.apollo.lv/rss/society,13,Sociedad,101,Letonia,lv,true,0
-4938,Latvian Red Cross,Humanitarian and social assistance.,https://www.redcross.lv/rss,13,Sociedad,101,Letonia,lv,true,0
 4951,Apollo Latvia Technology,News and opinion portal technology.,https://www.apollo.lv/rss/technology,14,Tecnología,101,Letonia,lv,true,0
-4972,Riga TechGirls,Women in technology organization.,https://www.rigatechgirls.org/rss,14,Tecnología,101,Letonia,lv,true,0
 4994,Ministry of Health Liberia Science,Public health research and scientific reports.,https://www.moh.gov.lr/rss,1,Ciencia,103,Liberia,en,true,0
-5033,Ministry of Gender Liberia Society,Children protection family and social welfare.,https://www.mogcsp.gov.lr/rss,13,Sociedad,103,Liberia,en,true,0
 5067,Wirtschaftskammer Economia,Camara de comercio e industria para empresas y negocios.,https://www.wirtschaftskammer.li/feed/,4,Economía,105,Liechtenstein,de,true,0
 5082,15min Politica,Sitio de noticias con enfoque en politica y sociedad.,https://www.15min.lt/rss/politika,11,Política,106,Lituania,lt,true,0
-5085,Delfi Politica,Portal de noticias mas popular con seccion de politica y actualidad.,https://www.delfi.lt/rss/politika.xml,11,Política,106,Lituania,lt,true,0
 5091,15min Technologijos Tecnologia,Portal de noticias con las ultimas novedades en tecnologia y startups.,https://www.15min.lt/rss/technologijos,14,Tecnología,106,Lituania,lt,true,0
-5132,National Council for Scientific Research,Lebanese scientific research council.,https://www.cnrs.edu.lb/rss,1,Ciencia,102,Líbano,ar,true,0
 5176,France 24 Lebanon,France 24 coverage of Lebanon.,https://www.france24.com/rss/lebanon,11,Política,102,Líbano,fr,true,0
 5189,crisisgroup.org  Libano,,https://www.crisisgroup.org/rss/82,11,Política,102,Líbano,en,true,0
-5194,ArabNet Lebanon,Digital business and technology conference.,https://www.arabnet.me/rss,14,Tecnología,102,Líbano,en,true,0
 5226,Agricultural Research Center,Farming science crop studies and agricultural innovation.,https://www.fofifa.mg/category/actualites/feed/,1,Ciencia,109,Madagascar,mg,true,0
 5241,Madagascar Tribune Economia,Economy business and trade news from Malagasy newspaper.,https://www.madagascar-tribune.com/spip.php?page=backend&id_rubrique=3,4,Economía,109,Madagascar,fr,true,0
-5248,Madagascar Tribune Politica,Political news and analysis from a leading Malagasy newspaper.,https://www.madagascar-tribune.com/spip.php?page=backend&id_rubrique=2,11,Política,109,Madagascar,fr,true,0
 5249,Midi Madagasikara Politica,Political section of a major national daily newspaper.,https://www.midi-madagasikara.mg/category/politique/feed/,11,Política,109,Madagascar,mg,true,0
-5253,UN Madagascar News,UN political and developmental news and reports about Madagascar.,https://madagascar.un.org/en/rss.xml,11,Política,109,Madagascar,en,true,0
 5257,Madagascar Tribune Sociedad,Social issues community news and cultural events.,https://www.madagascar-tribune.com/spip.php?page=backend&id_rubrique=4,13,Sociedad,109,Madagascar,fr,true,0
-5263,Youth and Sports Ministry,Youth programs sports events and social activities.,https://www.mjs.gov.mg/category/actualites/feed/,13,Sociedad,109,Madagascar,mg,true,0
 5266,Forest Research Institute,Forestry science biodiversity and conservation research.,https://www.frim.gov.my/feed/,1,Ciencia,110,Malasia,en,true,0
 5271,Ministry of Science Technology,National science policy research funding and innovation.,https://www.mosti.gov.my/feed/,1,Ciencia,110,Malasia,ms,true,0
 5278,Free Malaysia Today Economy,Economic news and financial updates.,https://www.freemalaysiatoday.com/category/business/feed/,4,Economía,110,Malasia,en,true,0
@@ -910,43 +760,19 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 5327,Malawi24 Politics,Political news updates and commentary.,https://www.malawi24.com/category/politics/feed/,11,Política,111,Malaui,en,true,0
 5328,Maravi Post Politics,Political analysis and national affairs coverage.,https://www.maravipost.com/category/politics/feed/,11,Política,111,Malaui,en,true,0
 5330,Nyasa Times Politics,Independent political news and current affairs.,https://www.nyasatimes.com/category/politics/feed/,11,Política,111,Malaui,en,true,0
-5341,Nyasa Times Society,Community news social affairs and public issues.,https://www.nyasatimes.com/category/society/feed/,13,Sociedad,111,Malaui,en,true,0
-5369,National Bureau Statistics,Economic indicators statistics and data releases.,https://statisticsmaldives.gov.mv/feed/,4,Economía,112,Maldivas,en,true,0
-5383,UN Maldives News,UN political and developmental news about Maldives.,https://maldives.un.org/en/rss.xml,11,Política,112,Maldivas,en,true,0
 5395,Energy Water Agency,Energy science water resources and sustainable tech.,https://energywateragency.gov.mt/feed/,1,Ciencia,114,Malta,en,true,0
-5405,Gaming Authority Malta,Gaming industry news regulation and economic impact.,https://www.mga.org.mt/feed/,4,Economía,114,Malta,en,true,0
 5406,Malta Chamber Commerce,Business news trade events and economic updates.,https://www.maltachamber.org.mt/feed/,4,Economía,114,Malta,en,true,0
 5408,Malta Financial Services,Financial services news regulation and sector updates.,https://www.mfsa.mt/feed/,4,Economía,114,Malta,en,true,0
 5433,Youth Agency Malta,Youth programs activities and social development.,https://agenzijazghazagh.gov.mt/feed/,13,Sociedad,114,Malta,en,true,0
-5438,Malta Digital Authority,Digital policy e-government and ICT strategy.,https://digitalmalta.gov.mt/feed/,14,Tecnología,114,Malta,en,true,0
-5451,Office Niger Agriculture,Irrigation science water management and farming.,https://www.omvs.org/feed/,1,Ciencia,113,Malí,fr,true,0
 5467,Bamada.net Politique,Political news and current affairs.,https://bamada.net/category/politique/feed/,11,Política,113,Malí,fr,true,0
 5468,Journal du Mali Politique,Political updates and government news.,https://www.journaldumali.com/category/politique/feed/,11,Política,113,Malí,fr,true,0
-5473,UN Mali News,UN political and security news about Mali.,https://mali.un.org/fr/rss.xml,11,Política,113,Malí,fr,true,0
 5496,Hespress Politique,Political news and current affairs from news portal.,https://www.hespress.com/politique/feed/,11,Política,115,Marruecos,ar,true,0
-5503,UN Morocco News,UN political and developmental news about Morocco.,https://morocco.un.org/fr/rss.xml,11,Política,115,Marruecos,fr,true,0
 5506,Hespress Societe,Social news and current affairs from news portal.,https://www.hespress.com/societe/feed/,13,Sociedad,115,Marruecos,ar,true,0
-5530,Mauritius Chamber Commerce,Business news trade events and economic updates.,https://www.mchamber.org/feed/,4,Economía,116,Mauricio,en,true,0
-5543,UN Mauritius News,UN political and developmental news about Mauritius.,https://mauritius.un.org/en/rss.xml,11,Política,116,Mauricio,en,true,0
-5552,National Empowerment Foundation,Poverty reduction social programs and empowerment.,https://nef.mu/feed/,13,Sociedad,116,Mauricio,en,true,0
-5601,UN Micronesia News,UN political and developmental news about Micronesia.,https://micronesia.un.org/en/rss.xml,11,Política,119,Micronesia,en,true,0
 5634,Biroul National Statistica,Economic indicators statistics and data releases.,https://statistica.gov.md/feed/,4,Economía,120,Moldavia,ro,true,0
 5648,Ministerul Sanatatii,Public health news disease prevention and medical care.,https://ms.gov.md/feed/,13,Sociedad,120,Moldavia,ro,true,0
-5671,National University Mongolia,Academic research scientific studies and discoveries.,https://www.num.edu.mn/research/feed/,1,Ciencia,122,Mongolia,mn,true,0
 5674,Investment Mongolia,Investment news business climate and economic development.,https://www.investmongolia.gov.mn/feed/,4,Economía,122,Mongolia,en,true,0
-5691,UN Mongolia News,UN political and developmental news about Mongolia.,https://mongolia.un.org/en/rss.xml,11,Política,122,Mongolia,en,true,0
-5702,CdM Economy,Business news trade and investment updates.,https://www.cdm.me/ekonomija/feed/,4,Economía,123,Montenegro,sr,true,0
-5713,CdM Politics,Political news from independent news portal.,https://www.cdm.me/politika/feed/,11,Política,123,Montenegro,sr,true,0
-5720,UN Montenegro News,UN political and developmental news about Montenegro.,https://montenegro.un.org/en/rss.xml,11,Política,123,Montenegro,en,true,0
-5734,Canal de Mozambique,Political updates and government news from media.,https://www.canal.co.mz/politica/feed/,11,Política,124,Mozambique,pt,true,0
-5740,UN Mozambique News,UN political and developmental news about Mozambique.,https://mozambique.un.org/pt/rss.xml,11,Política,124,Mozambique,pt,true,0
 5808,Monaco Telecom,Telecom services broadband and technology news.,https://www.monaco-telecom.mc/feed/,14,Tecnología,121,Mónaco,fr,true,0
-5826,Namibia Statistics Agency,Economic indicators statistics and data releases.,https://www.nsa.org.na/feed/,4,Economía,125,Namibia,en,true,0
-5840,UN Namibia News,UN political and developmental news about Namibia.,https://namibia.un.org/en/rss.xml,11,Política,125,Namibia,en,true,0
 5879,Radio New Zealand Pacific,Regional political news covering Nauru.,http://www.rnz.co.nz/rss/pacific.xml,11,Política,126,Nauru,en,true,0
-5897,Nepal Rastra Bank,Monetary policy financial stability and banking news.,https://nrb.org.np/feed/,4,Economía,127,Nepal,ne,true,0
-5910,UN Nepal News,UN political and developmental news about Nepal.,https://nepal.un.org/en/rss.xml,11,Política,127,Nepal,en,true,0
-5911,crisisgroup.org Omán,,https://www.crisisgroup.org/rss/157,11,Política,133,Omán,,true,0
 5912,BBC News – Technology,Noticias de tecnología de BBC News.,https://feeds.bbci.co.uk/news/technology/rss.xml,6,Entretenimiento,144,Reino Unido,en,true,0
 5913,crisisgroup.org Siria,,https://www.crisisgroup.org/rss/83,11,Política,164,Siria,en,true,0
 5914,Dagens Nyheter Ekonomi,Dagstidningens bevakning av ekonomi och näringsliv.,https://www.dn.se/rss/ekonomi,4,Economía,170,Suecia,sv,true,0
@@ -954,17 +780,10 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 5924,Dagens Nyheter Politik,Dagstidningens bevakning av politiska utvecklingar.,https://www.dn.se/rss/politik,11,Política,170,Suecia,sv,true,0
 5925,Moderaterna,Politiska nyheter partiståndpunkter och aktiviteter.,https://www.moderaterna.se/rss,11,Política,170,Suecia,sv,true,0
 5928,SVT Nyheter Politik,Politiska nyheter och analys från public service.,https://www.svt.se/nyheter/rss.xml?category=politik,11,Política,170,Suecia,sv,true,0
-5937,Swiss Federal Institute of Technology Lausanne EPFL,Scientific research engineering innovation.,https://www.epfl.ch/en/rss,1,Ciencia,171,Suiza,en,true,0
-5941,Swiss Polar Institute,Polar research climate studies environmental science.,https://swisspolar.ch/en/rss,1,Ciencia,171,Suiza,en,true,0
-5946,Social Democratic Party of Switzerland SP,Political party news positions and activities.,https://www.sp-ps.ch/rss,11,Política,171,Suiza,de,true,0
-5985,General Bureau of Statistics Suriname,Economic indicators trade data statistics.,https://www.statistics-suriname.org/rss,4,Economía,172,Surinam,nl,true,0
 5994,Government of Suriname Portal,Official government news and public announcements.,https://www.gov.sr/rss,11,Política,172,Surinam,nl,true,0
 6010,Suriname Red Cross,Humanitarian aid disaster response community health.,https://www.rodekruis.sr/rss,13,Sociedad,172,Surinam,nl,true,0
 6027,Ministry of Finance Thailand,Fiscal policy budget economic planning.,https://www.mof.go.th/rss,4,Economía,173,Tailandia,th,true,0
-6079,Tanzania Red Cross Society,Humanitarian aid disaster response and community health programs.,https://www.trcs.or.tz/rss,13,Sociedad,174,Tanzania,en,true,0
 6090,Statistical Agency under President of Tajikistan,Official economic statistics indicators and demographic data.,https://www.stat.tj/en/rss,4,Economía,175,Tayikistán,en,true,0
-6106,National Statistical Committee Tajikistan,Social statistics demographic data and quality of life indicators.,https://stat.tj/en/social/rss,13,Sociedad,175,Tayikistán,en,true,0
-6144,Presidencia RDTL Politica,Comunicados y noticias de la presidencia de la republica.,https://presidenciarepublica.tl/feed/,11,Política,176,Timor Oriental,pt,true,0
 6146,Suara Timor Lorosae Politica,Diario lider con cobertura politica y social.,https://stl.news/feed/,11,Política,176,Timor Oriental,pt,true,0
 6147,Tatoli Agencia Estatal Politica,Agencia oficial de noticias del gobierno de Timor-Leste.,https://tatoli.tl/feed/,11,Política,176,Timor Oriental,pt,true,0
 6163,France 24 - Afrique,Noticias africanas de France 24. Cobertura ocasional de Togo.,https://www.france24.com/fr/afrique/rss,11,Política,177,Togo,fr,true,0
@@ -974,10 +793,7 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 6182,ScienceDaily - All News,Agregador global de los ultimos hallazgos cientificos.,https://www.sciencedaily.com/rss/all.xml,1,Ciencia,178,Tonga,en,true,0
 6200,NASA - News,Noticias de la agencia espacial estadounidense.,https://www.nasa.gov/rss/dyn/breaking_news.rss,1,Ciencia,179,Trinidad y Tobago,en,true,0
 6220,CNC3 Television,Principal canal de television privada. Noticias nacionales.,https://www.cnc3.co.tt/rss,11,Política,179,Trinidad y Tobago,en,true,0
-6227,Office of the Prime Minister,Comunicados oficiales y anuncios del Primer Ministro.,https://www.opm.gov.tt/rss,11,Política,179,Trinidad y Tobago,en,true,0
 6231,The Diplomat - Global Politics,Analisis de politica internacional que ocasionalmente cubre el Caribe.,https://thediplomat.com/feed/,11,Política,179,Trinidad y Tobago,en,true,0
-6241,Power 102.1 FM - News,Radio de noticias. Cobertura de temas sociales y actualidad.,https://power102fm.com/category/news/feed/,13,Sociedad,179,Trinidad y Tobago,en,true,0
-6242,The Guardian - Global Development,Noticias internacionales sobre desarrollo y sociedad.,https://www.theguardian.com/global-development/rss,13,Sociedad,179,Trinidad y Tobago,en,true,0
 6251,Ars Technica,Noticias de tecnologia y ciencia en profundidad.,https://arstechnica.com/feed/,14,Tecnología,179,Trinidad y Tobago,en,true,0
 6256,MIT Technology Review - News,Noticias sobre tecnologias emergentes y su impacto.,https://www.technologyreview.com/feed/,14,Tecnología,179,Trinidad y Tobago,en,true,0
 6260,TechCrunch - Startups,Noticias globales sobre startups y capital de riesgo.,https://techcrunch.com/feed/,14,Tecnología,179,Trinidad y Tobago,en,true,0
@@ -1001,7 +817,6 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 6342,Foreign Policy - Turkey,Analisis en profundidad de la politica exterior turca.,https://foreignpolicy.com/tag/turkey/feed/,11,Política,182,Turquía,en,true,0
 6345,Haberturk,Buyuk ulusal gazete ve haber portalı.,https://www.haberturk.com/rss,11,Política,182,Turquía,tr,true,0
 6346,Hurriyet Daily News,Principal diario en ingles (centro-derecha). Noticias politicas y economicas.,https://www.hurriyetdailynews.com/rss.aspx,11,Política,182,Turquía,en,true,0
-6349,Milliyet,Köklü merkez gazete. Son dakika haberleri.,https://www.milliyet.com.tr/rss/rssNew/gundemRss.xml,11,Política,182,Turquía,tr,true,0
 6351,NTV,Populer ulusal televizyon haber kanali.,https://www.ntv.com.tr/gundem.rss,11,Política,182,Turquía,tr,true,0
 6353,Sabah,Buyuk pro-iktidar gazete. Son dakika haberleri.,https://www.sabah.com.tr/rss/gundem.xml,11,Política,182,Turquía,tr,true,0
 6354,Sozcu,Gazete laik ve milliyetci (opositor secular/nacionalista). Politika haberleri.,https://www.sozcu.com.tr/rss/politika.xml,11,Política,182,Turquía,tr,true,0
@@ -1016,33 +831,26 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 6443,The Guardian - Ukraine,Seccion de Ucrania del diario britanico. Cobertura internacional.,https://www.theguardian.com/world/ukraine/rss,11,Política,184,Ucrania,en,true,0
 6445,Ukraine Crisis Media Center,Centro de comunicacion para crisis. Briefings y analisis.,https://uacrisis.org/en/feed,11,Política,184,Ucrania,en,true,0
 6446,Ukrainska Pravda,Principal medio digital independiente. Cobertura politica y de guerra.,https://www.pravda.com.ua/rss/,11,Política,184,Ucrania,uk,true,0
-6450,Amnesty International - Ukraine,Noticias y campañas sobre derechos humanos.,https://www.amnesty.org/en/countries/europe-and-central-asia/ukraine/rss/,13,Sociedad,184,Ucrania,en,true,0
+6450,Amnesty International - Ukraine,Noticias y campañas sobre derechos humanos.,https://www.amnesty.org/en/countries/europe-and-central-asia/ukraine/rss/,13,Sociedad,184,Ucrania,en,false,10
 6460,Zmina Human Rights Centre,Informes y noticias sobre derechos humanos en Ucrania.,https://zmina.info/feed/,13,Sociedad,184,Ucrania,uk,true,0
 6461,DOU (Developers.org.ua),Comunidad mas grande de desarrolladores de software. Noticias y articulos.,https://dou.ua/feed/,14,Tecnología,184,Ucrania,ru,true,0
 6464,Lviv IT Cluster,Comunidad tecnologica de Lviv. Noticias e iniciativas del sector.,https://itcluster.lviv.ua/feed/,14,Tecnología,184,Ucrania,en,true,0
 6491,Amref Health Africa - Uganda,Noticias sobre salud comunitaria y capacitacion sanitaria.,https://amref.org/uganda/rss/,13,Sociedad,185,Uganda,en,true,0
-6495,The Independent Uganda,Noticias y analisis sobre politica economia negocios sociedad y asuntos regionales de Uganda.,https://www.independent.co.ug/feed/,13,Sociedad,185,Uganda,en,true,0
-6508,Uganda Communications Commission (UCC),Regulador de telecomunicaciones. Noticias del sector y espectro.,https://www.ucc.co.ug/rss,14,Tecnología,185,Uganda,en,true,0
+6495,The Independent Uganda,Noticias y analisis sobre politica economia negocios sociedad y asuntos regionales de Uganda.,https://www.independent.co.ug/feed/,13,Sociedad,185,Uganda,en,false,10
 6562,Spot.uz,Principal medio especializado en economia y negocios de Uzbekistan.,https://spot.uz/ru/rss/,4,Economía,187,Uzbekistán,ru,true,0
 6567,Gazeta.uz,Periodico digital en uzbeko y ruso. Cobertura politica nacional.,https://www.gazeta.uz/oz/rss/,11,Política,187,Uzbekistán,uz,true,0
 6570,Podrobno.uz,Agencia de noticias. Cobertura de politica y sociedad.,https://podrobno.uz/rss/,11,Política,187,Uzbekistán,ru,true,0
 6574,The Diplomat - Central Asia,Analisis de politica y seguridad en Asia Central.,https://thediplomat.com/tag/uzbekistan/feed/,11,Política,187,Uzbekistán,en,true,0
-6587,PINA (Pacific Islands News Association),Agregador de noticias del Pacifico. Filtrado por Vanuatu.,https://www.pina.com.fj/category/vanuatu/feed/,11,Política,188,Vanuatu,en,true,0
-6589,The Vanuatu Independent,Semanal independiente. Analisis politico y noticias nacionales.,https://vanuatuindependent.com/feed/,11,Política,188,Vanuatu,en,true,0
 6595,Vatican News - English,Official news portal of the Holy See in English.,https://www.vaticannews.va/en.rss.xml,11,Política,189,Vaticano,en,true,0
 6596,Vatican News - Espanol,Portal oficial de noticias de la Santa Sede en espanol.,https://www.vaticannews.va/es.rss.xml,11,Política,189,Vaticano,es,true,0
 6597,Vatican News - Vatican City,Noticias especificas sobre el gobierno de la Ciudad del Vaticano.,https://www.vaticannews.va/en/vatican-city.rss.xml,11,Política,189,Vaticano,en,true,0
-6600,Al Navio - Economia,Analisis de temas economicos.,https://alnavio.com/category/economia/feed/,4,Economía,190,Venezuela,es,true,0
+6600,Al Navio - Economia,Analisis de temas economicos.,https://alnavio.com/category/economia/feed/,4,Economía,190,Venezuela,es,false,10
 6602,Bolsa de Valores de Caracas,Informacion del mercado de capitales.,https://www.bolsadecaracas.com/feed/,4,Economía,190,Venezuela,es,true,0
 6605,Contrapunto - Economia,Seccion de economia y finanzas.,https://contrapunto.com/category/economia/feed/,4,Economía,190,Venezuela,es,true,0
 6607,El Nacional - Economia,Seccion economica del diario El Nacional.,https://www.elnacional.com/economia/feed/,4,Economía,190,Venezuela,es,true,0
 6608,El Pitazo - Economia,Noticias economicas con enfoque comunitario.,https://elpitazo.net/category/economia/feed/,4,Economía,190,Venezuela,es,true,0
-6620,Contrapunto - Tecnologia,Seccion de ciencia y tecnologia.,https://contrapunto.com/category/ciencia-y-tecnologia/feed/,14,Tecnología,190,Venezuela,es,true,0
 6649,The Guardian Yemen,Noticias de The Guardian sobre Yemen.,http://www.theguardian.com/rss/yemen,11,Política,192,Yemen,en,true,0
 6661,Google News Yemen,Noticias de Google sobre Yemen.,http://news.google.com/rss/yemen-technology,14,Tecnología,192,Yemen,en,true,0
-6683,Autoridad Portuaria Yibuti,Autoridad Portuaria y de Zona Franca.,http://www.portdedjibouti.com/rss,4,Economía,193,Yibuti,fr,true,0
-6750,Lusaka Times - Lifestyle,Cultural and lifestyle articles from leading news site.,https://www.lusakatimes.com/category/lifestyle/feed/,2,Cultura,194,Zambia,en,true,0
-6761,Zambia Development Agency,Investment news and business opportunities.,https://www.zda.org.zm/news/rss,4,Economía,194,Zambia,en,true,0
 6763,Lusaka Times,Zambia's leading online news site covering politics and current affairs.,https://www.lusakatimes.com/feed/,11,Política,194,Zambia,en,true,0
 6764,News Diggers,Independent Zambian newspaper with political reporting.,https://diggers.news/feed/,11,Política,194,Zambia,en,true,0
 6767,The Zambian Observer,Political commentary and analysis on Zambian affairs.,https://zambianobserver.com/feed/,11,Política,194,Zambia,en,true,0
@@ -1068,9 +876,8 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 6834,Prothom Alo English – Stories,Versión en inglés de Prothom Alo.,https://en.prothomalo.com/stories.rss,13,Sociedad,15,Bangladés,en,true,0
 6837,BD24Live – Bangla,Portal de noticias en bengalí.,https://www.bd24live.com/feed/,13,Sociedad,15,Bangladés,bn,true,0
 6838,Bangla Tribune – National,Noticias nacionales de Bangla Tribune.,https://banglatribune.com/feed/national,11,Política,15,Bangladés,bn,true,0
-6840,BelTA – Noticias oficiales,Agencia de noticias estatal de Bielorrusia (feed principal).,https://belta.by/rss/,13,Sociedad,21,Bielorrusia,ru,true,0
+6840,BelTA – Noticias oficiales,Agencia de noticias estatal de Bielorrusia (feed principal).,https://belta.by/rss/,13,Sociedad,21,Bielorrusia,ru,false,10
 6841,Zerkalo.io – Noticias del día,Medio independiente (exilio). Noticias diarias.,https://news.zerkalo.io/rss/daynews.rss,13,Sociedad,21,Bielorrusia,ru,true,0
-6842,The Minsk Herald,Noticias de Minsk y Bielorrusia en inglés.,https://minskherald.com/feed/,13,Sociedad,21,Bielorrusia,en,true,0
 6843,Sputnik Belarus,Noticias de Sputnik en Bielorrusia.,https://sputnik.by/export/rss2/archive/index.xml,13,Sociedad,21,Bielorrusia,ru,true,0
 6844,Zerkalo.io – Economía,Sección económica de Zerkalo.io.,https://news.zerkalo.io/rss/a~40.rss,4,Economía,21,Bielorrusia,ru,true,0
 6845,Zerkalo.io – Sociedad / Vida,Sección de vida y sociedad de Zerkalo.io.,https://news.zerkalo.io/rss/a~25.rss,13,Sociedad,21,Bielorrusia,ru,true,0
@@ -1086,8 +893,6 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 6856,Novinite.com – All news (RDF),Principal portal de noticias de Bulgaria en inglés,https://www.novinite.com/services/news_rdf.php,13,Sociedad,28,Bulgaria,en,true,0
 6858,Le Pays – Feed,Diario independiente de información general,https://lepays.bf/feed/,13,Sociedad,29,Burkina Faso,fr,true,0
 6859,L'Express du Faso – Feed,Noticias de sociedad política cultura y deporte,https://www.lexpressdufaso-bf.com/feed/,13,Sociedad,29,Burkina Faso,fr,true,0
-6860,LeFaso.net – Politique,Sección política de LeFaso.net,https://lefaso.net/spip.php?page=backend&id_rubrique=2,11,Política,29,Burkina Faso,fr,true,0
-6861,LeFaso.net – Économie,Sección económica de LeFaso.net,https://lefaso.net/spip.php?page=backend&id_rubrique=3,4,Economía,29,Burkina Faso,fr,true,0
 6862,A Nação – Jornal Independente,Diario independiente de Cabo Verde,https://www.anacao.cv/feed/,13,Sociedad,32,Cabo Verde,pt,true,0
 6863,Cabo-Verde.cv – News,Portal de noticias generales del archipiélago,https://cabo-verde.cv/feed/,13,Sociedad,32,Cabo Verde,en,true,0
 6864,Egypt Independent – Main,Portal principal en inglés de Egypt Independent,https://www.egyptindependent.com/feed/,13,Sociedad,52,Egipto,en,true,0
@@ -1109,7 +914,6 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 6885,El Universo Política,Noticias políticas de Ecuador,https://www.eluniverso.com/arc/outboundfeeds/rss/category/politica/?outputType=xml,2,Cultura,51,Ecuador,es,true,0
 6886,El Universo Economía,Noticias económicas y empresariales de Ecuador,https://www.eluniverso.com/arc/outboundfeeds/rss/category/economia/?outputType=xml,5,Educación,51,Ecuador,es,true,0
 6887,El Universo Deportes,Noticias deportivas de Ecuador y el mundo,https://www.eluniverso.com/arc/outboundfeeds/rss/category/deportes/?outputType=xml,3,Deportes,51,Ecuador,es,true,0
-6888,El Universo Tecnología,Noticias de tecnología e innovación,https://www.eluniverso.com/arc/outboundfeeds/rss/category/tecnologia/?outputType=xml,14,Tecnología,51,Ecuador,es,true,0
 6892,Crónica Deportes,Noticias deportivas de Loja y Ecuador,https://cronica.com.ec/feed/,3,Deportes,51,Ecuador,es,true,0
 6893,Diario El Norte Deportes,Noticias deportivas de Imbabura y Ecuador,https://elnorte.ec/feed/,3,Deportes,51,Ecuador,es,true,0
 6894,La Gaceta Tecnología,Noticias de tecnología,https://lagaceta.com.ec/feed/,14,Tecnología,51,Ecuador,es,true,0
@@ -1122,15 +926,13 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 6906,Mada Masr – Main,Medio independiente egipcio con cobertura de política economía sociedad y cultura,https://www.madamasr.com/en/feed,13,Sociedad,52,Egipto,en,true,0
 6910,KingFut,Noticias fútbol egipcio y africano resultados análisis y actualidad deportiva,https://feeds.feedburner.com/KingFut,3,Deportes,52,Egipto,en,true,0
 6912,Diario Co Latino - Noticias,Medio salvadoreño con cobertura de política sociedad economía seguridad y actualidad nacional.,https://diariocolatino.com/feed/,1,Ciencia,53,El Salvador,es,true,0
-6913,Cronio - Noticias,Portal digital salvadoreño especializado en sucesos seguridad actualidad y noticias nacionales.,https://cronio.sv/feed/,8,Medio Ambiente,53,El Salvador,es,true,0
 6914,Diario Libre SV,Periódico digital salvadoreño con noticias nacionales internacionales política y actualidad.,https://diariolibresv.com/feed/,1,Ciencia,53,El Salvador,es,true,0
 6915,El Salvador Times,Diario digital salvadoreño con noticias de política sucesos economía sociedad e información nacional.,https://elsalvadortimes.com/rss,1,Ciencia,53,El Salvador,es,true,0
 6916,Periódico Equilibrium,Medio independiente salvadoreño con información nacional política sociedad y actualidad.,https://periodicoequilibrium.com/feed/,13,Sociedad,53,El Salvador,es,true,0
 6917,Última Hora SV,Medio digital salvadoreño especializado en política actualidad y seguimiento de acontecimientos nacionales.,https://ultimahora.sv/feed/,2,Cultura,53,El Salvador,es,true,0
 6918,Periódico El País El Salvador,Medio salvadoreño con noticias nacionales economía sociedad política y actualidad internacional.,https://elpais.com.sv/feed/,1,Ciencia,53,El Salvador,es,true,0
-6919,Diario1,Diario digital salvadoreño con información sobre política deportes economía tecnología cultura y actualidad.,https://diario1.com/feed/,1,Ciencia,53,El Salvador,es,true,0
 6920,El Metropolitano Digital,Medio digital salvadoreño con noticias nacionales sociedad política cultura y actualidad.,https://elmetropolitanodigital.com/feed/,13,Sociedad,53,El Salvador,es,true,0
-6925,102nueve,Medio y emisora salvadoreña con información nacional política economía sociedad y actualidad.,https://102nueve.com/feed/,1,Ciencia,53,El Salvador,es,true,5
+6925,102nueve,Medio y emisora salvadoreña con información nacional política economía sociedad y actualidad.,https://102nueve.com/feed/,1,Ciencia,53,El Salvador,es,false,10
 6926,Žurnal24 – Noticias,Portal de noticias esloveno con actualidad nacional política sociedad y noticias internacionales.,https://www.zurnal24.si/feeds/latest,1,Ciencia,57,Eslovenia,sl,true,0
 6927,24ur.com – Deportes,Noticias deportivas eslovenas e internacionales y resultados deportivos.,https://www.24ur.com/rss,3,Deportes,57,Eslovenia,sl,true,0
 6928,The Slovenia Times,Medio de noticias sobre Eslovenia publicado en inglés con política economía sociedad y actualidad.,https://sloveniatimes.com/feed,1,Ciencia,57,Eslovenia,en,true,0
@@ -1162,28 +964,16 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 6994,RFI Guyana,Noticias y actualidad internacional relacionadas con Guyana.,https://www.rfi.fr/fr/tag/guyana/rss,7,Internacional,77,Guyana,fr,true,0
 6995,Euronews Guyana,Noticias internacionales y actualidad relacionadas con Guyana.,https://www.euronews.com/rss?level=tag&name=guyana,7,Internacional,77,Guyana,en,true,0
 6998,Haitian History Blog,Historia política sociedad y acontecimientos históricos de Haití.,https://haitianhistory.tumblr.com/rss,13,Sociedad,78,Haití,en,true,0
-7000,God's Littlest Angels Haiti,Actualidad comunitaria infancia y proyectos sociales en Haití.,https://glahaiti.org/blog-feed.xml,13,Sociedad,78,Haití,en,true,0
 7001,Many Hands for Haiti,Actualidad comunitaria educación desarrollo y proyectos sociales en Haití.,https://mh4h.org/feed,13,Sociedad,78,Haití,en,true,0
-7002,Love Haiti,Desarrollo comunitario educación agricultura y actualidad local de Haití.,https://lovehaiti.org/blog?format=rss,13,Sociedad,78,Haití,en,true,0
-7003,H O P E Haiti,Desarrollo comunitario educación salud y actualidad del norte de Haití.,https://hopehaiti.org/blog-feed.xml,13,Sociedad,78,Haití,en,true,0
 7004,Hope for Haiti,Ayuda humanitaria desarrollo y actualidad de comunidades haitianas.,https://hopeforhaiti.com/feed,13,Sociedad,78,Haití,en,true,0
 7005,Tree of Hope Haiti,Educación desarrollo programas sociales y noticias comunitarias de Haití.,https://treeofhopehaiti.org/blog/rss,13,Sociedad,78,Haití,en,true,0
-7006,GOALS Haiti,Educación deporte juventud desarrollo comunitario y actualidad haitiana.,https://goalshaiti.org/blog?format=rss,13,Sociedad,78,Haití,en,true,0
-7007,Loving Haiti,Educación comunidad agricultura y desarrollo social en Haití.,https://lovinghaiti.org/feed,13,Sociedad,78,Haití,en,true,0
 7008,Hope for Haiti Foundation,Educación desarrollo salud y proyectos comunitarios en Haití.,https://hopeforhaitifoundation.com/feed,13,Sociedad,78,Haití,en,true,0
-7009,Lamp for Haiti,Desarrollo social educación y proyectos comunitarios en Haití.,https://lampforhaiti.org/feed,13,Sociedad,78,Haití,en,true,0
 7010,Clean Water for Haiti,Agua saneamiento salud y desarrollo comunitario en Haití.,https://cleanwaterforhaiti.org/feed,12,Salud,78,Haití,en,true,0
-7011,St Luke Foundation Haiti,Salud educación y apoyo social a comunidades vulnerables de Haití.,https://stlukehaiti.org/blog?format=rss,12,Salud,78,Haití,en,true,0
-7012,Project Living Hope Haiti,Desarrollo comunitario educación y proyectos sociales en Haití.,https://plhope.org/blog?format=rss,13,Sociedad,78,Haití,en,true,0
 7015,TU NOTA Honduras Hoy,Noticias nacionales actualidad sucesos y sociedad de Honduras.,https://www.tunota.com/rss/honduras-hoy.xml,13,Sociedad,79,Honduras,es,true,0
-7016,TU NOTA Política,Noticias políticas gobierno Congreso y partidos de Honduras.,https://www.tunota.com/rss/politica.xml,11,Política,79,Honduras,es,true,0
 7017,TU NOTA Economía,Noticias económicas negocios empleo y finanzas de Honduras.,https://www.tunota.com/rss/economia.xml,4,Economía,79,Honduras,es,true,0
 7018,TU NOTA Mundo,Noticias internacionales y relaciones exteriores.,https://www.tunota.com/rss/mundo.xml,7,Internacional,79,Honduras,es,true,0
 7019,TU NOTA Deportes,Noticias deportivas fútbol y deporte hondureño.,https://www.tunota.com/rss/deportes.xml,3,Deportes,79,Honduras,es,true,0
 7020,TU NOTA Entretenimiento,Cultura espectáculos televisión música y entretenimiento.,https://www.tunota.com/rss/entretenimiento.xml,2,Cultura,79,Honduras,es,true,0
-7021,TU NOTA Opinión,Columnas análisis y opinión sobre Honduras y actualidad.,https://www.tunota.com/rss/opinion.xml,10,Opinión,79,Honduras,es,true,0
-7022,TU NOTA Tecnología,Tecnología innovación internet y transformación digital.,https://www.tunota.com/rss/tecnologia.xml,14,Tecnología,79,Honduras,es,true,0
-7023,TU NOTA Vida,Salud estilo de vida sociedad y bienestar.,https://www.tunota.com/rss/vida.xml,12,Salud,79,Honduras,es,true,0
 7024,TU NOTA Radar Comercial,Empresas comercio consumo y actividad empresarial de Honduras.,https://www.tunota.com/rss/radar-comercial.xml,4,Economía,79,Honduras,es,true,0
 7025,TU NOTA El Chekeador,Verificación de datos fact checking y desinformación.,https://www.tunota.com/rss/el-chekeador.xml,13,Sociedad,79,Honduras,es,true,0
 7026,Radio HRN Nacionales,Noticias nacionales sucesos política y actualidad de Honduras.,https://www.radiohrn.hn/rss/nacionales.xml,13,Sociedad,79,Honduras,es,true,0
@@ -1229,7 +1019,6 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 7114,Adnkronos Noticias,Noticias generales de la agencia italiana Adnkronos,https://www.adnkronos.com/RSS_PrimaPagina.xml,13,Sociedad,90,Italia,it,true,0
 7118,Il Fatto Quotidiano,Noticias política sociedad economía e investigación,https://www.ilfattoquotidiano.it/feed/,11,Política,90,Italia,it,true,0
 7119,Il Messaggero,Noticias nacionales política sociedad y actualidad,https://www.ilmessaggero.it/rss/home.xml,13,Sociedad,90,Italia,it,true,0
-7120,TGcom24,Noticias generales de actualidad italiana e internacional,https://www.tgcom24.mediaset.it/rss/home.xml,13,Sociedad,90,Italia,it,true,0
 7122,Il Foglio Noticias,Actualidad política análisis e información italiana,https://naxos.ilfoglio.it/api/v5/rss/stories/latest,11,Política,90,Italia,it,true,0
 7123,Libero Quotidiano,Noticias política sociedad economía e Italia,https://www.liberoquotidiano.it/rss.xml,11,Política,90,Italia,it,true,0
 7124,Domani,Noticias política sociedad cultura e investigación,https://www.editorialedomani.it/rss,11,Política,90,Italia,it,true,0
@@ -1239,7 +1028,6 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 7128,Il Sole 24 Ore Economía,Economía finanzas empresas y mercados italianos,https://www.ilsole24ore.com/rss/economia.xml,4,Economía,90,Italia,it,true,0
 7129,Il Sole 24 Ore Finanza,Finanzas mercados inversiones y banca,https://www.ilsole24ore.com/rss/finanza.xml,4,Economía,90,Italia,it,true,0
 7130,Il Sole 24 Ore Tecnología,Tecnología innovación y transformación digital,https://www.ilsole24ore.com/rss/tecnologia.xml,14,Tecnología,90,Italia,it,true,0
-7131,AGI Economia,Noticias económicas y empresariales italianas,https://www.agi.it/economia/rss.xml,4,Economía,90,Italia,it,true,0
 7132,QuiFinanza,Finanzas personales economía mercados y empresas,https://quifinanza.it/feed/,4,Economía,90,Italia,it,true,0
 7133,La Voce Info,Economía política económica y análisis italiano,https://lavoce.info/feed/,4,Economía,90,Italia,it,true,0
 7135,EconomyUp,Startups innovación empresas y economía digital,https://www.economyup.it/feed/,14,Tecnología,90,Italia,it,true,0
@@ -1258,8 +1046,6 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 7151,Il Foglio Economía,Economía empresas y mercados,https://naxos.ilfoglio.it/api/v5/rss/stories/economia,4,Economía,90,Italia,it,true,0
 7152,Il Foglio Política,Política italiana y análisis político,https://naxos.ilfoglio.it/api/v5/rss/stories/politica,11,Política,90,Italia,it,true,0
 7153,Il Foglio Ciencia,Ciencia investigación y divulgación,https://naxos.ilfoglio.it/api/v5/rss/stories/scienza,1,Ciencia,90,Italia,it,true,0
-7154,Il Foglio Tecnología,Tecnología e innovación,https://naxos.ilfoglio.it/api/v5/rss/stories/tecnologia,14,Tecnología,90,Italia,it,true,0
-7155,Il Foglio Deporte,Actualidad deportiva italiana e internacional,https://naxos.ilfoglio.it/api/v5/rss/stories/sport,3,Deportes,90,Italia,it,true,0
 7156,Il Foglio Internacional,Política internacional y asuntos exteriores,https://naxos.ilfoglio.it/api/v5/rss/stories/esteri,7,Internacional,90,Italia,it,true,0
 7157,Jamaica Gleaner News,Noticias nacionales y actualidad de Jamaica,https://jamaica-gleaner.com/feed/news.xml,13,Sociedad,91,Jamaica,en,true,0
 7158,Jamaica Gleaner Sports,Deportes y actualidad deportiva de Jamaica,https://jamaica-gleaner.com/feed/sports.xml,3,Deportes,91,Jamaica,en,true,0
@@ -1290,24 +1076,17 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 7184,Asahi Shimbun Educación,Educación universidades e investigación en Japón,https://www.asahi.com/rss/asahi/edu.rdf,13,Sociedad,92,Japón,ja,true,0
 7185,Asahi Shimbun Ciencia y Tecnología,Ciencia tecnología e innovación,https://www.asahi.com/rss/asahi/science.rdf,1,Ciencia,92,Japón,ja,true,0
 7186,Asahi Shimbun AJW,Noticias de Japón en inglés de Asahi Shimbun,http://www.asahi.com/ajw/feed_msn/,7,Internacional,92,Japón,en,true,0
-7187,ITmedia NEWS,Noticias de tecnología informática y digitalización,https://rss.itmedia.co.jp/rss/2.0/news_bursts.xml,14,Tecnología,92,Japón,ja,true,0
 7188,ITmedia AI+,Inteligencia artificial y tecnologías relacionadas,https://rss.itmedia.co.jp/rss/2.0/aiplus.xml,14,Tecnología,92,Japón,ja,true,0
 7189,ITmedia Mobile,Telefonía móvil smartphones y comunicaciones,https://rss.itmedia.co.jp/rss/2.0/mobile.xml,14,Tecnología,92,Japón,ja,true,0
 7190,ITmedia PC USER,PC hardware software y tecnología de consumo,https://rss.itmedia.co.jp/rss/2.0/pcuser.xml,14,Tecnología,92,Japón,ja,true,0
-7191,ITmedia Business Online,Economía empresas negocios y transformación digital,https://rss.itmedia.co.jp/rss/2.0/business.xml,4,Economía,92,Japón,ja,true,0
-7192,ITmedia Enterprise,Tecnología empresarial seguridad e informática corporativa,https://rss.itmedia.co.jp/rss/2.0/enterprise.xml,14,Tecnología,92,Japón,ja,true,0
 7193,ITmedia Seguridad,Ciberseguridad privacidad y seguridad informática,https://rss.itmedia.co.jp/rss/2.0/news_security.xml,14,Tecnología,92,Japón,ja,true,0
 7194,JAXA Comunicados de Prensa,Noticias y comunicados oficiales de la agencia espacial japonesa,https://www.jaxa.jp/rss/press_j.rdf,1,Ciencia,92,Japón,ja,true,0
-7195,JAXA Actualizaciones,Actualizaciones y novedades de JAXA,https://www.jaxa.jp/rss/new_j.rdf,1,Ciencia,92,Japón,ja,true,0
-7196,RIKEN Press Releases,Investigación científica y comunicados del instituto RIKEN,https://www.riken.jp/en/feed/press_feed/,1,Ciencia,92,Japón,en,true,0
 7197,RIKEN Topics,Noticias y temas destacados de investigación de RIKEN,https://www.riken.jp/feed/topics_feed/,1,Ciencia,92,Japón,ja,true,0
 7201,Al Wakeel News,Noticias generales y actualidad de Jordania,https://www.alwakeelnews.com/rss,13,Sociedad,93,Jordania,ar,true,0
 7202,Al Bawaba Jordan,Noticias de Jordania y actualidad de Oriente Medio,https://www.albawaba.com/rss/all,7,Internacional,93,Jordania,en,true,0
-7203,Central Bank of Jordan,Noticias y comunicados del Banco Central de Jordania,https://www.cbj.gov.jo/RSSFeeds/RSSNewsAR.aspx,4,Economía,93,Jordania,ar,true,0
 7204,National Bank Kazakhstan Noticias Kazajo,Noticias del Banco Nacional de Kazajistán en kazajo,https://nationalbank.kz/rss_news_kazakh.xml,4,Economía,94,Kazajistán,kk,true,0
 7205,National Bank Kazakhstan Noticias Ruso,Noticias del Banco Nacional de Kazajistán en ruso,https://nationalbank.kz/rss_news_russian.xml,4,Economía,94,Kazajistán,ru,true,0
 7206,National Bank Kazakhstan News English,Noticias del Banco Nacional de Kazajistán en inglés,https://nationalbank.kz/rss_news_english.xml,4,Economía,94,Kazajistán,en,true,0
-7207,National Bank Kazakhstan Tipos de Cambio,Tipos de cambio oficiales y de mercado de Kazajistán,https://nationalbank.kz/rss/rates_all.xml,4,Economía,94,Kazajistán,ru,true,0
 7208,Kazinform Kazakhstan English,Noticias generales de Kazajistán y actualidad nacional,https://qazinform.com/rss/en.xml,13,Sociedad,94,Kazajistán,en,true,0
 7209,Kazinform Kazakhstan President,Noticias y actividades de la Presidencia de Kazajistán,https://qazinform.com/rss/presidenten.xml,11,Política,94,Kazajistán,en,true,0
 7210,Kazinform Kazakhstan President English,Información presidencial y actividad institucional de Kazajistán,https://qazinform.com/rss/p_en.xml,11,Política,94,Kazajistán,en,true,0
@@ -1319,12 +1098,10 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 7216,Sadaq Política,Noticias políticas de Kazajistán,https://sadaq.kz/ru/rss/category/politika,11,Política,94,Kazajistán,ru,true,0
 7217,Sadaq Sucesos,Sucesos y actualidad policial de Kazajistán,https://sadaq.kz/ru/rss/category/proisshestviya,13,Sociedad,94,Kazajistán,ru,true,0
 7218,Sadaq Cultura,Cultura arte y actualidad cultural de Kazajistán,https://sadaq.kz/ru/rss/category/kultura,2,Cultura,94,Kazajistán,ru,true,0
-7219,Sadaq Tecnología,Tecnología innovación y transformación digital,https://sadaq.kz/ru/rss/category/tekhnologiya,14,Tecnología,94,Kazajistán,ru,true,0
 7220,Sadaq Salud,Salud medicina y bienestar en Kazajistán,https://sadaq.kz/ru/rss/category/zdorove,12,Salud,94,Kazajistán,ru,true,0
 7221,Sadaq Ciencia y Educación,Ciencia educación universidades e investigación,https://sadaq.kz/ru/rss/category/nauka-i-obrazovanie,1,Ciencia,94,Kazajistán,ru,true,0
 7222,Sadaq Ecología,Medio ambiente ecología y sostenibilidad en Kazajistán,https://sadaq.kz/ru/rss/category/ekologiya,8,Medio Ambiente,94,Kazajistán,ru,true,0
 7223,Sadaq Economía,Economía empresas mercados y negocios de Kazajistán,https://sadaq.kz/ru/rss/category/ekonomika,4,Economía,94,Kazajistán,ru,true,0
-7224,Sadaq TV,Noticias y contenidos audiovisuales de Sadaq,https://sadaq.kz/ru/rss/category/sadaq-tv,13,Sociedad,94,Kazajistán,ru,true,0
 7225,Sadaq Sociedad,Sociedad y vida cotidiana de Kazajistán,https://sadaq.kz/ru/rss/category/obshchestvo,13,Sociedad,94,Kazajistán,ru,true,0
 7226,Sadaq Deportes,Deportes y actualidad deportiva de Kazajistán,https://sadaq.kz/ru/rss/category/sport-21,3,Deportes,94,Kazajistán,ru,true,0
 7227,Sadaq Mundo,Noticias internacionales y asuntos mundiales,https://sadaq.kz/ru/rss/category/mir,7,Internacional,94,Kazajistán,ru,true,0
@@ -1333,7 +1110,6 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 7230,Azattyq Kazakhstan,Noticias investigaciones y análisis sobre Kazajistán,https://www.azattyq.org/api/z--qyl-vomx-tpervpt,13,Sociedad,94,Kazajistán,kk,true,0
 7231,Azattyq Derechos Humanos,Derechos humanos y libertades civiles en Kazajistán,https://www.azattyq.org/api/ziy-qvl-vomx-tpemrqor,13,Sociedad,94,Kazajistán,kk,true,0
 7232,Azattyq Mundo,Noticias internacionales y geopolítica,https://www.azattyq.org/api/zobqql-vomx-tpepvpi,7,Internacional,94,Kazajistán,kk,true,0
-7233,Azattyq Sociedad,Noticias sociales y vida cotidiana de Kazajistán,https://www.azattyq.org/api/z-vtprl-vomx-tperogpr,13,Sociedad,94,Kazajistán,kk,true,0
 7234,Azattyq Asia Central,Noticias de Asia Central y Kazajistán,https://www.azattyq.org/api/zb-qvl-vomx-tpeqvpr,7,Internacional,94,Kazajistán,kk,true,0
 7235,Azattyq Economía,Economía mercados energía y negocios de Kazajistán,https://www.azattyq.org/api/z_-qvl-vomx-tpevypr,4,Economía,94,Kazajistán,kk,true,0
 7236,The Standard Kenya,Noticias generales de Kenia y principales titulares,https://www.standardmedia.co.ke/rss/headlines.php,13,Sociedad,95,Kenia,en,true,0
@@ -1347,19 +1123,6 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 7244,The Standard KTN Videos,Noticias y vídeos de KTN y actualidad keniana,https://www.standardmedia.co.ke/rss/ktnvideos.php,13,Sociedad,95,Kenia,en,true,0
 7245,The Standard Entertainment,Entretenimiento cultura música y espectáculos,https://www.standardmedia.co.ke/rss/entertainment.php,2,Cultura,95,Kenia,en,true,0
 7246,Kenyapedia Latest Posts,Últimas publicaciones sobre Kenia y actualidad nacional,https://www.kenyapedia.co.ke/rss/latest-posts,13,Sociedad,95,Kenia,en,true,0
-7247,Kenyapedia History and Culture,Historia patrimonio y cultura de Kenia,https://www.kenyapedia.co.ke/rss/category/history-and-culture,2,Cultura,95,Kenia,en,true,0
-7248,Kenyapedia Business and Industry,Empresas industria y actividad económica de Kenia,https://www.kenyapedia.co.ke/rss/category/business-and-industry,4,Economía,95,Kenia,en,true,0
-7249,Kenyapedia Travel and Tourism,Turismo viajes y destinos de Kenia,https://www.kenyapedia.co.ke/rss/category/travel-and-tourism,15,Viajes,95,Kenia,en,true,0
-7250,Kenyapedia Environment and Natural Resources,Medio ambiente conservación y recursos naturales de Kenia,https://www.kenyapedia.co.ke/rss/category/environment-and-natural-resources,8,Medio Ambiente,95,Kenia,en,true,0
-7251,Kenyapedia Energy,Energía y sector energético de Kenia,https://www.kenyapedia.co.ke/rss/category/energy,4,Economía,95,Kenia,en,true,0
-7252,Kenyapedia Money and Finances,Finanzas dinero banca y servicios financieros,https://www.kenyapedia.co.ke/rss/category/money-and-finances,4,Economía,95,Kenia,en,true,0
-7253,Kenyapedia Kenya Economy,Economía y evolución económica de Kenia,https://www.kenyapedia.co.ke/rss/category/kenya-economy,4,Economía,95,Kenia,en,true,0
-7254,Kenyapedia Science and Innovation,Ciencia investigación innovación y tecnología,https://www.kenyapedia.co.ke/rss/category/science-and-innovation,1,Ciencia,95,Kenia,en,true,0
-7255,Kenyapedia Transport and Infrastructure,Transporte infraestructuras y desarrollo urbano,https://www.kenyapedia.co.ke/rss/category/transport-and-infrastructure,13,Sociedad,95,Kenia,en,true,0
-7256,Kenyapedia National Security and Defence,Seguridad nacional defensa y asuntos militares,https://www.kenyapedia.co.ke/rss/category/national-security-and-defence,11,Política,95,Kenia,en,true,0
-7257,Kenyapedia Health,Salud medicina y bienestar en Kenia,https://www.kenyapedia.co.ke/rss/category/health,12,Salud,95,Kenia,en,true,0
-7258,Kenyapedia Kenya and the World,Kenia relaciones internacionales y asuntos exteriores,https://www.kenyapedia.co.ke/rss/category/kenya-and-the-world,7,Internacional,95,Kenia,en,true,0
-7259,Kenyapedia Policing and Justice,Policía justicia y sistema judicial de Kenia,https://www.kenyapedia.co.ke/rss/category/policing-and-justice,13,Sociedad,95,Kenia,en,true,0
 7260,Azattyk Noticias,Noticias de Kirguistán y actualidad general,https://www.azattyk.org/api/z_jitl-vomx-tpev__q,13,Sociedad,96,Kirguistán,ky,true,0
 7261,Azattyk Política,Política de Kirguistán y actualidad institucional,https://www.azattyk.org/api/zmoovl-vomx-tpeykpr,11,Política,96,Kirguistán,ky,true,0
 7262,Azattyk Kirguistán,Noticias de Kirguistán y sus regiones,https://www.azattyk.org/api/zoooml-vomx-tpepkpy,13,Sociedad,96,Kirguistán,ky,true,0
@@ -1369,7 +1132,6 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 7266,Azattyk Ecología,Medio ambiente clima naturaleza y conservación,https://www.azattyk.org/api/z__pmml-vomx-tpevb_m_,8,Medio Ambiente,96,Kirguistán,ky,true,0
 7267,Azattyk Ciencia Educación y Tecnología,Ciencia educación e informática de Kirguistán y el mundo,https://www.azattyk.org/api/zvbivl-vomx-tpeuv_v,1,Ciencia,96,Kirguistán,ky,true,0
 7268,Azattyk Deportes,Deportes de Kirguistán y actualidad deportiva internacional,https://www.azattyk.org/api/zuoopl-vomx-tpegkp_,3,Deportes,96,Kirguistán,ky,true,0
-7269,Azattyk Prensa,Análisis de publicaciones y prensa de Kirguistán y el mundo,https://www.azattyk.org/api/zkooml-vomx-tpejkpy,10,Opinión,96,Kirguistán,ky,true,0
 7270,Azattyk Nosotros y el Mundo,Análisis de acontecimientos mundiales y su impacto en Kirguistán,https://www.azattyk.org/api/zbgrpol-vomx-tpeq_ipi,7,Internacional,96,Kirguistán,ky,true,0
 7271,Azattyk Economía,Economía mercados empresas y negocios de Kirguistán,https://www.azattyk.org/api/zyooql-vomx-tpetkpo,4,Economía,96,Kirguistán,ky,true,0
 7272,Kloop Noticias,Noticias generales de Kirguistán y actualidad nacional,http://kloop.kg/feed,13,Sociedad,96,Kirguistán,ru,true,0
@@ -1383,8 +1145,6 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 7283,Kuwait Times Politics,Política y actualidad institucional de Kuwait,https://kuwaittimes.com/rssFeed/2,11,Política,98,Kuwait,en,true,0
 7284,Kuwait Times Sports,Deportes y actualidad deportiva,https://kuwaittimes.com/rssFeed/3,3,Deportes,98,Kuwait,en,true,0
 7285,Kuwait Times Economics,Economía mercados y actividad económica,https://kuwaittimes.com/rssFeed/4,4,Economía,98,Kuwait,en,true,0
-7287,Kuwait Times Front,Principales noticias y titulares de Kuwait,https://kuwaittimes.com/rssFeed/6,13,Sociedad,98,Kuwait,en,true,0
-7288,Kuwait Times Last Page,Actualidad y contenidos de la última página,https://kuwaittimes.com/rssFeed/7,13,Sociedad,98,Kuwait,en,true,0
 7289,Kuwait Times Culture,Cultura arte y actualidad cultural,https://kuwaittimes.com/rssFeed/8,2,Cultura,98,Kuwait,en,true,0
 7290,Kuwait Times Technology,Tecnología innovación y transformación digital,https://kuwaittimes.com/rssFeed/9,14,Tecnología,98,Kuwait,en,true,0
 7291,Kuwait Times Business,Empresas negocios mercados y comercio,https://kuwaittimes.com/rssFeed/11,4,Economía,98,Kuwait,en,true,0
@@ -1421,21 +1181,11 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 7322,LSM Salud,Salud medicina y bienestar,https://www.lsm.lv/rss/?lang=lv&catid=51,12,Salud,101,Letonia,lv,true,0
 7323,LSM Tecnología,Ciencia tecnología e innovación,https://www.lsm.lv/rss/?lang=lv&catid=61,14,Tecnología,101,Letonia,lv,true,0
 7324,LSM Medio Ambiente,Medio ambiente naturaleza clima y animales,https://www.lsm.lv/rss/?lang=lv&catid=270,8,Medio Ambiente,101,Letonia,lv,true,0
-7325,LSM Viajes,Viajes turismo y destinos de Letonia,https://www.lsm.lv/rss/?lang=lv&catid=255,15,Viajes,101,Letonia,lv,true,0
-7326,LSM Política,Política y actualidad institucional de Letonia,https://www.lsm.lv/rss/?lang=lv&catid=64,11,Política,101,Letonia,lv,true,0
-7327,LSM Regiones,Noticias de las regiones de Letonia,https://www.lsm.lv/rss/?lang=lv&catid=22679,13,Sociedad,101,Letonia,lv,true,0
-7328,LSM Riga,Noticias y actualidad de Riga,https://www.lsm.lv/rss/?lang=lv&catid=22695,13,Sociedad,101,Letonia,lv,true,0
-7329,LSM Latgale,Noticias y actualidad de Latgale,https://www.lsm.lv/rss/?lang=lv&catid=22681,13,Sociedad,101,Letonia,lv,true,0
-7330,LSM Vidzeme,Noticias y actualidad de Vidzeme,https://www.lsm.lv/rss/?lang=lv&catid=22682,13,Sociedad,101,Letonia,lv,true,0
-7331,LSM Kurzeme,Noticias y actualidad de Kurzeme,https://www.lsm.lv/rss/?lang=lv&catid=22683,13,Sociedad,101,Letonia,lv,true,0
-7332,LSM Zemgale,Noticias y actualidad de Zemgale,https://www.lsm.lv/rss/?lang=lv&catid=22684,13,Sociedad,101,Letonia,lv,true,0
 7333,LSM Fútbol,Fútbol y actualidad futbolística,https://www.lsm.lv/rss/?lang=lv&catid=54,3,Deportes,101,Letonia,lv,true,0
 7334,LSM Hockey,Hockey y actualidad deportiva,https://www.lsm.lv/rss/?lang=lv&catid=32,3,Deportes,101,Letonia,lv,true,0
 7335,LSM Baloncesto,Baloncesto y actualidad deportiva,https://www.lsm.lv/rss/?lang=lv&catid=33,3,Deportes,101,Letonia,lv,true,0
 7336,LSM Música,Música y actualidad musical de Letonia,https://www.lsm.lv/rss/?lang=lv&catid=46,2,Cultura,101,Letonia,lv,true,0
-7337,LSM Arte,Arte y artes visuales de Letonia,https://www.lsm.lv/rss/?lang=lv&catid=47,2,Cultura,101,Letonia,lv,true,0
 7338,LSM Literatura,Literatura y libros,https://www.lsm.lv/rss/?lang=lv&catid=49,2,Cultura,101,Letonia,lv,true,0
-7339,LSM Teatro,Teatro y artes escénicas,https://www.lsm.lv/rss/?lang=lv&catid=48,2,Cultura,101,Letonia,lv,true,0
 7340,LSM English Economy,Economía empresas y negocios de Letonia en inglés,https://eng.lsm.lv/rss/?lang=en&catid=276,4,Economía,101,Letonia,en,true,0
 7341,LSM English Politics,Política y actualidad institucional de Letonia,https://eng.lsm.lv/rss/?lang=en&catid=315,11,Política,101,Letonia,en,true,0
 7342,LSM English Society,Sociedad y actualidad social de Letonia,https://eng.lsm.lv/rss/?lang=en&catid=278,13,Sociedad,101,Letonia,en,true,0
@@ -1466,7 +1216,6 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 7368,China News Service Deportes,Noticias deportivas de China News Service.,https://www.chinanews.com.cn/rss/sports.xml,3,Deportes,39,China,zh,true,0
 7369,China News Service Educacion,Noticias de educacion de China News Service.,https://www.chinanews.com.cn/rss/edu.xml,13,Sociedad,39,China,zh,true,0
 7370,China News Service Justicia,Noticias judiciales y legales de China.,https://www.chinanews.com.cn/rss/fz.xml,11,Política,39,China,zh,true,0
-7371,China News Service Belt and Road,Cobertura de la iniciativa Belt and Road de China News Service.,https://www.chinanews.com.cn/rss/ydyl.xml,7,Internacional,39,China,zh,true,0
 7372,China News Service China-ASEAN,Noticias comerciales y economicas entre China y ASEAN.,https://www.chinanews.com.cn/rss/aseaninfo.xml,4,Economía,39,China,zh,true,0
 7373,China News Service Vida,Noticias sobre vida cotidiana y consumo en China.,https://www.chinanews.com.cn/rss/life.xml,13,Sociedad,39,China,zh,true,0
 7375,Xinhua Politica,Noticias politicas de Xinhua.,http://www.xinhuanet.com/politics/news_politics.xml,11,Política,39,China,zh,true,0
@@ -1480,16 +1229,13 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 7383,CarNewsChina,Noticias de automocion y vehiculos de China.,https://carnewschina.com/feed/,14,Tecnología,39,China,en,true,0
 7384,China Digital Times,Noticias y analisis independientes sobre China.,https://chinadigitaltimes.net/feed/,11,Política,39,China,en,true,0
 7390,China Copyright and Media,Documentacion sobre politica medios y legislacion china.,https://chinacopyrightandmedia.wordpress.com/feed/,11,Política,39,China,en,true,0
-7391,New Business Ethiopia Economia,Noticias de negocios inversiones mercados comercio energia y economia de Etiopia.,https://newbusinessethiopia.com/feed/,4,Economía,62,Etiopía,en,true,0
 7392,Aiga News Ethiopia,Noticias de Etiopia Tigray y Africa Oriental con actualidad politica y social.,https://aiganews.com/feed/,7,Internacional,62,Etiopía,en,true,0
 7393,Ethiopia Insight,Analisis politico social y economico sobre Etiopia y el Cuerno de Africa.,https://www.ethiopia-insight.com/feed/,11,Política,62,Etiopía,en,true,0
-7394,Addis Fortune,Principal medio economico y empresarial de Etiopia.,https://addisfortune.news/feed/,4,Economía,62,Etiopía,en,true,0
 7395,Ethiopia Nege,Noticias y actualidad politica social y economica de Etiopia.,https://ethiopianege.com/feed,11,Política,62,Etiopía,am,true,0
 7396,GMA News Online Noticias,Noticias nacionales y actualidad de Filipinas de GMA News.,https://data.gmanews.tv/gno/rss/news/feed.xml,13,Sociedad,63,Filipinas,en,true,0
 7397,Philstar Headlines,Principales noticias de Filipinas de Philstar.com.,https://www.philstar.com/rss/headlines,13,Sociedad,63,Filipinas,en,true,0
 7398,Interaksyon Filipinas,Noticias y actualidad politica social y cultural de Filipinas.,https://www.interaksyon.com/feed/,7,Internacional,63,Filipinas,en,true,0
-7403,The Manila Times,Noticias nacionales politica economia y actualidad de Filipinas.,https://www.manilatimes.net/news/feed,13,Sociedad,63,Filipinas,en,true,0
-7406,Eagle News Philippines,Noticias nacionales internacionales politica negocios y sociedad de Filipinas.,https://www.eaglenews.ph/feed/,13,Sociedad,63,Filipinas,en,true,0
+7403,The Manila Times,Noticias nacionales politica economia y actualidad de Filipinas.,https://www.manilatimes.net/news/feed,13,Sociedad,63,Filipinas,en,true,1
 7407,TechPinas Tecnologia,Noticias tecnologia dispositivos y tendencias digitales de Filipinas.,https://feeds.feedburner.com/Techpinas,14,Tecnología,63,Filipinas,en,true,0
 7408,UNBOX PH Tecnologia,Noticias de tecnologia gadgets y cultura digital de Filipinas.,https://www.unbox.ph/feed/,14,Tecnología,63,Filipinas,en,true,0
 7410,Finnish Meteorological Institute,Noticias avisos meteorologicos e investigacion del Instituto Meteorologico Finlandes.,https://www.ilmatieteenlaitos.fi/api/news/tiedote/rss,1,Ciencia,64,Finlandia,fi,true,0
@@ -1499,8 +1245,6 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 7418,Infos Gabon,Agencia de noticias sobre politica economia sociedad salud cultura y medio ambiente de Gabon.,https://fr.infosgabon.com/feed,13,Sociedad,67,Gabón,fr,true,0
 7419,Direct Infos Gabon,Actualidad politica economica y social de Gabon.,https://directinfosgabon.com/feed,13,Sociedad,67,Gabón,fr,true,0
 7420,Gabon Review Cultura,Noticias culturales y actualidad cultural de Gabon.,https://www.gabonreview.com/category/culture/feed/,2,Cultura,67,Gabón,fr,true,0
-7421,Gabon Review Faits Divers,Sucesos seguridad y actualidad social de Gabon.,https://www.gabonreview.com/category/faits_divers/feed/,13,Sociedad,67,Gabón,fr,true,0
-7422,VOA Afrique Gabon,Noticias de politica economia salud sociedad cultura ciencia y tecnologia sobre Gabon.,https://www.voaafrique.com/api/zpv_qol-vomx-tpe_qtqp,7,Internacional,67,Gabón,fr,true,0
 7423,The Point Gambia,Noticias de politica economia democracia derechos humanos y actualidad de Gambia.,https://thepoint.gm/posts/rss/xml,11,Política,68,Gambia,en,true,0
 7424,Malagen Gambia,Periodismo de investigacion sobre politica gobernanza corrupcion y asuntos nacionales de Gambia.,https://malagen.org/feed,11,Política,68,Gambia,en,true,0
 7425,Kairo News Gambia,Noticias y actualidad politica social economica y deportiva de Gambia.,https://kaironews.com/feed,13,Sociedad,68,Gambia,en,true,0
@@ -1509,14 +1253,11 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 7429,Venezuelanalysis,Analisis y noticias sobre politica economia y actualidad de Venezuela.,https://venezuelanalysis.com/feed/,11,Política,190,Venezuela,en,true,0
 7430,El Estimulo,Noticias y analisis sobre economia politica cultura y sociedad venezolana.,https://elestimulo.com/feed/,13,Sociedad,190,Venezuela,es,true,0
 7431,Runrun.es,Noticias investigacion y derechos humanos sobre la actualidad venezolana.,https://runrunes.org/feed/,11,Política,190,Venezuela,es,true,0
-7433,Caracas Chronicles,Analisis independiente sobre politica economia y actualidad de Venezuela.,https://www.caracaschronicles.com/feed,11,Política,190,Venezuela,en,true,0
 7434,Nuz.uz,Noticias de Uzbekistan y actualidad nacional e internacional sobre politica economia sociedad y deportes.,https://nuz.uz/feed,13,Sociedad,187,Uzbekistán,ru,true,0
 7436,Anhor.uz,Noticias de Uzbekistan y Tashkent con cobertura politica economia sociedad y actualidad nacional.,https://anhor.uz/feed,13,Sociedad,187,Uzbekistán,ru,true,0
 7437,UzA Uzbekistan National News Agency,Agencia nacional de noticias de Uzbekistan con informacion politica economica social y nacional.,https://uza.uz/en/rss,7,Internacional,187,Uzbekistán,en,true,0
 7438,UzNet Press Rusia,Agregador y archivo de noticias de Uzbekistan con feed continuo en ruso.,https://uznet.press/rss/today_ru.xml,13,Sociedad,187,Uzbekistán,ru,true,0
 7439,UzNet Press Uzbek,Agregador y archivo de noticias de Uzbekistan con feed continuo en uzbeko.,https://uznet.press/rss/today_uz.xml,13,Sociedad,187,Uzbekistán,uz,true,0
-7486,El Observador - Ciencia y Tecnologia,Noticias de ciencia tecnologia innovacion e investigacion de Uruguay.,https://www.elobservador.com.uy/rss/pages/ciencia-y-tecnologia.xml,1,Ciencia,186,Uruguay,es,true,0
-7487,El Observador - Salud,Noticias de salud medicina investigacion sanitaria y bienestar en Uruguay.,https://www.elobservador.com.uy/rss/pages/salud.xml,12,Salud,186,Uruguay,es,true,0
 7488,El Observador - Economia y Empresas,Noticias de economia empresas mercados finanzas y negocios de Uruguay.,https://www.elobservador.com.uy/rss/pages/economia.xml,4,Economía,186,Uruguay,es,true,0
 7489,El Observador - Nacional,Actualidad nacional politica y sociedad de Uruguay.,https://www.elobservador.com.uy/rss/pages/nacional.xml,13,Sociedad,186,Uruguay,es,true,0
 7490,El Observador - Cultura y Espectaculos,Noticias de cultura espectaculos cine musica literatura y entretenimiento de Uruguay.,https://www.elobservador.com.uy/rss/pages/cultura-y-espectaculos.xml,2,Cultura,186,Uruguay,es,true,0
@@ -1535,7 +1276,6 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 7503,Ukrainska Pravda English,Version en ingles de Ukrainska Pravda con noticias y analisis sobre Ucrania.,https://www.pravda.com.ua/eng/rss/,7,Internacional,184,Ucrania,en,true,0
 7504,European Pravda,Noticias y analisis sobre politica exterior relaciones internacionales y Europa.,https://www.eurointegration.com.ua/eng/rss/,11,Política,184,Ucrania,en,true,0
 7505,BBC News Ukraine,Noticias internacionales y cobertura de Ucrania de BBC News.,https://feeds.bbci.co.uk/news/topics/cx1m7zg0gzdt/rss.xml,7,Internacional,184,Ucrania,en,true,0
-7506,Bellingcat Ukraine,Investigaciones y periodismo de datos sobre Ucrania conflictos y seguridad.,https://www.bellingcat.com/tag/ukraine/feed,11,Política,184,Ucrania,en,true,0
 7507,Interfax Ukraine Sports,Noticias deportivas de Ucrania de la agencia Interfax Ukraine.,https://en.interfax.com.ua/news/sport.rss,3,Deportes,184,Ucrania,en,true,0
 7508,VnExpress - Mundo,Noticias internacionales de VnExpress.,https://vnexpress.net/rss/the-gioi.rss,7,Internacional,191,Vietnam,vi,true,0
 7509,VnExpress - Actualidad,Noticias nacionales y actualidad politica de Vietnam.,https://vnexpress.net/rss/thoi-su.rss,11,Política,191,Vietnam,vi,true,0
@@ -1554,7 +1294,6 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 7522,VietnamPlus - Little Heroes,Noticias sociales y contenidos sobre infancia y comunidad.,https://www.vietnamplus.vn/rss/doisong/littleheroes-425.rss,13,Sociedad,191,Vietnam,vi,true,0
 7523,VietnamPlus - Ciencia,Noticias de ciencia e investigacion de Vietnam.,https://www.vietnamplus.vn/rss/khoahoc-213.rss,1,Ciencia,191,Vietnam,vi,true,0
 7524,VietnamPlus - Tecnologia,Noticias de tecnologia e innovacion de Vietnam.,https://www.vietnamplus.vn/rss/congnghe-212.rss,14,Tecnología,191,Vietnam,vi,true,0
-7525,VietnamPlus - Medio Ambiente,Noticias sobre medio ambiente clima y sostenibilidad.,https://www.vietnamplus.vn/rss/moitruong-270.rss,8,Medio Ambiente,191,Vietnam,vi,true,0
 7526,Tuoi Tre - General,Principales noticias de Tuoi Tre Online.,https://tuoitre.vn/home.rss,13,Sociedad,191,Vietnam,vi,true,0
 7527,Tuoi Tre - Actualidad,Noticias nacionales y actualidad de Vietnam.,https://tuoitre.vn/thoi-su.rss,13,Sociedad,191,Vietnam,vi,true,0
 7528,Tuoi Tre - Economia,Noticias de economia negocios y empresas.,https://tuoitre.vn/kinh-doanh.rss,4,Economía,191,Vietnam,vi,true,0
@@ -1580,37 +1319,16 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 7548,VNA - Salud,Noticias de salud medicina e investigacion sanitaria.,https://vnanet.vn/vi/rss/suc-khoe-7.rss,12,Salud,191,Vietnam,vi,true,0
 7549,VNA - Vida,Noticias sobre vida cotidiana sociedad y comunidad.,https://vnanet.vn/vi/rss/moi-quan-tam-con-nguoi-8.rss,13,Sociedad,191,Vietnam,vi,true,0
 7550,VNA - Empleo,Noticias sobre empleo trabajo y mercado laboral.,https://vnanet.vn/vi/rss/lao-dong-9.rss,13,Sociedad,191,Vietnam,vi,true,0
-7551,VNA - Estilo de Vida,Noticias sobre estilo de vida sociedad y tendencias.,https://vnanet.vn/vi/rss/phong-cach-10.rss,13,Sociedad,191,Vietnam,vi,true,0
 7552,VNA - Politica,Noticias politicas nacionales de Vietnam.,https://vnanet.vn/vi/rss/chinh-tri-11.rss,11,Política,191,Vietnam,vi,true,0
-7553,VNA - Religion,Noticias sobre religion y vida religiosa en Vietnam.,https://vnanet.vn/vi/rss/ton-giao-12.rss,13,Sociedad,191,Vietnam,vi,true,0
 7554,VNA - Ciencia y Tecnologia,Noticias de ciencia tecnologia e innovacion.,https://vnanet.vn/vi/rss/khoa-hoc-cong-nghe-13.rss,14,Tecnología,191,Vietnam,vi,true,0
 7555,VNA - Sociedad,Noticias sociales y actualidad nacional de Vietnam.,https://vnanet.vn/vi/rss/xa-hoi-14.rss,13,Sociedad,191,Vietnam,vi,true,0
 7556,VNA - Deportes,Noticias deportivas de Vietnam.,https://vnanet.vn/vi/rss/the-thao-15.rss,3,Deportes,191,Vietnam,vi,true,0
 7557,VNA - Seguridad y Defensa,Noticias sobre seguridad defensa y fuerzas armadas.,https://vnanet.vn/vi/rss/an-ninh-quoc-phong-16.rss,11,Política,191,Vietnam,vi,true,0
 7558,VNA - Meteorologia,Informacion meteorologica y previsiones de Vietnam.,https://vnanet.vn/vi/rss/thoi-tiet-17.rss,13,Sociedad,191,Vietnam,vi,true,0
-7559,VNA - Mundo,Noticias internacionales de la agencia nacional de noticias de Vietnam.,https://vnanet.vn/vi/rss/the-gioi-18.rss,7,Internacional,191,Vietnam,vi,true,0
-7560,VNA English - Culture,Noticias de cultura y patrimonio de Vietnam en ingles.,https://vnanet.vn/en/rss/culture-19.rss,2,Cultura,191,Vietnam,en,true,0
 7561,VNA English - Law,Noticias juridicas y legales de Vietnam en ingles.,https://vnanet.vn/en/rss/law-20.rss,11,Política,191,Vietnam,en,true,0
-7562,VNA English - Disaster and Accident,Noticias sobre desastres y accidentes de Vietnam en ingles.,https://vnanet.vn/en/rss/disaster-and-accident-422.rss,13,Sociedad,191,Vietnam,en,true,0
-7563,VNA English - Economy,Noticias economicas y empresariales de Vietnam en ingles.,https://vnanet.vn/en/rss/economy-423.rss,4,Economía,191,Vietnam,en,true,0
-7564,VNA English - Education,Noticias de educacion y formacion de Vietnam en ingles.,https://vnanet.vn/en/rss/education-424.rss,13,Sociedad,191,Vietnam,en,true,0
-7565,VNA English - Environment,Noticias sobre medio ambiente y sostenibilidad de Vietnam en ingles.,https://vnanet.vn/en/rss/environmental-425.rss,8,Medio Ambiente,191,Vietnam,en,true,0
-7566,VNA English - Health,Noticias de salud y medicina de Vietnam en ingles.,https://vnanet.vn/en/rss/health-443.rss,12,Salud,191,Vietnam,en,true,0
-7567,VNA English - Life,Noticias sobre sociedad y vida cotidiana de Vietnam en ingles.,https://vnanet.vn/en/rss/life-1001.rss,13,Sociedad,191,Vietnam,en,true,0
-7568,VNA English - Employment,Noticias sobre empleo y mercado laboral de Vietnam en ingles.,https://vnanet.vn/en/rss/employment-1002.rss,13,Sociedad,191,Vietnam,en,true,0
-7569,VNA English - Lifestyle,Noticias sobre estilo de vida y tendencias de Vietnam en ingles.,https://vnanet.vn/en/rss/lifestyle-1003.rss,13,Sociedad,191,Vietnam,en,true,0
 7570,VNA English - Politics,Noticias politicas de Vietnam en ingles.,https://vnanet.vn/en/rss/politics-1004.rss,11,Política,191,Vietnam,en,true,0
-7571,VNA English - Society,Noticias sociales y actualidad nacional de Vietnam en ingles.,https://vnanet.vn/en/rss/society-1007.rss,13,Sociedad,191,Vietnam,en,true,0
-7572,VNA English - Sports,Noticias deportivas de Vietnam en ingles.,https://vnanet.vn/en/rss/sports-1008.rss,3,Deportes,191,Vietnam,en,true,0
-7573,VNA English - Security Defence,Noticias sobre seguridad y defensa de Vietnam en ingles.,https://vnanet.vn/en/rss/security-defence-1009.rss,11,Política,191,Vietnam,en,true,0
-7574,VNA English - Weather,Informacion meteorologica de Vietnam en ingles.,https://vnanet.vn/en/rss/weather-1010.rss,13,Sociedad,191,Vietnam,en,true,0
-7575,VNA English - Human Interest,Historias y actualidad social de Vietnam en ingles.,https://vnanet.vn/en/rss/human-interest-1170.rss,13,Sociedad,191,Vietnam,en,true,0
-7576,Turkmen.News,Noticias independientes de Turkmenistan sobre politica economia sociedad educacion y derechos humanos.,https://en.turkmen.news/feed,11,Política,181,Turkmenistán,en,true,0
 7577,Arzuw News,Noticias de Turkmenistan Asia Central y la CEI con cobertura politica economia sociedad y cultura.,https://arzuw.news/feed,13,Sociedad,181,Turkmenistán,en,true,0
 7578,Turkmenistan Live,Noticias de Turkmenistan sobre politica economia sociedad negocios cultura y actualidad.,https://turkmenistanlive.com/feed,13,Sociedad,181,Turkmenistán,ru,true,0
-7579,RFE/RL Turkmenistan,Noticias de Radio Free Europe Radio Liberty sobre Turkmenistan con cobertura politica sociedad y derechos humanos.,https://www.rferl.org/api/zyiiil-vomx-tpetgmp,11,Política,181,Turkmenistán,tk,true,0
-7580,Tonga Broadcasting Commission - Latest News,Noticias nacionales de Tonga de la principal emisora publica del pais.,https://tbc.to/feed,13,Sociedad,178,Tonga,en,true,0
-7581,Tonga Broadcasting Commission - English News,Noticias de Tonga y actualidad nacional publicadas por la emisora nacional.,https://tbc.to/en/feed,13,Sociedad,178,Tonga,en,true,0
 7582,Kaniva Tonga,Noticias de Tonga y actualidad del Pacifico en ingles y tongano.,https://kanivatonga.co.nz/feed,13,Sociedad,178,Tonga,en,true,0
 7583,Togo First Economia y Negocios,Noticias de economia inversiones empresas y negocios de Togo,https://www.togofirst.com/en/rss-en,4,Economía,177,Togo,en,true,0
 7584,iciLome Noticias,Noticias de Togo sobre politica sociedad economia cultura y actualidad nacional,https://icilome.com/feed,13,Sociedad,177,Togo,fr,true,0
@@ -1621,7 +1339,7 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 7589,Togotopnews,Noticias y analisis de actualidad de Togo politica sociedad economia y cultura,https://togotopnews.com/feed,13,Sociedad,177,Togo,fr,true,0
 7590,Savoirnews Togo,Noticias de Togo sobre sociedad economia politica salud deportes y actualidad,https://savoirnews.net/feed,13,Sociedad,177,Togo,fr,true,0
 7591,Presidencia de la Republica de Togo,Noticias oficiales de la Presidencia de la Republica Togolesa,https://presidence.gouv.tg/feed,11,Política,177,Togo,fr,true,0
-7592,Presidencia del Consejo de Togo,Noticias oficiales del Presidente del Consejo y actividades del Gobierno de Togo,https://presidenceduconseil.gouv.tg/feed,11,Política,177,Togo,fr,true,0
+7592,Presidencia del Consejo de Togo,Noticias oficiales del Presidente del Consejo y actividades del Gobierno de Togo,https://presidenceduconseil.gouv.tg/feed,11,Política,177,Togo,fr,false,10
 7593,Jornal Timor Post,Noticias de Timor-Leste sobre politica sociedad economia y actualidad nacional,https://timorpost.com/feed,13,Sociedad,176,Timor Oriental,pt,true,0
 7594,Asia-Plus Tajikistan,Noticias de Tayikistan sobre politica sociedad economia cultura deportes y actualidad regional,https://asiaplus.news/en/rss,13,Sociedad,175,Tayikistán,en,true,0
 7595,Avesta Tajikistan,Noticias de Tayikistan sobre politica sociedad economia y actualidad nacional,https://avesta.tj/feed,13,Sociedad,175,Tayikistán,ru,true,0
@@ -1656,7 +1374,6 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 7627,Isango Star – Tecnología,Noticias de tecnología e innovación de Ruanda.,https://isangostar.rw/rss/category/ikoranabuhanga,6,Entretenimiento,150,Ruanda,rw,true,0
 7628,KT Press – Noticias,Noticias de actualidad de Ruanda política sociedad economía y asuntos internacionales.,https://www.ktpress.rw/feed,7,Internacional,150,Ruanda,en,true,0
 7629,Taarifa Rwanda – Noticias,Noticias de Ruanda África política economía sociedad y actualidad internacional.,https://taarifa.rw/feed,7,Internacional,150,Ruanda,en,true,0
-7630,The Rwandan – Noticias,Noticias y análisis sobre Ruanda política sociedad economía y deportes.,https://www.therwandan.com/feed/,7,Internacional,150,Ruanda,en,true,0
 7631,Diario Libre – Portada,Principales noticias de República Dominicana y actualidad internacional.,https://www.diariolibre.com/rss/portada.xml,7,Internacional,149,República Dominicana,es,true,0
 7632,Diario Libre – Política,Noticias de política y gobierno de República Dominicana.,https://www.diariolibre.com/rss/politica.xml,7,Internacional,149,República Dominicana,es,true,0
 7633,Diario Libre – Actualidad,Noticias de actualidad y sucesos de República Dominicana.,https://www.diariolibre.com/rss/actualidad.xml,7,Internacional,149,República Dominicana,es,true,0
@@ -1664,13 +1381,10 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 7635,Diario Libre – Deportes,Noticias deportivas de República Dominicana y deporte internacional.,https://www.diariolibre.com/rss/deportes.xml,12,Salud,149,República Dominicana,es,true,0
 7636,Diario Libre – Mundo,Noticias internacionales y acontecimientos mundiales.,https://www.diariolibre.com/rss/mundo.xml,7,Internacional,149,República Dominicana,es,true,0
 7637,Diario Libre – Planeta,Noticias de medioambiente ciencia clima y planeta.,https://www.diariolibre.com/rss/planeta.xml,6,Entretenimiento,149,República Dominicana,es,true,0
-7638,Radio República – Nacionales,Noticias nacionales de República Dominicana.,https://www.radiorepublica.do/rss/nacional/,7,Internacional,149,República Dominicana,es,true,0
 7639,Radio República – Economía,Noticias económicas y empresariales de República Dominicana.,https://www.radiorepublica.do/rss/economia/,4,Economía,149,República Dominicana,es,true,0
 7640,Radio República – Deportes,Noticias deportivas de República Dominicana.,https://www.radiorepublica.do/rss/deportes/,12,Salud,149,República Dominicana,es,true,0
-7641,Radio República – Política,Noticias políticas y gubernamentales de República Dominicana.,https://www.radiorepublica.do/rss/politica/,7,Internacional,149,República Dominicana,es,true,0
 7642,Radio República – Tecnología,Noticias de tecnología e innovación.,https://www.radiorepublica.do/rss/tecnologia/,6,Entretenimiento,149,República Dominicana,es,true,0
 7644,Radio República – Cultura,Noticias culturales y actividades artísticas.,https://www.radiorepublica.do/rss/cultura/,13,Sociedad,149,República Dominicana,es,true,0
-7646,Radio República – Actualidad,Noticias de actualidad de República Dominicana.,https://www.radiorepublica.do/rss/actualidad/,7,Internacional,149,República Dominicana,es,true,0
 7647,Infos7 – Últimas noticias,Noticias de actualidad de la República Democrática del Congo y del mundo.,https://infos7.cd/rss/latest-posts,7,Internacional,148,República Democrática del Congo,fr,true,0
 7648,Infos7 – Actualidad,Noticias generales de actualidad de la República Democrática del Congo.,https://infos7.cd/rss/category/actualites,7,Internacional,148,República Democrática del Congo,fr,true,0
 7649,Infos7 – Política,Noticias políticas de la República Democrática del Congo.,https://infos7.cd/rss/category/politique,7,Internacional,148,República Democrática del Congo,fr,true,0
@@ -1716,7 +1430,6 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 7692,Sky News – Business,Noticias económicas y empresariales de Reino Unido y mercados internacionales.,https://feeds.skynews.com/feeds/rss/business.xml,4,Economía,144,Reino Unido,en,true,0
 7693,Agence Congolaise d'Information (ACI) – République du Congo,Noticias de la Agence Congolaise d'Information sobre la República del Congo.,https://www.aci.cg/feed/,13,Sociedad,147,República del Congo,fr,true,0
 7694,RFI – Congo-Brazzaville,Noticias de Radio France Internationale sobre la República del Congo.,https://www.rfi.fr/fr/tag/congo-brazzaville/rss,7,Internacional,147,República del Congo,fr,true,0
-7695,Le Monde – République du Congo,Noticias de Le Monde sobre la República del Congo.,https://www.lemonde.fr/congo-brazzaville/rss_full.xml,7,Internacional,147,República del Congo,fr,true,0
 7696,Reporters Sans Frontières – Congo-Brazzaville,Noticias e información de Reporteros Sin Fronteras relacionadas con la libertad de prensa en la República del Congo.,https://rsf.org/es/rss/afrique/congo-brazzaville/feed.xml,7,Internacional,147,República del Congo,fr,true,0
 7698,Notes from Poland,Noticias y análisis sobre actualidad política económica y social de Polonia.,https://notesfrompoland.com/feed/,7,Internacional,142,Polonia,en,true,0
 7699,Rzeczpospolita – RSS,Noticias de actualidad política económica y social de Polonia.,https://www.rp.pl/rss_main,13,Sociedad,142,Polonia,pl,true,0
@@ -1731,7 +1444,7 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 7711,Peru Reports,Noticias y análisis sobre Perú en inglés.,https://perureports.com/feed,7,Internacional,141,Perú,en,true,0
 7712,El Búho – Arequipa,Noticias de Arequipa y Perú.,https://elbuho.pe/feed,13,Sociedad,141,Perú,es,true,0
 7713,El Men,Noticias de actualidad entretenimiento salud y sociedad del Perú.,https://elmen.pe/feed,13,Sociedad,141,Perú,es,true,0
-7714,La Hora – Perú,Noticias nacionales e internacionales de La Hora.,https://lahora.pe/feed,13,Sociedad,141,Perú,es,true,0
+7714,La Hora – Perú,Noticias nacionales e internacionales de La Hora.,https://lahora.pe/feed,13,Sociedad,141,Perú,es,false,10
 7715,Diario UNO – Perú,Noticias de política actualidad economía deportes y sociedad del Perú.,https://diariouno.pe/feed,13,Sociedad,141,Perú,es,true,0
 7717,Diario Voces – San Martín,Noticias y actualidad de la región San Martín y Perú.,https://diariovoces.com.pe/feed,13,Sociedad,141,Perú,es,true,0
 7718,Prensa Regional – Moquegua,Noticias de Moquegua Arequipa y el sur del Perú.,https://prensaregional.pe/feed,13,Sociedad,141,Perú,es,true,0
@@ -1751,19 +1464,16 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 7742,Trujillo Informa,Noticias de Trujillo La Libertad y Perú.,https://trujilloinforma.com/feed,13,Sociedad,141,Perú,es,true,0
 7744,Andina – Agencia Peruana de Noticias,Noticias políticas económicas sociales y de actualidad del Perú.,https://andina.pe/agencia/rss.aspx,13,Sociedad,141,Perú,es,true,0
 7745,France 24 – Perú,Noticias sobre Perú de France 24.,https://www.france24.com/es/tag/peru/rss,7,Internacional,141,Perú,es,true,0
-7746,ABC Color – Nacionales,Noticias nacionales de Paraguay de ABC Color.,https://www.abc.com.py/arc/outboundfeeds/rss/nacionales/,13,Sociedad,143,Portugal,es,true,0
 7747,ABC Color – Deportes,Noticias deportivas de Paraguay de ABC Color.,https://www.abc.com.py/arc/outboundfeeds/rss/deportes/,3,Deportes,143,Portugal,es,true,0
 7748,ABC Color – Fútbol,Noticias de fútbol de Paraguay de ABC Color.,https://www.abc.com.py/arc/outboundfeeds/rss/deportes/futbol/,3,Deportes,143,Portugal,es,true,0
 7749,ABC Color – Mundo,Noticias internacionales de ABC Color.,https://www.abc.com.py/arc/outboundfeeds/rss/mundo/,7,Internacional,143,Portugal,es,true,0
 7750,ABC Color – Espectáculos,Noticias de entretenimiento y espectáculos de ABC Color.,https://www.abc.com.py/arc/outboundfeeds/rss/espectaculos/,6,Entretenimiento,143,Portugal,es,true,0
 7751,ABC Color – Ciencia,Noticias científicas de ABC Color.,https://www.abc.com.py/arc/outboundfeeds/rss/ciencia/,1,Ciencia,143,Portugal,es,true,0
 7752,ABC Color – Tecnología,Noticias de tecnología de ABC Color.,https://www.abc.com.py/arc/outboundfeeds/rss/tecnologia/,14,Tecnología,143,Portugal,es,true,0
-7753,ABC Color – Noticias del día,Principales noticias del día de ABC Color.,https://www.abc.com.py/arc/outboundfeeds/rss/noticias-del-dia/,13,Sociedad,143,Portugal,es,true,0
 7754,Diario Popular,Noticias de Paraguay sobre actualidad entretenimiento deportes y política.,https://popular.com.py/feed,13,Sociedad,143,Portugal,es,true,0
 7755,ADN Digital,Noticias de Paraguay y del mundo.,https://www.adndigital.com.py/feed,13,Sociedad,143,Portugal,es,true,0
 7756,Noticias CDE,Noticias de Ciudad del Este Alto Paraná y Paraguay.,https://noticiascde.com.py/feed,13,Sociedad,143,Portugal,es,true,0
 7759,Diario HOY,Noticias de Paraguay y el mundo sobre economía deportes política y actualidad.,https://www.hoy.com.py/feed,13,Sociedad,143,Portugal,es,true,0
-7761,Unicanal,Noticias de Paraguay y el mundo sobre economía deportes cultura y actualidad.,https://www.unicanal.com.py/feed,13,Sociedad,143,Portugal,es,true,0
 7762,A24 Paraguay,Noticias de actualidad de Paraguay.,https://www.americatv.com.py/a24-com-py/feed,13,Sociedad,143,Portugal,es,true,0
 7764,ONE Papua New Guinea,Noticias de actualidad política economía sociedad deportes tecnología y otros temas de Papúa Nueva Guinea.,https://www.onepng.com/feeds/posts/default,13,Sociedad,139,Papúa Nueva Guinea,en,true,0
 7765,Business Advantage PNG,Noticias análisis y actualidad económica y empresarial de Papúa Nueva Guinea.,https://businessadvantagepng.com/feed,4,Economía,139,Papúa Nueva Guinea,en,true,0
@@ -1771,15 +1481,10 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 7768,Post-Courier – Papua New Guinea,Noticias nacionales de Papúa Nueva Guinea y actualidad internacional.,https://postcourier.com.pg/feed/,13,Sociedad,139,Papúa Nueva Guinea,en,true,0
 7826,Palestine News Network,Noticias de actualidad política sociedad economía y cultura de Palestina.,https://english.pnn.ps/feed/,13,Sociedad,137,Palestina,en,true,0
 7827,Palestinian Information Center,Noticias y actualidad política y social de Palestina en árabe.,https://palinfo.com/feed,11,Política,137,Palestina,ar,true,0
-7829,Palestine Chronicle,Noticias análisis y actualidad sobre Palestina y Oriente Medio.,https://www.palestinechronicle.com/feed/,7,Internacional,137,Palestina,en,true,0
-7830,Wattan News,Noticias políticas y sociales palestinas en árabe.,https://www.wattan.net/ar/rss,11,Política,137,Palestina,ar,true,0
-7832,Euronews Palestine,Noticias internacionales y actualidad sobre Palestina.,https://www.euronews.com/rss?level=tag&name=palestine,7,Internacional,137,Palestina,en,true,0
 7833,France 24 Palestine,Noticias y actualidad sobre Palestina y los territorios palestinos.,https://www.france24.com/en/tag/palestinian-territories/rss,7,Internacional,137,Palestina,en,true,0
 7834,RFI Palestine,Noticias y actualidad sobre Palestina en francés.,https://www.rfi.fr/fr/tag/territoires-palestiniens/rss,7,Internacional,137,Palestina,fr,true,0
-7835,The Times of Israel – State of Palestine,Noticias y actualidad sobre Palestina y los territorios palestinos.,https://www.timesofisrael.com/topic/state-of-palestine/feed/,7,Internacional,137,Palestina,en,true,0
 7836,Middle East Monitor – Palestine,Noticias análisis y actualidad sobre Palestina y Oriente Medio.,https://www.middleeastmonitor.com/tag/palestine/feed/,7,Internacional,137,Palestina,en,true,0
 7837,The Electronic Intifada,Noticias análisis y actualidad sobre Palestina.,https://electronicintifada.net/rss.xml,7,Internacional,137,Palestina,en,true,0
-7838,IMEMC News,Noticias de Palestina y Oriente Medio sobre política sociedad y derechos humanos.,https://imemc.org/feed/,13,Sociedad,137,Palestina,en,true,0
 7839,UN Palestine,Noticias y comunicados de Naciones Unidas sobre Palestina.,https://palestine.un.org/en/rss.xml,7,Internacional,137,Palestina,en,true,0
 7846,Google News Palestine,Noticias agregadas de múltiples medios sobre Palestina.,https://news.google.com/rss/search?q=Palestine&hl=en-US&gl=US&ceid=US:en,7,Internacional,137,Palestina,en,true,0
 7847,Google News Palestina,Noticias agregadas de múltiples medios sobre Palestina en español.,https://news.google.com/rss/search?q=Palestina&hl=es&gl=ES&ceid=ES:es,7,Internacional,137,Palestina,es,true,0
@@ -1819,3 +1524,133 @@ id,nombre,descripcion,url,categoria_id,categoria,pais_id,pais,idioma,activo,fall
 7881,Google News Palau Pacific,Noticias regionales del Pacífico relacionadas con Palaos.,https://news.google.com/rss/search?q=Palau+Pacific&oq=Palau+Pacific&scoring=n&hl=en-US&gl=US&ceid=US:en,7,Internacional,138,Panamá,en,true,0
 7882,Google News Palau China,Noticias sobre las relaciones entre Palaos y China.,https://news.google.com/rss/search?q=Palau+China&oq=Palau+China&scoring=n&hl=en-US&gl=US&ceid=US:en,7,Internacional,138,Panamá,en,true,0
 7883,Google News Palau Taiwan,Noticias sobre las relaciones entre Palaos y Taiwán.,https://news.google.com/rss/search?q=Palau+Taiwan&oq=Palau+Taiwan&scoring=n&hl=en-US&gl=US&ceid=US:en,7,Internacional,138,Panamá,en,true,0
+7884,TOLOnews – Afghanistan,Noticias de Afganistán en inglés y actualidad nacional e internacional,https://www.tolonews.com/rss.xml,7,Internacional,1,Afganistán,en,true,0
+7885,Afghan Online Press – AOP,Agregador de noticias afganas con actualidad política sociedad y seguridad,https://www.aopnews.com/feed/,7,Internacional,1,Afganistán,en,true,0
+7886,BBC News – Afghanistan,Noticias internacionales y cobertura específica de Afganistán,https://feeds.bbci.co.uk/news/topics/c8nq32jw5r5t/rss.xml,7,Internacional,1,Afganistán,en,true,0
+7887,RFE/RL – Afghanistan,Noticias análisis y reportajes de Radio Free Europe Radio Liberty sobre Afganistán,https://www.rferl.org/api/zvoi_l-vomx-tpeukmy,7,Internacional,1,Afganistán,en,true,0
+7888,Afghanistan Sun – News,Noticias de Afganistán y actualidad internacional,https://feeds.afghanistansun.com/rss/6e1d5c8e1f98f17c,7,Internacional,1,Afganistán,en,true,0
+7889,Afghanistan News.Net,Noticias de Afganistán región economía y actualidad internacional,https://feeds.afghanistannews.net/rss/6e1d5c8e1f98f17c,7,Internacional,1,Afganistán,en,true,0
+7890,Bakhtar News Agency – Dari,Agencia de noticias afgana con información nacional e internacional en dari,https://www.bakhtarnews.af/dr/rss/category/afghanistan-fa,7,Internacional,1,Afganistán,fa,true,0
+7891,Afghan Islamic Press – English,Agencia afgana de noticias con cobertura política social y de actualidad,https://www.afghanislamicpress.com/en/rss,7,Internacional,1,Afganistán,en,true,6
+7892,Diari d'Andorra – Noticias,Diario andorrano con noticias nacionales política sociedad y actualidad,https://freenewsapi.ai/v1/rss?host=www.diariandorra.ad&size=50,7,Internacional,4,Andorra,ca,true,0
+7893,El Periòdic d'Andorra – Noticias,Diario digital andorrano con información política sociedad economía y deportes,https://freenewsapi.ai/v1/rss?host=elperiodic.ad&size=50,7,Internacional,4,Andorra,ca,true,0
+7894,Bondia – Noticias,Diario digital andorrano con noticias nacionales sociedad política y opinión,https://www.bondia.ad/frontpage?format=feed&page=1801&type=rss,7,Internacional,4,Andorra,ca,false,0
+7895,RTVA – Notícies,Radio y televisión pública de Andorra con noticias nacionales economía cultura y sociedad,https://www.rtva.ad/rss.xml,7,Internacional,4,Andorra,ca,false,0
+7896,ANA – Agència de Notícies Andorrana,Agencia de noticias de Andorra con cobertura política economía sociedad cultura y sucesos,https://www.ana.ad/feed,7,Internacional,4,Andorra,ca,false,0
+7897,Forum.ad – Noticias,Portal digital con actualidad andorrana y noticias de sociedad economía y política,https://forum.ad/feed/,7,Internacional,4,Andorra,ca,false,0
+7898,Agenda.ad – Cultura y eventos,Agenda cultural de Andorra con eventos actividades y programación local,https://www.agenda.ad/rss,7,Internacional,4,Andorra,ca,false,0
+7899,Correio da Kianda – Noticias,Portal angoleño de actualidad nacional e internacional.,https://correiokianda.info/feed,7,Internacional,5,Angola,pt,true,0
+7900,Notícias de Angola – Noticias,Portal de actualidad angoleña con información política economía cultura y deportes.,https://noticiasdeangola.co.ao/feed,7,Internacional,5,Angola,pt,true,3
+7901,Folha 8 – Noticias,Diario angoleño con cobertura de política sociedad economía y cultura.,https://jornalf8.net/feed,7,Internacional,5,Angola,pt,true,0
+7902,Portal de Angola – Noticias,Portal informativo sobre Angola y su diáspora lusófona.,https://www.portaldeangola.com/feed,7,Internacional,5,Angola,pt,true,0
+7903,Nova Gazeta – Noticias,Medio angoleño con información de sociedad política economía deportes y cultura.,https://www.novagazeta.co.ao/rss.php,7,Internacional,5,Angola,pt,true,0
+7904,Club-K – Noticias,Portal independiente angoleño de actualidad y política.,https://www.club-k.net/index.php?lang=pt,7,Internacional,5,Angola,pt,true,3
+7905,O País – Noticias,Diario angoleño con cobertura de política sociedad economía opinión y cultura.,https://opais.co.ao/feed,7,Internacional,5,Angola,pt,true,3
+7906,Saudi Gazette – Noticias,Diario saudí en inglés con noticias nacionales e internacionales,https://saudigazette.com.sa/rssFeed/74,7,Internacional,7,Arabia Saudita,en,true,0
+7907,Al-Watan – Noticias,Diario saudí en árabe con actualidad nacional política y sociedad,https://alwatan.com.sa/rssFeed/45,7,Internacional,,,ar,false,0
+7908,Al Madina – Noticias,Diario saudí en árabe con noticias sociedad economía y deportes,https://al-madina.com/rssFeed/193,7,Internacional,,,ar,false,0
+7909,Al-Bilad – Noticias,Diario saudí con noticias nacionales e internacionales,https://albiladdaily.com/feed,7,Internacional,7,Arabia Saudita,ar,true,0
+7910,Makkah – Noticias,Diario saudí en árabe con noticias de actualidad,https://makkahnewspaper.com/rssFeed/0,7,Internacional,7,Arabia Saudita,ar,false,10
+7911,Al-Jazirah – Noticias,Diario saudí con cobertura nacional e internacional,https://www.al-jazirah.com/rss/ln.xml,7,Internacional,7,Arabia Saudita,ar,true,0
+7912,Asharq Al-Awsat – Noticias,Diario panárabe con noticias regionales e internacionales,https://aawsat.com/feed,7,Internacional,7,Arabia Saudita,ar,true,0
+7913,Okaz – Noticias,Diario saudí con información política económica deportiva y social,https://okaz.com.sa/rssFeed/190,7,Internacional,7,Arabia Saudita,ar,true,0
+7914,Al Yaum – Noticias,Diario saudí con noticias regionales economía y deportes,https://alyaum.com/rssFeed/1,7,Internacional,,,ar,false,0
+7915,Al Eqtisadiah – Economía,Medio saudí especializado en economía mercados energía y negocios,https://www.aleqt.com,4,Economía,7,Arabia Saudita,ar,false,10
+7916,Umm Al-Qura – Boletín oficial,Gaceta oficial saudí con noticias y publicaciones normativas,https://www.uqn.gov.sa/rssFeed/19,7,Internacional,7,Arabia Saudita,ar,true,0
+7917,Umm Al-Qura – Decisiones y legislación,Gaceta oficial saudí con decisiones y disposiciones legales,https://www.uqn.gov.sa/rssFeed/20,7,Internacional,7,Arabia Saudita,ar,true,0
+7918,Sauress – Noticias,Agregador de noticias saudíes sobre actualidad economía y deportes,https://www.sauress.com/en,7,Internacional,7,Arabia Saudita,en,false,10
+7919,Al-Watan – Política,Diario saudí en árabe con noticias políticas,https://www.alwatan.com.sa/rssFeed/1,7,Internacional,7,Arabia Saudita,ar,true,0
+7920,Al Madina – Noticias,Diario saudí en árabe con noticias de actualidad,https://www.al-madina.com/rssFeed/193,7,Internacional,7,Arabia Saudita,ar,true,0
+7921,Al Yaum – Noticias,Diario saudí en árabe con noticias nacionales y regionales,https://www.alyaum.com/rssFeed/1005,7,Internacional,7,Arabia Saudita,ar,true,0
+7922,Vanguardia (MX) – Portada,Noticias generales de Coahuila y México.,https://vanguardia.com.mx/rss.xml,13,Sociedad,118,México,es,true,0
+7923,El Informador – México,Sección México del diario de Guadalajara.,https://www.informador.mx/rss/mexico.xml,13,Sociedad,118,México,es,true,0
+7924,Mexico News Daily,Noticias de México en inglés.,https://mexiconewsdaily.com/feed/,13,Sociedad,118,México,en,true,0
+7926,El Norte – Portada,Diario de Monterrey (Grupo Reforma).,https://www.elnorte.com/rss/portada.xml,13,Sociedad,118,México,es,true,0
+7927,Mural – Portada,Diario de Guadalajara (Grupo Reforma).,https://www.mural.com.mx/rss/portada.xml,13,Sociedad,118,México,es,true,0
+7928,El Siglo de Torreón,Noticias de La Laguna y Coahuila.,https://www.elsiglodetorreon.com.mx/index.xml,13,Sociedad,118,México,es,true,0
+7929,Diario de Yucatán,Noticias de la península de Yucatán.,https://www.yucatan.com.mx/feed,13,Sociedad,118,México,es,true,0
+7930,24 Horas,Diario gratuito de la Ciudad de México.,https://24-horas.mx/feed/,13,Sociedad,118,México,es,true,0
+7931,El Imparcial de Oaxaca,Noticias de Oaxaca y México.,https://imparcialoaxaca.mx/feed/,13,Sociedad,118,México,es,true,0
+7934,SDP Noticias,Portal de noticias y entretenimiento.,https://feeds.sdpnoticias.com/portal/all,13,Sociedad,118,México,es,true,0
+7937,Sahara Medias,Portal de noticias líder de Mauritania y el Sáhara.,https://saharamedias.net/feed,13,Sociedad,117,Mauritania,ar,true,0
+7938,Kassataya Mauritanie,Actualidad de Mauritania y África.,https://kassataya.com/feed,13,Sociedad,117,Mauritania,fr,true,0
+7939,Le Calame,Semanario mauritano de información general y política.,https://lecalame.info/?q=rss.xml,11,Política,117,Mauritania,fr,true,0
+7940,MauriActu – Opinión,Artículos de opinión sobre Mauritania de un único autor.,https://mauriactu.info/ar/rss.xml,10,Opinión,117,Mauritania,ar,true,0
+7941,Al Alam,Periódico digital marroquí de información general y política (árabe).,https://www.alalam.ma/xml/atom.xml,11,Política,115,Marruecos,ar,true,0
+7944,Al Watan,Diario marroquí de información general y política (árabe).,https://lwatan.com/category/الرئيسية/feed/,11,Política,115,Marruecos,ar,true,0
+7945,Media1,Medio digital marroquí con secciones de política y sociedad (árabe).,https://media1.ma/feed/,13,Sociedad,115,Marruecos,ar,true,0
+7946,Moldpres,摩尔多瓦国家通讯社，官方新闻来源，支持多语言 RSS 输出（罗马尼亚语/俄语/英语）。,https://moldpres.md/config/rss.php?lang=rom,11,Política,120,Moldavia,ro,true,0
+7947,Moldpres (Русский),摩尔多瓦国家通讯社俄语版 RSS feed。,https://moldpres.md/config/rss.php?lang=rus,11,Política,120,Moldavia,ru,true,0
+7948,Moldpres (English),摩尔多瓦国家通讯社英语版 RSS feed。,https://moldpres.md/config/rss.php?lang=eng,11,Política,120,Moldavia,en,true,0
+7949,Point.md,摩尔多瓦新闻门户网站，提供新闻资讯 RSS 输出。,https://point.md/ru/rss/novosti,13,Sociedad,120,Moldavia,ru,true,0
+7952,Monaco Tribune - Actualités,Medio digital monegasco con noticias de actualidad política economía y sociedad (francés).,https://www.monaco-tribune.com/categorie/actualites/feed/,13,Sociedad,121,Mónaco,fr,true,0
+7954,Monaco Tribune - News,Sección de noticias en inglés de Monaco Tribune.,https://www.monaco-tribune.com/en/category/news/feed/,7,Internacional,121,Mónaco,en,true,0
+7955,Monaco Tribune - Société,Sección de noticias sociales de Mónaco (francés).,https://www.monaco-tribune.com/categorie/societe/feed/,13,Sociedad,121,Mónaco,fr,true,0
+7959,Өрөг.МН,Medio independiente mongol con RSS a través de Free News API.,https://freenewsapi.ai/v1/rss?host=urug.mn&size=50,13,Sociedad,122,Mongolia,mn,true,0
+7961,La Nueva Radio YA,Cadena de radio y medio digital afín al gobierno con RSS disponible a través de Free News API.,https://freenewsapi.ai/v1/rss?host=nuevaya.com.ni&size=50,7,Internacional,128,Nicaragua,es,true,0
+7962,Canal 10,Medio de televisión nicaragüense con RSS disponible a través de Free News API.,https://freenewsapi.ai/v1/rss?host=www.canal10.com.ni&size=50,7,Internacional,128,Nicaragua,es,true,0
+7963,Canal 4 Nicaragua,Medio de televisión nicaragüense con RSS disponible a través de Free News API.,https://freenewsapi.ai/v1/rss?host=www.canal4.com.ni&size=50,7,Internacional,128,Nicaragua,es,true,0
+7965,Le Sahel,Diario estatal de Níger publicado por la Oficina Nacional de Edición y Prensa (ONEP).,https://www.lesahel.org/rss,13,Sociedad,129,Níger,fr,true,2
+7968,Vanguard,Diario nacional nigeriano fundado en 1984 con cobertura de política negocios deportes y entretenimiento.,https://www.vanguardngr.com/category/top-stories/feed/,7,Internacional,130,Nigeria,en,true,0
+7970,Punch,Diario de mayor circulación de Nigeria fundado en 1971.,https://freenewsapi.ai/v1/rss?host=punchng.com&size=50,13,Sociedad,130,Nigeria,en,true,0
+7971,Premium Times,Periodismo de investigación y noticias de última hora.,https://www.premiumtimesng.com/feed,11,Política,130,Nigeria,en,true,0
+7977,Leadership,Diario de Abuya especializado en política y gobernanza.,https://leadership.ng/feed/,11,Política,130,Nigeria,en,true,0
+7979,NRK Toppsaker,Feed principal de titulares de NRK.,https://www.nrk.no/toppsaker.rss,7,Internacional,131,Noruega,no,true,0
+7980,NRK Siste nyheter,Feed de últimas noticias de NRK.,https://www.nrk.no/nyheter/siste.rss,7,Internacional,131,Noruega,no,true,0
+7981,NRK Norge,Feed de noticias nacionales de NRK.,https://www.nrk.no/norge/toppsaker.rss,7,Internacional,131,Noruega,no,true,0
+7983,VG Innenriks,Feed de noticias nacionales del diario VG.,https://www.vg.no/rss/feed/?categories=1069,13,Sociedad,131,Noruega,no,true,0
+7984,VG Utenriks,Feed de noticias internacionales del diario VG.,https://www.vg.no/rss/feed/?categories=1070,7,Internacional,131,Noruega,no,true,0
+7985,Aftenposten,Periódico nacional de referencia en Noruega. Feed de noticias.,https://www.aftenposten.no/rss,13,Sociedad,131,Noruega,no,true,0
+7986,Dagbladet,Diario tabloide noruego de información general.,https://www.dagbladet.no/?lab_viewport=rss,13,Sociedad,131,Noruega,no,true,0
+7989,E24 Aksjetips,Sección de consejos bursátiles de E24.,http://e24.no/rss2/?seksjon=aksjetips,4,Economía,131,Noruega,no,true,0
+7991,TV2 Nyheter,Feed de noticias del canal privado TV2.,https://www.tv2.no/rss/nyheter,7,Internacional,131,Noruega,no,true,0
+7992,TV2 Innenriks,Feed de noticias nacionales de TV2.,https://www.tv2.no/rss/nyheter/innenriks,13,Sociedad,131,Noruega,no,true,0
+7993,TV2 Utenriks,Feed de noticias internacionales de TV2.,https://www.tv2.no/rss/nyheter/utenriks,7,Internacional,131,Noruega,no,true,0
+7994,TV2 Sport,Feed de noticias deportivas de TV2.,https://www.tv2.no/rss/sport,3,Deportes,131,Noruega,no,true,0
+7995,TV2 Underholdning,Feed de entretenimiento de TV2.,https://www.tv2.no/rss/underholdning,6,Entretenimiento,131,Noruega,no,true,0
+7996,Nettavisen,Diario digital noruego. Feed de todas las noticias.,https://www.nettavisen.no/service/rich-rss,13,Sociedad,131,Noruega,no,true,0
+7997,Nettavisen Nyheter,Sección de noticias de Nettavisen.,https://www.nettavisen.no/service/rich-rss?tag=nyheter,13,Sociedad,131,Noruega,no,true,0
+7999,Dagsavisen,Diario noruego de orientación socialista. Feed principal.,https://www.dagsavisen.no/rss,11,Política,131,Noruega,no,true,0
+8000,Dagens Næringsliv,Principal diario económico y empresarial de Noruega. Todas las noticias.,https://services.dn.no/api/feed/rss/,4,Economía,131,Noruega,no,true,0
+8001,Finansavisen,Diario especializado en economía y finanzas. Feed principal.,https://ws.finansavisen.no/api/articles.rss,4,Economía,131,Noruega,no,true,0
+8002,Finansavisen Børs,Sección de bolsa de Finansavisen.,https://ws.finansavisen.no/api/articles.rss?category=B%C3%B8rs,4,Economía,131,Noruega,no,true,0
+8003,Bergens Tidende,Diario regional de Bergen. Feed principal.,https://www.bt.no/rss,13,Sociedad,131,Noruega,no,true,0
+8004,Stavanger Aftenblad,Diario regional de Stavanger. Feed principal.,https://www.aftenbladet.no/rss,13,Sociedad,131,Noruega,no,true,0
+8005,Adresseavisen,Diario regional de Trondheim. Feed principal.,https://www.adressa.no/rss,13,Sociedad,131,Noruega,no,true,0
+8011,Klar Tale,Periódico de noticias en lenguaje fácil.,https://www.klartale.no/?lab_viewport=rss,13,Sociedad,131,Noruega,no,true,0
+8014,ITavisen,Portal de noticias de tecnología y móviles.,https://www.itavisen.no/feed/,14,Tecnología,131,Noruega,no,true,0
+8015,NRK Beta,Portal de tecnología y medios de NRK.,http://nrkbeta.no/feed/,14,Tecnología,131,Noruega,no,true,0
+8017,News in English,Noticias de Noruega en inglés para lectores internacionales.,http://feeds.feedburner.com/newsinenglish/AzQS,7,Internacional,131,Noruega,en,true,0
+8019,RNZ Politics,Sección de política de Radio New Zealand.,https://www.rnz.co.nz/rss/political,11,Política,132,Nueva Zelanda,en,true,0
+8020,RNZ Business,Sección de negocios y economía de Radio New Zealand.,https://www.rnz.co.nz/rss/business,4,Economía,132,Nueva Zelanda,en,true,0
+8021,RNZ World,Sección de noticias internacionales de Radio New Zealand.,https://www.rnz.co.nz/rss/world,7,Internacional,132,Nueva Zelanda,en,true,0
+8022,RNZ Sport,Sección de deportes de Radio New Zealand.,https://www.rnz.co.nz/rss/sport,3,Deportes,132,Nueva Zelanda,en,true,0
+8024,NZ Herald Politics,Sección de política del New Zealand Herald.,http://rss.nzherald.co.nz/rss/xml/nzhrsscid_000000280.xml,11,Política,132,Nueva Zelanda,en,true,0
+8025,Stuff,Portal de noticias de Stuff Limited. Fuente principal de noticias.,https://www.stuff.co.nz/rss,13,Sociedad,132,Nueva Zelanda,en,true,0
+8033,Oman Observer,Principal diario en inglés de Omán. Feed principal.,https://www.omanobserver.om/rssFeed/1,13,Sociedad,133,Omán,en,true,0
+8036,NOS Nieuws Algemeen,Radiodifusión pública neerlandesa. Feed general de noticias.,https://feeds.nos.nl/nosnieuwsalgemeen,7,Internacional,134,Países Bajos,nl,true,0
+8037,NOS Nieuws Binnenland,Sección de noticias nacionales de NOS.,https://feeds.nos.nl/nosnieuwsbinnenland,13,Sociedad,134,Países Bajos,nl,true,0
+8038,NOS Nieuws Buitenland,Sección de noticias internacionales de NOS.,https://feeds.nos.nl/nosnieuwsbuitenland,7,Internacional,134,Países Bajos,nl,true,0
+8039,NOS Nieuws Politiek,Sección de política de NOS.,https://feeds.nos.nl/nosnieuwspolitiek,11,Política,134,Países Bajos,nl,true,0
+8040,NOS Nieuws Economie,Sección de economía de NOS.,https://feeds.nos.nl/nosnieuwseconomie,4,Economía,134,Países Bajos,nl,true,0
+8041,NOS Nieuws Tech,Sección de tecnología de NOS.,https://feeds.nos.nl/nosnieuwstech,14,Tecnología,134,Países Bajos,nl,true,0
+8042,NOS Sport Algemeen,Sección deportiva general de NOS.,https://feeds.nos.nl/nossportalgemeen,3,Deportes,134,Países Bajos,nl,true,0
+8047,NU.nl Algemeen,Portal de noticias de referencia en Países Bajos. Feed general.,https://www.nu.nl/rss/Algemeen,7,Internacional,134,Países Bajos,nl,true,0
+8048,NU.nl Economie,Sección económica de NU.nl.,https://www.nu.nl/rss/Economie,4,Economía,134,Países Bajos,nl,true,0
+8049,NU.nl Sport,Sección deportiva de NU.nl.,https://www.nu.nl/rss/Sport,3,Deportes,134,Países Bajos,nl,true,0
+8050,NRC,Diario de referencia neerlandés. Feed general.,https://www.nrc.nl/rss.php,13,Sociedad,134,Países Bajos,nl,true,1
+8051,AD Algemeen,Algemeen Dagblad. Feed general de noticias.,https://www.ad.nl/rss.xml,13,Sociedad,134,Países Bajos,nl,true,0
+8052,AD Binnenland,Sección de noticias nacionales del AD.,https://www.ad.nl/binnenland/rss.xml,13,Sociedad,134,Países Bajos,nl,true,0
+8053,AD Buitenland,Sección de noticias internacionales del AD.,https://www.ad.nl/buitenland/rss.xml,7,Internacional,134,Países Bajos,nl,true,0
+8054,AD Sport,Sección deportiva del AD.,https://www.ad.nl/sport/rss.xml,3,Deportes,134,Países Bajos,nl,true,0
+8055,De Telegraaf Algemeen,Diario de mayor circulación de Países Bajos. Feed general.,https://www.telegraaf.nl/rss,13,Sociedad,134,Países Bajos,nl,true,0
+8056,De Telegraaf Misdaad,Sección de sucesos de De Telegraaf.,https://www.telegraaf.nl/misdaad/rss,13,Sociedad,134,Países Bajos,nl,true,0
+8057,De Telegraaf Binnenland,Sección nacional de De Telegraaf.,https://www.telegraaf.nl/binnenland/rss,13,Sociedad,134,Países Bajos,nl,true,0
+8058,De Telegraaf Buitenland,Sección internacional de De Telegraaf.,https://www.telegraaf.nl/buitenland/rss,7,Internacional,134,Países Bajos,nl,true,0
+8061,Het Financieele Dagblad,Principal diario económico y financiero neerlandés.,https://freenewsapi.ai/v1/rss?host=fd.nl&size=50,4,Economía,134,Países Bajos,nl,true,0
+8062,Bright,Revista de tecnología y estilo de vida.,https://www.bright.nl/rss,14,Tecnología,134,Países Bajos,nl,true,0
+8065,The Express Tribune,Diario en inglés asociado a The New York Times. Feed principal.,https://tribune.com.pk/feed/home,7,Internacional,135,Pakistán,en,true,0
+8066,The News International,Diario en inglés de Jang Group. Feed general.,https://www.thenews.com.pk/rss/1/1,13,Sociedad,135,Pakistán,en,true,0
+8067,Geo News,Principal canal de noticias de Pakistán. Feed en inglés.,https://freenewsapi.ai/v1/rss?host=www.geo.tv&size=50,7,Internacional,135,Pakistán,en,true,0
+8068,Internews Pakistan,Medio digital paquistaní en inglés con noticias de actualidad.,http://internews.pk/eng/feed/,7,Internacional,135,Pakistán,en,true,0
+8069,Qaumi Awaz,Diario en urdu con sección dedicada a Pakistán.,https://www.qaumiawaz.com/stories.rss?section=pakistan,13,Sociedad,135,Pakistán,ur,true,0

@@ -3,11 +3,12 @@ import { useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { apiService, api } from '../services/api'
 import { News } from '../services/api'
-import { Search, Globe, X } from 'lucide-react'
+import { Search, Globe, X, Sparkles, Bookmark } from 'lucide-react'
 import { SkeletonNewsList, NoResultsFound, CompactNewsCard, ExpandedNewsModal } from '../components/ui'
 import { NewsCard } from '../components/ui/NewsCard'
 import { CreateListModal } from '../components/CreateListModal'
-import { useApiFavorites, useApiLists } from '../hooks/useApiFavorites'
+import { SaveSearchModal } from '../components/SaveSearchModal'
+import { useApiFavorites, useApiLists, useApiSavedSearches } from '../hooks/useApiFavorites'
 import { useSearchHistory } from '../hooks/useSearchHistory'
 
 export function Home() {
@@ -17,6 +18,7 @@ export function Home() {
   const categoryId = searchParams.get('category_id') || ''
   const countryId = searchParams.get('country_id') || ''
   const translatedOnly = searchParams.get('translated_only') === 'true'
+  const semantic = searchParams.get('semantic') === 'true'
   
   // Local state for search input
   const [localQuery, setLocalQuery] = useState(q)
@@ -34,6 +36,10 @@ export function Home() {
   
   // Expanded modal for hover/touch
   const [expandedNews, setExpandedNews] = useState<News | null>(null)
+
+  // Save search modal state
+  const [showSaveModal, setShowSaveModal] = useState(false)
+  const { createSearch } = useApiSavedSearches()
 
   // Detect if we're in search mode (for grid layout)
   const isSearchMode = !!q || !!categoryId || !!countryId
@@ -80,13 +86,14 @@ export function Home() {
   }
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['news', page, q, categoryId, countryId, translatedOnly],
+    queryKey: ['news', page, q, categoryId, countryId, translatedOnly, semantic],
     queryFn: () => apiService.getNews({ 
       page, 
       q, 
       category_id: categoryId || undefined,
       country_id: countryId || undefined,
       translated_only: translatedOnly ? 'true' : undefined,
+      semantic: semantic ? 'true' : undefined,
     }),
   })
 
@@ -111,6 +118,7 @@ export function Home() {
       category_id: categoryId,
       country_id: countryId,
       translated_only: translatedOnly ? 'true' : '',
+      semantic: semantic ? 'true' : '',
     })
     setShowHistory(false)
   }
@@ -122,6 +130,7 @@ export function Home() {
       category_id: categoryId,
       country_id: countryId,
       translated_only: translatedOnly ? 'true' : '',
+      semantic: semantic ? 'true' : '',
     })
   }
 
@@ -133,6 +142,7 @@ export function Home() {
       category_id: categoryId,
       country_id: countryId,
       translated_only: translatedOnly ? 'true' : '',
+      semantic: semantic ? 'true' : '',
     })
     setShowHistory(false)
   }
@@ -154,6 +164,17 @@ export function Home() {
       delete newParams.translated_only
     } else {
       newParams.translated_only = 'true'
+    }
+    newParams.page = '1'
+    setSearchParams(newParams)
+  }
+
+  const toggleSemantic = () => {
+    const newParams = Object.fromEntries(searchParams)
+    if (semantic) {
+      delete newParams.semantic
+    } else {
+      newParams.semantic = 'true'
     }
     newParams.page = '1'
     setSearchParams(newParams)
@@ -300,6 +321,18 @@ export function Home() {
             <Globe className="h-4 w-4" />
             Solo traducidas
           </button>
+
+          <button
+            onClick={toggleSemantic}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
+              semantic 
+                ? 'bg-purple-600 text-white border-purple-600' 
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            <Sparkles className="h-4 w-4" />
+            Búsqueda semántica
+          </button>
           
           {isSearchMode && (
             <button
@@ -307,6 +340,17 @@ export function Home() {
               className="text-sm text-gray-500 hover:text-gray-700"
             >
               Limpiar filtros
+            </button>
+          )}
+
+          {isSearchMode && (
+            <button
+              onClick={() => setShowSaveModal(true)}
+              className="flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 font-medium"
+              title="Guardar esta búsqueda"
+            >
+              <Bookmark className="h-4 w-4" />
+              Guardar
             </button>
           )}
         </div>
@@ -398,6 +442,22 @@ export function Home() {
         onClose={() => setExpandedNews(null)}
         onToggleFavorite={toggleFavorite}
         onAddToList={handleAddToList}
+      />
+
+      {/* Save Search Modal */}
+      <SaveSearchModal
+        isOpen={showSaveModal}
+        onClose={() => setShowSaveModal(false)}
+        onSave={(label) => {
+          const params: Record<string, any> = {}
+          if (q) params.q = q
+          if (categoryId) params.categoria = categoryId
+          if (countryId) params.pais = countryId
+          if (translatedOnly) params.lang = 'es'
+          createSearch('news', label, params)
+          setShowSaveModal(false)
+        }}
+        typeLabel="búsqueda"
       />
     </div>
   )

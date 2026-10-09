@@ -110,6 +110,12 @@ export function News() {
           {news.summary_translated || news.resumen}
         </p>
 
+        {(news.content_translated || news.contenido) && (
+          <p className="text-gray-700 whitespace-pre-wrap leading-relaxed mt-4">
+            {news.content_translated || news.contenido}
+          </p>
+        )}
+
         <div className="flex flex-wrap gap-4 items-center">
           <a
             href={news.url}

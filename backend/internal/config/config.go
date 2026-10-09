@@ -14,6 +14,7 @@ type Config struct {
 	JWTExpiration      time.Duration
 	TranslationURL     string
 	OllamaURL          string
+	EmbeddingsURL      string
 	SpacyURL           string
 	DefaultLang        string
 	NewsPerPage        int
@@ -42,6 +43,7 @@ func Load() *Config {
 		JWTExpiration:         getEnvDuration("JWT_EXPIRATION", 24*time.Hour),
 		TranslationURL:        getEnv("TRANSLATION_URL", "http://libretranslate:7790"),
 		OllamaURL:             getEnv("OLLAMA_URL", "http://ollama:11434"),
+		EmbeddingsURL:        getEnv("EMBEDDINGS_URL", "http://embeddings:6000"),
 		SpacyURL:             getEnv("SPACY_URL", "http://spacy:8000"),
 		DefaultLang:          getEnv("DEFAULT_LANG", "es"),
 		NewsPerPage:          getEnvInt("NEWS_PER_PAGE", 30),

@@ -70,7 +70,7 @@ export function TagCloud({ tags, onTagClick }: TagCloudProps) {
           `}
           title={`${tag.count} menciones`}
         >
-          {TIPO_LABELS[tag.tipo] || '📰'} {tag.valor}
+          {tag.valor}
         </button>
       ))}
     </div>

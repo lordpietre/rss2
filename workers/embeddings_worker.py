@@ -11,6 +11,8 @@ from psycopg2.extras import execute_values
 import torch
 from sentence_transformers import SentenceTransformer
 
+from flask import Flask, request, jsonify
+
 
 # ================================================================
 # Logging
@@ -241,14 +243,81 @@ def load_model() -> SentenceTransformer:
 
 
 # ================================================================
+# Flask API Server
+# ================================================================
+app = Flask(__name__)
+model = None
+
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({'status': 'ok', 'model': EMB_MODEL})
+
+@app.route('/api/embeddings', methods=['POST'])
+def get_embeddings():
+    """
+    Genera embeddings para una lista de textos.
+    
+    Body JSON:
+    {
+        "texts": ["texto1", "texto2"]  // hasta 100 textos
+    }
+    
+    Returns:
+    {
+        "embeddings": [[0.1, 0.2, ...], [0.3, 0.4, ...]],
+        "model": "sentence-transformers/...",
+        "dimension": 384
+    }
+    """
+    global model
+    
+    data = request.get_json()
+    if not data or 'texts' not in data:
+        return jsonify({'error': 'Missing texts field'}), 400
+    
+    texts = data['texts']
+    if not isinstance(texts, list):
+        return jsonify({'error': 'texts must be a list'}), 400
+    
+    if len(texts) > 100:
+        return jsonify({'error': 'Maximum 100 texts per request'}), 400
+    
+    if not texts:
+        return jsonify({'embeddings': [], 'model': EMB_MODEL, 'dimension': 384})
+    
+    try:
+        # Load model if not loaded
+        if model is None:
+            model = load_model()
+        
+        # Generate embeddings
+        embs = model.encode(
+            texts,
+            batch_size=len(texts),
+            convert_to_numpy=True,
+            show_progress_bar=False,
+            normalize_embeddings=True,
+        )
+        
+        return jsonify({
+            'embeddings': embs.tolist(),
+            'model': EMB_MODEL,
+            'dimension': int(embs.shape[1])
+        })
+    except Exception as e:
+        log.exception(f"Error generating embeddings: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+# ================================================================
 # Main Worker
 # ================================================================
-def main():
+def run_worker():
     log.info(
         f"Iniciando embeddings_worker | model={EMB_MODEL} | batch={EMB_BATCH} | lang={','.join(EMB_LANGS)} | limit={EMB_LIMIT}"
     )
 
-    model = load_model()
+    worker_model = load_model()
 
     while True:
         try:
@@ -263,7 +332,7 @@ def main():
                 texts = texts_from_rows(rows)
 
                 # Encode
-                embs = model.encode(
+                embs = worker_model.encode(
                     texts,
                     batch_size=EMB_BATCH,
                     convert_to_numpy=True,
@@ -279,6 +348,17 @@ def main():
         except Exception as e:
             log.exception(f"Error en embeddings_worker: {e}")
             time.sleep(SLEEP_IDLE)
+
+def main():
+    import threading
+    
+    # Start worker in background thread
+    worker_thread = threading.Thread(target=run_worker, daemon=True)
+    worker_thread.start()
+    
+    # Start Flask server
+    log.info("Iniciando API server en :6000")
+    app.run(host='0.0.0.0', port=6000, debug=False)
 
 
 if __name__ == "__main__":

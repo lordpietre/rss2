@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { News } from '../services/api'
-import { Heart, Trash2, ExternalLink, Calendar, Newspaper, Search, Play, Edit2, Check, X, FolderPlus, Folder, Plus, Minus, Globe, Lightbulb, Sparkles } from 'lucide-react'
+import { Heart, Trash2, ExternalLink, Calendar, Newspaper, Search, Play, Edit2, Check, X, FolderPlus, Folder, Plus, Minus, Globe, Lightbulb, Sparkles, Clock, LayoutGrid } from 'lucide-react'
 import { useNavigate, Link } from 'react-router-dom'
 import { CreateListModal } from '../components/CreateListModal'
 import { NewsCard } from '../components/ui/NewsCard'
@@ -241,6 +241,7 @@ function ListDetailView({
   const [editingKeywords, setEditingKeywords] = useState(false)
   const [editKeywords, setEditKeywords] = useState(keywords)
   const [showRelated, setShowRelated] = useState(false)
+  const [viewMode, setViewMode] = useState<'grid' | 'timeline'>('grid')
 
   const handleSaveKeywords = () => {
     onUpdateKeywords(editKeywords)
@@ -272,6 +273,22 @@ function ListDetailView({
         </div>
         <div className="flex items-center gap-3">
           <span className="text-gray-500">{news.length} noticias</span>
+          <div className="flex items-center border rounded-lg overflow-hidden">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`p-2 ${viewMode === 'grid' ? 'bg-primary-100 text-primary-600' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+              title="Vista de cuadrícula"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('timeline')}
+              className={`p-2 ${viewMode === 'timeline' ? 'bg-primary-100 text-primary-600' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+              title="Vista de timeline"
+            >
+              <Clock className="h-4 w-4" />
+            </button>
+          </div>
           <ListShareButtons listName={listName} news={news} size="md" />
         </div>
       </div>
@@ -363,14 +380,14 @@ function ListDetailView({
         </div>
       )}
 
-      {/* News Grid */}
+      {/* News Grid / Timeline */}
       {news.length === 0 ? (
         <div className="card p-12 text-center">
           <Folder className="h-16 w-16 text-gray-300 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-700 mb-2">Lista vacía</h2>
           <p className="text-gray-500">Añade noticias desde el carrusel de noticias</p>
         </div>
-      ) : (
+      ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {news.map(n => (
             <div key={n.id} className="relative">
@@ -405,6 +422,86 @@ function ListDetailView({
               </button>
             </div>
           ))}
+        </div>
+      ) : (
+        <div>
+          {/* Timeline horizontal line */}
+          <div className="relative mb-6">
+            <div className="absolute top-4 left-0 right-0 h-0.5 bg-primary-200 dark:bg-primary-800" />
+            <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin">
+              {([...news]
+                .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
+                .map((n, idx, arr) => {
+                  const isFirst = idx === 0
+                  const isLast = idx === arr.length - 1
+                  return (
+                    <div key={n.id} className="relative flex flex-col items-center min-w-[200px] max-w-[200px] shrink-0">
+                      {/* Dot on the timeline */}
+                      <div className={`relative z-10 w-4 h-4 rounded-full bg-primary-500 ring-4 ring-primary-100 dark:ring-primary-900 ${isFirst ? 'bg-green-500' : isLast ? 'bg-red-500' : ''}`} />
+                      {/* Date/Time label */}
+                      <div className="mt-2 text-center">
+                        {n.fecha && (
+                          <>
+                            <span className="text-sm font-bold text-primary-600 dark:text-primary-400 tabular-nums block">
+                              {new Date(n.fecha).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            <span className="text-[11px] text-gray-500 tabular-nums">
+                              {new Date(n.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )
+                }))}
+            </div>
+          </div>
+          {/* News cards in horizontal scroll, oldest left */}
+          <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin">
+            {[...news]
+              .sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
+              .map((n) => (
+                <div key={n.id} className="relative flex-shrink-0 w-64">
+                  <Link to={`/news/${n.id}`} className="card hover:shadow-md transition-shadow block">
+                    {n.imagen_url && (
+                      <img src={n.imagen_url} alt={n.titulo} className="w-full h-36 object-cover rounded-t-xl" />
+                    )}
+                    <div className="p-3">
+                      <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
+                        <Newspaper className="h-3 w-3" />
+                        <span className="truncate">{n.fuente_nombre}</span>
+                        {n.title_translated && (
+                          <span className="flex items-center gap-1 bg-primary-100 text-primary-700 px-1.5 py-0.5 rounded text-xs">
+                            <Globe className="h-3 w-3" />ES
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="text-sm font-semibold text-gray-900 line-clamp-2 mb-1">
+                        {n.title_translated || n.titulo}
+                      </h3>
+                      <p className="text-xs text-gray-600 line-clamp-2">
+                        {n.summary_translated || n.resumen}
+                      </p>
+                      {n.fecha && (
+                        <div className="mt-2 text-[10px] text-gray-400 flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {new Date(n.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          {' · '}
+                          {new Date(n.fecha).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      )}
+                    </div>
+                  </Link>
+                  <button
+                    onClick={() => onRemoveNews(n.id)}
+                    className="absolute top-2 right-2 bg-white/90 hover:bg-red-50 text-red-500 p-1.5 rounded-full shadow"
+                    title="Quitar de lista"
+                  >
+                    <Minus className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+          </div>
         </div>
       )}
     </div>
@@ -546,7 +643,6 @@ export function Favorites() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Favoritos</h1>
       </div>
 
       {/* Tabs */}

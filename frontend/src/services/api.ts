@@ -167,7 +167,7 @@ export interface Stats {
 }
 
 export const apiService = {
-  getNews: async (params: { page?: number; per_page?: number; q?: string; category_id?: string; country_id?: string; translated_only?: string }): Promise<NewsListResponse> => {
+  getNews: async (params: { page?: number; per_page?: number; q?: string; category_id?: string; country_id?: string; translated_only?: string; semantic?: string }): Promise<NewsListResponse> => {
     const { data } = await api.get('/news', { params })
     return data
   },

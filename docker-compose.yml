@@ -360,6 +360,7 @@ services:
   # Embeddings locales (sentence-transformers, CPU): traducciones done
   # → traduccion_embeddings. Sustituto del Ollama retirado; alimenta a
   # related (coseno SQL). Modelo pre-descargado en ./hf_cache.
+  # También sirve API HTTP en :6000 para búsqueda semántica bajo demanda.
   embeddings:
     build:
       context: .
@@ -376,6 +377,8 @@ services:
       EMB_LANGS: es
       EMB_LIMIT: 1000
       DEVICE: cpu
+    ports:
+      - "6000:6000"
     volumes:
       - ./hf_cache:/cache
     networks:

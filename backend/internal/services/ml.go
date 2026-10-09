@@ -3,12 +3,14 @@ package services
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/rss2/backend/internal/config"
+	"github.com/rss2/backend/internal/db"
 	"github.com/rss2/backend/internal/models"
 )
 
@@ -65,23 +67,14 @@ func Translate(ctx context.Context, sourceLang, targetLang string, texts []strin
 	return result.Translations, nil
 }
 
-type EmbeddingRequest struct {
-	Model string   `json:"model"`
-	Input []string `json:"input"`
-}
-
-type EmbeddingResponse struct {
-	Embeddings [][]float64 `json:"embeddings"`
-}
-
 func GetEmbeddings(ctx context.Context, texts []string) ([][]float64, error) {
 	if len(texts) == 0 {
 		return nil, nil
 	}
 
-	reqBody := EmbeddingRequest{
-		Model: "mxbai-embed-large",
-		Input: texts,
+	// Use our embeddings service (sentence-transformers)
+	reqBody := map[string]interface{}{
+		"texts": texts,
 	}
 
 	body, err := json.Marshal(reqBody)
@@ -90,7 +83,7 @@ func GetEmbeddings(ctx context.Context, texts []string) ([][]float64, error) {
 	}
 
 	httpClient := &http.Client{Timeout: 60 * time.Second}
-	resp, err := httpClient.Post(cfg.OllamaURL+"/api/embeddings", "application/json", bytes.NewReader(body))
+	resp, err := httpClient.Post(cfg.EmbeddingsURL+"/api/embeddings", "application/json", bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("embeddings request failed: %w", err)
 	}
@@ -100,7 +93,11 @@ func GetEmbeddings(ctx context.Context, texts []string) ([][]float64, error) {
 		return nil, fmt.Errorf("embeddings service returned status %d", resp.StatusCode)
 	}
 
-	var result EmbeddingResponse
+	var result struct {
+		Embeddings [][]float64 `json:"embeddings"`
+		Model      string      `json:"model"`
+		Dimension  int         `json:"dimension"`
+	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
@@ -151,20 +148,124 @@ func ExtractEntities(ctx context.Context, text string) ([]Entity, error) {
 }
 
 func SemanticSearch(ctx context.Context, query, lang string, page, perPage int) (*models.NewsListResponse, error) {
+	// Get embedding for the query from Ollama
 	embeddings, err := GetEmbeddings(ctx, []string{query})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get query embedding: %w", err)
 	}
 
-	if len(embeddings) == 0 {
+	if len(embeddings) == 0 || len(embeddings[0]) == 0 {
 		return &models.NewsListResponse{}, nil
 	}
 
+	queryEmbedding := embeddings[0]
+
+	// Build the SQL query to find similar translations using vector similarity
+	offset := (page - 1) * perPage
+
+	// First get total count
+	var total int
+	countQuery := `
+		SELECT COUNT(DISTINCT te.traduccion_id)
+		FROM traduccion_embeddings te
+		JOIN traducciones t ON te.traduccion_id = t.id
+		WHERE te.embedding_vector IS NOT NULL
+		  AND te.embedding_vector != '0'::vector(384)
+		  AND t.lang_to = $1
+		  AND t.status = 'done'
+	`
+	err = db.GetPool().QueryRow(ctx, countQuery, lang).Scan(&total)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count results: %w", err)
+	}
+
+	if total == 0 {
+		return &models.NewsListResponse{
+			News:       []models.NewsWithTranslations{},
+			Total:      0,
+			Page:       page,
+			PerPage:    perPage,
+			TotalPages: 0,
+		}, nil
+	}
+
+	// Convert query embedding to PostgreSQL array format for vector
+	embeddingStr := "[" + floatArrayToString(queryEmbedding) + "]"
+
+	// Search for similar translations using cosine distance
+	// Note: pgvector <=> operator works with string casting
+	searchQuery := fmt.Sprintf(`
+		SELECT 
+			n.id, COALESCE(n.titulo, ''), COALESCE(n.resumen, ''), COALESCE(n.contenido, ''), 
+			n.url, n.fecha, n.imagen_url, n.fuente_nombre, n.lang,
+			t.titulo_trad, t.resumen_trad, t.contenido_trad,
+			1 - (te.embedding_vector <=> '%s'::vector) AS score
+		FROM traduccion_embeddings te
+		JOIN traducciones t ON te.traduccion_id = t.id
+		JOIN noticias n ON t.noticia_id = n.id
+		WHERE te.embedding_vector IS NOT NULL
+		  AND te.embedding_vector != '0'::vector(384)
+		  AND t.lang_to = $1
+		  AND t.status = 'done'
+		ORDER BY te.embedding_vector <=> '%s'::vector
+		LIMIT $2 OFFSET $3
+	`, embeddingStr, embeddingStr)
+
+	rows, err := db.GetPool().Query(ctx, searchQuery, lang, perPage, offset)
+	if err != nil {
+		return nil, fmt.Errorf("semantic search query failed: %w", err)
+	}
+	defer rows.Close()
+
+	news := []models.NewsWithTranslations{}
+	for rows.Next() {
+		var n models.NewsWithTranslations
+		var id, titulo, resumen, contenido, url string
+		var fecha sql.NullTime
+		var img, fuenteNombre, langRaw sql.NullString
+		var score float64
+
+		if err := rows.Scan(&id, &titulo, &resumen, &contenido, &url, &fecha, &img,
+			&fuenteNombre, &langRaw, &n.TitleTranslated, &n.SummaryTranslated, &n.ContentTranslated, &score); err != nil {
+			continue
+		}
+
+		n.ID = id
+		n.Titulo = titulo
+		n.Resumen = resumen
+		n.Contenido = contenido
+		n.URL = url
+		if fecha.Valid {
+			fechaStr := fecha.Time.Format(time.RFC3339)
+			n.Fecha = &fechaStr
+		}
+		if img.Valid {
+			n.ImagenURL = &img.String
+		}
+		n.FuenteNombre = fuenteNombre.String
+		n.Lang = langRaw.String
+
+		news = append(news, n)
+	}
+
+	totalPages := (total + perPage - 1) / perPage
+
 	return &models.NewsListResponse{
-		News:       []models.NewsWithTranslations{},
-		Total:      0,
+		News:       news,
+		Total:      total,
 		Page:       page,
 		PerPage:    perPage,
-		TotalPages: 0,
+		TotalPages: totalPages,
 	}, nil
+}
+
+func floatArrayToString(arr []float64) string {
+	result := ""
+	for i, v := range arr {
+		if i > 0 {
+			result += ","
+		}
+		result += fmt.Sprintf("%f", v)
+	}
+	return result
 }

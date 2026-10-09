@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir --upgrade pip
-RUN pip install --no-cache-dir psycopg2-binary numpy torch sentence-transformers
+RUN pip install --no-cache-dir psycopg2-binary numpy torch sentence-transformers flask
 
 COPY workers/embeddings_worker.py ./workers/embeddings_worker.py
 COPY workers/__init__.py ./workers/__init__.py
