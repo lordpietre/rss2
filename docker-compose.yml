@@ -203,7 +203,7 @@ services:
       DB_USER: ${POSTGRES_USER:-rss}
       DB_PASS: ${POSTGRES_PASSWORD}
       RSS_MAX_WORKERS: 20
-      RSS_POKE_INTERVAL_MIN: 8
+      RSS_POKE_INTERVAL_MIN: 60
     networks:
       - backend
     depends_on:
