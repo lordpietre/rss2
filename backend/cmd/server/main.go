@@ -349,7 +349,7 @@ func Main() {
 		api.GET("/entities/mentions", handlers.GetEntityMentions)
 		api.GET("/last-names", handlers.GetLastNames)
 
-		api.GET("/alerts", handlers.GetAlertas)
+		api.GET("/alerts", middleware.AuthRequired(), handlers.GetAlertas)
 		api.POST("/alerts/:id/read", middleware.AuthRequired(), handlers.MarkAlertaRead)
 		api.POST("/alerts/:id/dismiss", middleware.AuthRequired(), handlers.MarkAlertaDismiss)
 		api.POST("/alerts/read-all", middleware.AuthRequired(), handlers.MarkAllAlertasRead)

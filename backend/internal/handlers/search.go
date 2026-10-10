@@ -375,13 +375,14 @@ func GetStats(c *gin.Context) {
 		log.Error().Err(err).Msg("GetStats: query top_languages")
 	}
 
-	// Métricas de traducciones por hora para diferentes períodos
-	stats.TranslationStats12h = getHourlyStats(ctx, 12*time.Hour)
-	stats.TranslationStats24h = getHourlyStats(ctx, 24*time.Hour)
-	stats.TranslationStats2d = getHourlyStats(ctx, 48*time.Hour)
-	stats.TranslationStats3d = getHourlyStats(ctx, 72*time.Hour)
-	stats.TranslationStats4d = getHourlyStats(ctx, 96*time.Hour)
-	stats.TranslationStats5d = getHourlyStats(ctx, 120*time.Hour)
+	// Métricas de traducciones por hora para diferentes períodos (1 sola query)
+	stats12h, stats24h, stats2d, stats3d, stats4d, stats5d := getAllHourlyStats(ctx)
+	stats.TranslationStats12h = stats12h
+	stats.TranslationStats24h = stats24h
+	stats.TranslationStats2d = stats2d
+	stats.TranslationStats3d = stats3d
+	stats.TranslationStats4d = stats4d
+	stats.TranslationStats5d = stats5d
 
 	cache.Set(ctx, cacheKey, stats, cache.TTLMedium)
 
@@ -426,6 +427,43 @@ func getHourlyStats(ctx context.Context, duration time.Duration) []models.Hourly
 		stats = []models.HourlyStat{}
 	}
 	return stats
+}
+
+// getAllHourlyStats makes a single query for 120h and filters in memory for all periods
+func getAllHourlyStats(ctx context.Context) ([]models.HourlyStat, []models.HourlyStat, []models.HourlyStat, []models.HourlyStat, []models.HourlyStat, []models.HourlyStat) {
+	// Get 120h of data in one query
+	allStats := getHourlyStats(ctx, 120*time.Hour)
+	if len(allStats) == 0 {
+		empty := []models.HourlyStat{}
+		return empty, empty, empty, empty, empty, empty
+	}
+
+	cutoff12h := time.Now().Add(-12 * time.Hour)
+	cutoff24h := time.Now().Add(-24 * time.Hour)
+	cutoff48h := time.Now().Add(-48 * time.Hour)
+	cutoff72h := time.Now().Add(-72 * time.Hour)
+	cutoff96h := time.Now().Add(-96 * time.Hour)
+
+	filterByCutoff := func(stats []models.HourlyStat, cutoff time.Time) []models.HourlyStat {
+		result := []models.HourlyStat{}
+		for _, s := range stats {
+			hour, _ := time.Parse("2006-01-02 15:00", s.Hour)
+			if hour.After(cutoff) {
+				result = append(result, s)
+			}
+		}
+		if result == nil {
+			return []models.HourlyStat{}
+		}
+		return result
+	}
+
+	return filterByCutoff(allStats, cutoff12h),
+		filterByCutoff(allStats, cutoff24h),
+		filterByCutoff(allStats, cutoff48h),
+		filterByCutoff(allStats, cutoff72h),
+		filterByCutoff(allStats, cutoff96h),
+		allStats
 }
 
 func GetCategories(c *gin.Context) {

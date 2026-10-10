@@ -2,7 +2,7 @@
 set -e
 
 # Directorio de datos de PostgreSQL
-PGDATA_DIR="/var/lib/postgresql/data/18/main"
+PGDATA_DIR="/var/lib/postgresql/data/16/main"
 
 echo "RSS2: Checking database presence..."
 

@@ -191,6 +191,7 @@ export function Populares() {
         new_tipo: newTipo,
       })
       setSuccessMsg(`✅ Tipo cambiado a "${getTipoInfo(newTipo).label}"`)
+      setConfigModal(null) // Cerrar modal
       fetchEntities()
     } catch (err: any) {
       setSuccessMsg(`❌ Error: ${err?.response?.data?.error || 'Error desconocido'}`)

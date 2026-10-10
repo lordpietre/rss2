@@ -38,7 +38,7 @@ func AuthRequired() gin.HandlerFunc {
 			return
 		}
 
-		println("AuthRequired: claims.UserID =", claims.UserID, "email =", claims.Email)
+		// Auth check completed for user
 		c.Set("user", claims)
 		c.Set("user_id", int(claims.UserID))
 		c.Next()

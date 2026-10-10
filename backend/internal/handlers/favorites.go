@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
@@ -193,7 +194,6 @@ func GetLists(c *gin.Context) {
 
 func CreateList(c *gin.Context) {
 	userID := c.GetInt("user_id")
-	println("CreateList: userID =", userID)
 	var body struct {
 		Name     string `json:"name" binding:"required"`
 		Keywords string `json:"keywords"`
@@ -209,8 +209,7 @@ func CreateList(c *gin.Context) {
 		INSERT INTO user_lists (user_id, name, keywords) VALUES ($1, $2, $3) RETURNING id
 	`, userID, body.Name, body.Keywords).Scan(&id)
 	if err != nil {
-		println("CreateList: INSERT error =", err.Error())
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create list"})
 		return
 	}
 
@@ -848,9 +847,6 @@ func GetListRelatedNews(c *gin.Context) {
 	// Build tsquery from keywords
 	tsquery := strings.Join(searchTerms, " | ")
 
-	println("GetListRelatedNews: keywords =", keywords)
-	println("GetListRelatedNews: tsquery =", tsquery)
-
 	// Try full-text search first, fall back to ILIKE if it fails
 	rows, err := db.GetPool().Query(ctx, `
 		SELECT DISTINCT n.id, n.titulo, n.resumen, n.url, n.fecha, n.imagen_url,
@@ -867,12 +863,16 @@ func GetListRelatedNews(c *gin.Context) {
 
 	// If tsquery fails (e.g., due to special characters), try ILIKE fallback
 	if err != nil {
-		println("GetListRelatedNews: tsquery failed, trying ILIKE fallback:", err.Error())
-		// Build ILIKE conditions for each term
+		log.Printf("GetListRelatedNews: tsquery failed, trying ILIKE fallback: %v", err)
+		// Build ILIKE conditions for each term using parameterized queries
 		likeConditions := []string{}
+		args := []any{listID}
+		paramIdx := 2
 		for _, term := range searchTerms {
 			if term != "" {
-				likeConditions = append(likeConditions, fmt.Sprintf("(n.titulo ILIKE '%%%s%%' OR n.resumen ILIKE '%%%s%%')", term, term))
+				likeConditions = append(likeConditions, fmt.Sprintf("(n.titulo ILIKE $%d OR n.resumen ILIKE $%d)", paramIdx, paramIdx+1))
+				args = append(args, "%"+term+"%", "%"+term+"%")
+				paramIdx += 2
 			}
 		}
 		if len(likeConditions) > 0 {
@@ -889,7 +889,7 @@ func GetListRelatedNews(c *gin.Context) {
 				ORDER BY n.fecha DESC NULLS LAST
 				LIMIT 20
 			`, likeQuery)
-			rows, err = db.GetPool().Query(ctx, query, listID)
+			rows, err = db.GetPool().Query(ctx, query, args...)
 		}
 	}
 	if err != nil {

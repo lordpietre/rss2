@@ -13,8 +13,9 @@ export function Search() {
   const [searchParams, setSearchParams] = useSearchParams()
   const q = searchParams.get('q') || ''
   const lang = searchParams.get('lang') || ''
-  const categoria = searchParams.get('categoria') || ''
-  const pais = searchParams.get('pais') || ''
+  const categoria = searchParams.get('categoria_id') || ''
+  const pais = searchParams.get('pais_id') || ''
+  const page = parseInt(searchParams.get('page') || '1')
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [showSaveModal, setShowSaveModal] = useState(false)
   const [showListModal, setShowListModal] = useState(false)
@@ -43,12 +44,15 @@ export function Search() {
   })
 
   const { data, isLoading } = useQuery({
-    queryKey: ['search', q, lang, categoria, pais],
+    queryKey: ['search', q, lang, categoria, pais, page],
     queryFn: () => apiService.search({ 
       q, 
       lang: lang || undefined,
+      categoria_id: categoria || undefined,
+      pais_id: pais || undefined,
+      page,
     }),
-    enabled: !!q || !!lang,
+    enabled: !!q || !!lang || !!categoria || !!pais,
   })
 
   const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
@@ -62,8 +66,9 @@ export function Search() {
       }
     }
     if (formData.get('lang')) newParams.lang = formData.get('lang') as string
-    if (formData.get('categoria')) newParams.categoria = formData.get('categoria') as string
-    if (formData.get('pais')) newParams.pais = formData.get('pais') as string
+    if (formData.get('categoria_id')) newParams.categoria_id = formData.get('categoria_id') as string
+    if (formData.get('pais_id')) newParams.pais_id = formData.get('pais_id') as string
+    newParams.page = '1'
     setSearchParams(newParams)
   }
 
@@ -131,7 +136,7 @@ export function Search() {
 
           <div className="w-40">
             <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
-            <select name="categoria" defaultValue={categoria} className="input w-full">
+            <select name="categoria_id" defaultValue={categoria} className="input w-full">
               <option value="">Todas</option>
               {categorias?.map((cat) => (
                 <option key={cat.id} value={cat.id}>{cat.nombre}</option>
@@ -141,7 +146,7 @@ export function Search() {
 
           <div className="w-40">
             <label className="block text-sm font-medium text-gray-700 mb-1">País</label>
-            <select name="pais" defaultValue={pais} className="input w-full">
+            <select name="pais_id" defaultValue={pais} className="input w-full">
               <option value="">Todos</option>
               {paises?.map((p) => (
                 <option key={p.id} value={p.id}>{p.nombre}</option>
@@ -196,6 +201,29 @@ export function Search() {
         </div>
       ) : (
         <NoSearchResults query={q} onSearch={clearFilters} />
+      )}
+
+      {/* Pagination */}
+      {data && data.total_pages > 1 && (
+        <div className="flex justify-center gap-2 mt-8">
+          <button
+            onClick={() => setSearchParams({ ...Object.fromEntries(searchParams), page: String(page - 1) })}
+            disabled={page <= 1}
+            className="btn-secondary disabled:opacity-50"
+          >
+            Anterior
+          </button>
+          <span className="flex items-center px-4 text-gray-600">
+            {page} / {data.total_pages}
+          </span>
+          <button
+            onClick={() => setSearchParams({ ...Object.fromEntries(searchParams), page: String(page + 1) })}
+            disabled={page >= data.total_pages}
+            className="btn-secondary disabled:opacity-50"
+          >
+            Siguiente
+          </button>
+        </div>
       )}
 
       <SaveSearchModal

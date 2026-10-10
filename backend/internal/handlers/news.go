@@ -1,16 +1,17 @@
 package handlers
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/rss2/backend/internal/cache"
 	"github.com/rss2/backend/internal/config"
 	"github.com/rss2/backend/internal/db"
 	"github.com/rss2/backend/internal/models"
@@ -328,6 +329,7 @@ func GetNews(c *gin.Context) {
 			&n.TitleTranslated, &n.SummaryTranslated, &n.ContentTranslated, &n.LangTranslated,
 		)
 		if err != nil {
+			log.Printf("GetNews: scan error: %v", err)
 			continue
 		}
 		n.ID = id
@@ -463,6 +465,7 @@ func GetEntityNews(c *gin.Context) {
 		var img, fuenteNombre, langRaw *string
 		if err := rows.Scan(&id, &titulo, &resumen, &contenido, &url, &fecha, &img,
 			&fuenteNombre, &langRaw, &n.TitleTranslated, &n.SummaryTranslated, &n.ContentTranslated); err != nil {
+			log.Printf("GetEntityNews: scan error: %v", err)
 			continue
 		}
 		n.ID = id
@@ -627,6 +630,10 @@ func DeleteNews(c *gin.Context) {
 		return
 	}
 
+	// Invalidate related caches
+	cache.InvalidateStats(c.Request.Context())
+	cache.InvalidateSearch(c.Request.Context())
+
 	c.JSON(http.StatusOK, models.SuccessResponse{Message: "News deleted successfully"})
 }
 
@@ -760,6 +767,7 @@ func GetEntities(c *gin.Context) {
 		var apellido *string
 		var lastDate sql.NullTime
 		if err := rows.Scan(&e.Valor, &e.Tipo, &apellido, &e.Count, &e.WikiSummary, &e.WikiURL, &e.ImagePath, &lastDate); err != nil {
+			log.Printf("GetEntities: scan error: %v", err)
 			continue
 		}
 		if apellido != nil {
@@ -806,6 +814,7 @@ func GetLastNames(c *gin.Context) {
 	for rows.Next() {
 		var apellido string
 		if err := rows.Scan(&apellido); err != nil {
+			log.Printf("GetLastNames: scan error: %v", err)
 			continue
 		}
 		lastNames = append(lastNames, apellido)
@@ -843,96 +852,147 @@ func GetEntityMentions(c *gin.Context) {
 	}
 
 	start := time.Now().AddDate(0, 0, -(days - 1)).Truncate(24 * time.Hour)
+	ctx := c.Request.Context()
 
-	series := make([]models.MentionSeries, 0, len(values))
-	for _, valor := range values {
-		s, err := buildMentionSeries(c.Request.Context(), valor, days)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to get mentions", Message: err.Error()})
-			return
-		}
-
-		m := map[string]int{}
-		for _, p := range s.Data {
-			m[p.Fecha] = p.Count
-		}
-		data := make([]models.MentionPoint, 0, days)
-		for i := 0; i < days; i++ {
-			fecha := start.AddDate(0, 0, i).Format("2006-01-02")
-			data = append(data, models.MentionPoint{Fecha: fecha, Count: m[fecha]})
-		}
-		s.Data = data
-		s.Count = 0
-		for _, p := range s.Data {
-			s.Count += p.Count
-		}
-		if s.Tipo == "" {
-			s.Tipo = "desconocido"
-		}
-		series = append(series, *s)
+	// OPTIMIZED: Single query to get all tag IDs for all values using UNNEST
+	// Instead of N queries (one per value), we do 1 query
+	type tagInfo struct {
+		ID   int64
+		Tipo string
 	}
 
-	c.JSON(http.StatusOK, models.MentionsResponse{Days: days, Series: series})
-}
+	// Build array of lowercase values for the query
+	lowerValues := make([]string, len(values))
+	for i, v := range values {
+		lowerValues[i] = strings.ToLower(v)
+	}
 
-func buildMentionSeries(ctx context.Context, valor string, days int) (*models.MentionSeries, error) {
-	s := &models.MentionSeries{Valor: valor}
-
-	var tagIDs []int64
+	// Query all tag IDs for all values at once
 	rows, err := db.GetPool().Query(ctx, `
-		SELECT DISTINCT t.id, t.tipo
+		SELECT DISTINCT t.id, t.tipo, LOWER(t.valor) as valor_lower
 		FROM tags t
 		LEFT JOIN entity_aliases ea ON ea.tipo = t.tipo AND LOWER(ea.alias) = LOWER(t.valor)
-		WHERE LOWER(t.valor) = LOWER($1)
-		   OR LOWER(COALESCE(ea.canonical_name, t.valor)) = LOWER($1)
-	`, valor)
+		WHERE LOWER(t.valor) = ANY($1)
+		   OR LOWER(COALESCE(ea.canonical_name, t.valor)) = ANY($1)
+	`, lowerValues)
 	if err != nil {
-		return nil, err
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to get tag IDs", Message: err.Error()})
+		return
 	}
+	defer rows.Close()
+
+	// Map valor -> tagInfo list
+	valorToTags := make(map[string][]tagInfo)
+	valorToTipo := make(map[string]string)
 	for rows.Next() {
-		var id int64
-		var tipo string
-		if err := rows.Scan(&id, &tipo); err != nil {
+		var ti tagInfo
+		var valorLower string
+		if err := rows.Scan(&ti.ID, &ti.Tipo, &valorLower); err != nil {
+			log.Printf("GetEntityMentions: scan error: %v", err)
 			continue
 		}
-		tagIDs = append(tagIDs, id)
-		if s.Tipo == "" {
-			s.Tipo = tipo
+		valorToTags[valorLower] = append(valorToTags[valorLower], ti)
+		if valorToTipo[valorLower] == "" {
+			valorToTipo[valorLower] = ti.Tipo
 		}
 	}
-	rows.Close()
 
-	if len(tagIDs) == 0 {
-		s.Data = []models.MentionPoint{}
-		return s, nil
+	// Collect all tag IDs for the aggregation query
+	allTagIDs := []int64{}
+	tagIDToValor := make(map[int64]string) // reverse map
+	for _, v := range values {
+		lv := strings.ToLower(v)
+		for _, ti := range valorToTags[lv] {
+			allTagIDs = append(allTagIDs, ti.ID)
+			tagIDToValor[ti.ID] = lv
+		}
 	}
 
+	if len(allTagIDs) == 0 {
+		// No tags found for any of the values
+		series := make([]models.MentionSeries, 0, len(values))
+		for _, valor := range values {
+			data := make([]models.MentionPoint, days)
+			for i := 0; i < days; i++ {
+				data[i] = models.MentionPoint{Fecha: start.AddDate(0, 0, i).Format("2006-01-02"), Count: 0}
+			}
+			series = append(series, models.MentionSeries{
+				Valor: valor,
+				Data:  data,
+				Count: 0,
+				Tipo:  "desconocido",
+			})
+		}
+		c.JSON(http.StatusOK, models.MentionsResponse{Days: days, Series: series})
+		return
+	}
+
+	// OPTIMIZED: Single query to get all mention counts for all tag IDs
 	drows, err := db.GetPool().Query(ctx, `
-		SELECT n.fecha::date::text AS dia, COUNT(DISTINCT n.id) AS cnt
+		SELECT tn.tag_id, n.fecha::date::text AS dia, COUNT(DISTINCT n.id) AS cnt
 		FROM tags_noticia tn
-		JOIN tags t ON tn.tag_id = t.id
 		JOIN traducciones tr ON tn.traduccion_id = tr.id
 		JOIN noticias n ON tr.noticia_id = n.id
-		WHERE t.id = ANY($1) AND n.fecha >= CURRENT_DATE - ($2::int - 1)
-		GROUP BY n.fecha::date
-		ORDER BY n.fecha::date
-	`, tagIDs, days)
+		WHERE tn.tag_id = ANY($1) AND n.fecha >= CURRENT_DATE - ($2::int - 1)
+		GROUP BY tn.tag_id, n.fecha::date
+		ORDER BY tn.tag_id, n.fecha::date
+	`, allTagIDs, days)
 	if err != nil {
-		return nil, err
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to get mention counts", Message: err.Error()})
+		return
 	}
 	defer drows.Close()
 
+	// Build tag_id -> dia -> count
+	tagDayCount := make(map[int64]map[string]int)
 	for drows.Next() {
+		var tagID int64
 		var fecha string
 		var cnt int
-		if err := drows.Scan(&fecha, &cnt); err != nil {
+		if err := drows.Scan(&tagID, &fecha, &cnt); err != nil {
+			log.Printf("GetEntityMentions: scan error: %v", err)
 			continue
 		}
-		s.Data = append(s.Data, models.MentionPoint{Fecha: fecha, Count: cnt})
-	}
-	if s.Data == nil {
-		s.Data = []models.MentionPoint{}
+		if tagDayCount[tagID] == nil {
+			tagDayCount[tagID] = make(map[string]int)
+		}
+		tagDayCount[tagID][fecha] = cnt
 	}
 
-	return s, nil
+	// Build series for each value
+	series := make([]models.MentionSeries, 0, len(values))
+	for _, valor := range values {
+		lv := strings.ToLower(valor)
+		tags := valorToTags[lv]
+
+		// Aggregate counts across all tags for this value
+		dayCount := make(map[string]int)
+		totalCount := 0
+		for _, ti := range tags {
+			for dia, cnt := range tagDayCount[ti.ID] {
+				dayCount[dia] += cnt
+				totalCount += cnt
+			}
+		}
+
+		// Build complete day-by-day data
+		data := make([]models.MentionPoint, 0, days)
+		for i := 0; i < days; i++ {
+			fecha := start.AddDate(0, 0, i).Format("2006-01-02")
+			data = append(data, models.MentionPoint{Fecha: fecha, Count: dayCount[fecha]})
+		}
+
+		tipo := valorToTipo[lv]
+		if tipo == "" {
+			tipo = "desconocido"
+		}
+		series = append(series, models.MentionSeries{
+			Valor: valor,
+			Data:  data,
+			Count: totalCount,
+			Tipo:  tipo,
+		})
+	}
+
+	c.JSON(http.StatusOK, models.MentionsResponse{Days: days, Series: series})
 }

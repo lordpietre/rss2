@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/csv"
 	"fmt"
 	"io"
@@ -1210,9 +1211,14 @@ func DownloadRemoteWorker(c *gin.Context) {
 }
 
 func generateAPIKey() string {
-	b := make([]byte, 16)
-	for i := range b {
-		b[i] = byte(time.Now().UnixNano() % 256)
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		// Fallback to crypto/rand Read error handling
+		crand := make([]byte, 32)
+		for i := range crand {
+			crand[i] = byte(time.Now().UnixNano() % 256)
+		}
+		return fmt.Sprintf("%x", crand)
 	}
 	return fmt.Sprintf("%x", b)
 }

@@ -600,13 +600,9 @@ func esBasuraGiant(l string) bool {
 	case '(': // IIFE: "(function() { …"
 		return codeRe.MatchString(t[:min(len(t), 300)])
 	}
-	// Llamada con punto al inicio ("googletag.display("): código pegado.
+	// Llamada con punto ("googletag.defineSlot('…', …).display();"): aunque
+	// lleve espacios, es código pegado, no prosa.
 	if callRe.MatchString(t) {
-		return true
-	}
-	// Llamada con punto en cualquier parte de la línea (patrones JS comunes
-	// embebidos en chrome de página sin separador: "…Reklamwindow._taboola…" ).
-	if callSpanRe.MatchString(t) {
 		return true
 	}
 	// Texto corrido: más de un 5% de espacios. Se queda aunque lleve código
@@ -651,6 +647,41 @@ func limpiaLlamadas(l string) string {
 	return l
 }
 
+// limpiaUnaLlamada elimina la primera llamada con punto equilibrada cuyo
+// interior parece código (lleva ';' '{' o '='). Si no la hay, devuelve la línea
+// tal cual: un "v2.0 (beta)" de la prosa no se toca.
+func limpiaUnaLlamada(l string) string {
+	loc := callSpanRe.FindStringIndex(l)
+	if loc == nil {
+		return l
+	}
+	// loc[1]-1 es la posición del paréntesis que abre la llamada.
+	depth, end := 0, -1
+	limit := min(len(l), loc[1]-1+500)
+	for i := loc[1] - 1; i < limit; i++ {
+		switch l[i] {
+		case '(', '[', '{':
+			depth++
+		case ')', ']', '}':
+			depth--
+		}
+		if depth == 0 {
+			end = i + 1
+			break
+		}
+	}
+	if end < 0 {
+		return l // no se equilibra en 500 car.: no se arriesga
+	}
+	if !strings.ContainsAny(l[loc[0]:end], ";{=") {
+		return l
+	}
+	if end < len(l) && l[end] == ';' {
+		end++ // el ';' de la sentencia también es código
+	}
+	return strings.TrimRight(l[:loc[0]], " ") + " " + strings.TrimLeft(l[end:], " ")
+}
+
 // limpiaAsignacionesJS recorta asignaciones JavaScript comunes embebidas en prosa
 // sin separador (ej: "…Reklamwindow._taboola = window._taboola || [];").
 // Retorna la línea sin el código JavaScript, o la línea original si no encontró patrón.
@@ -691,41 +722,6 @@ func limpiaAsignacionesJS(l string) string {
 		}
 	}
 	return l
-}
-
-// limpiaUnaLlamada elimina la primera llamada con punto equilibrada cuyo
-// interior parece código (lleva ';' '{' o '='). Si no la hay, devuelve la línea
-// tal cual: un "v2.0 (beta)" de la prosa no se toca.
-func limpiaUnaLlamada(l string) string {
-	loc := callSpanRe.FindStringIndex(l)
-	if loc == nil {
-		return l
-	}
-	// loc[1]-1 es la posición del paréntesis que abre la llamada.
-	depth, end := 0, -1
-	limit := min(len(l), loc[1]-1+500)
-	for i := loc[1] - 1; i < limit; i++ {
-		switch l[i] {
-		case '(', '[', '{':
-			depth++
-		case ')', ']', '}':
-			depth--
-		}
-		if depth == 0 {
-			end = i + 1
-			break
-		}
-	}
-	if end < 0 {
-		return l // no se equilibra en 500 car.: no se arriesga
-	}
-	if !strings.ContainsAny(l[loc[0]:end], ";{=") {
-		return l
-	}
-	if end < len(l) && l[end] == ';' {
-		end++ // el ';' de la sentencia también es código
-	}
-	return strings.TrimRight(l[:loc[0]], " ") + " " + strings.TrimLeft(l[end:], " ")
 }
 
 // isUILine decide si una línea es exclusivamente chrome de página (menú,

@@ -114,27 +114,24 @@ export function Stats() {
         {hourlyStats.length === 0 ? (
           <p className="text-gray-500">No hay datos de traducciones por hora</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-2 px-3 text-sm font-medium text-gray-500">Hora</th>
-                  <th className="text-right py-2 px-3 text-sm font-medium text-gray-500">Batches</th>
-                  <th className="text-right py-2 px-3 text-sm font-medium text-gray-500">Items Traducidos</th>
-                </tr>
-              </thead>
-              <tbody>
-                {hourlyStats.map((hour: { hour: string; total: number; items: number }) => (
-                  <tr key={hour.hour} className="border-b last:border-0">
-                    <td className="py-2 px-3">
-                      <span className="font-medium">{hour.hour}</span>
-                    </td>
-                    <td className="text-right py-2 px-3">{hour.total}</td>
-                    <td className="text-right py-2 px-3 font-medium text-indigo-600">{hour.items.toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-3">
+            {(hourlyStats as { hour: string; total: number; items: number }[]).map((hour) => {
+              const maxItems = Math.max(...(hourlyStats as { hour: string; total: number; items: number }[]).map(h => h.items), 1)
+              const pct = (hour.items / maxItems) * 100
+              return (
+                <div key={hour.hour} className="flex items-center gap-3">
+                  <span className="text-sm font-medium text-gray-600 w-16 shrink-0">{hour.hour}</span>
+                  <div className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full h-5 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full flex items-center justify-end pr-2 transition-all duration-500"
+                      style={{ width: `${Math.max(pct, 2)}%` }}
+                    >
+                      <span className="text-xs font-semibold text-white whitespace-nowrap">{hour.items.toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         )}
       </div>

@@ -223,7 +223,7 @@ export const apiService = {
     return data
   },
 
-  search: async (params: { q: string; page?: number; lang?: string }): Promise<NewsListResponse> => {
+  search: async (params: { q: string; page?: number; lang?: string; categoria_id?: string; pais_id?: string }): Promise<NewsListResponse> => {
     const { data } = await api.get('/search', { params })
     return data
   },

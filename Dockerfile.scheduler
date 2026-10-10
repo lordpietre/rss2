@@ -18,6 +18,6 @@ ENV DB_HOST=db
 ENV DB_PORT=5432
 ENV DB_NAME=rss
 ENV DB_USER=rss
-ENV DB_PASS=x
+ENV DB_PASS=${DB_PASS}
 
 CMD ["python", "workers/translation_scheduler.py"]

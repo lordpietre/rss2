@@ -21,6 +21,6 @@ ENV DB_HOST=db \
     DB_PORT=5432 \
     DB_NAME=rss \
     DB_USER=rss \
-    DB_PASS=x
+    DB_PASS=${DB_PASS}
 
 CMD ["python", "workers/embeddings_worker.py"]

@@ -84,10 +84,11 @@ func GetFeeds(c *gin.Context) {
 		SELECT f.id, f.nombre, f.descripcion, f.url,
 		       f.categoria_id, f.pais_id, f.idioma, f.activo, f.fallos, f.last_error, f.last_fetch,
 		       c.nombre AS categoria, p.nombre AS pais,
-		       (SELECT COUNT(*) FROM noticias n WHERE n.fuente_nombre = f.nombre) as noticias_count
+		       COALESCE(fs.noticias_count, 0) as noticias_count
 		FROM feeds f
 		LEFT JOIN categorias c ON c.id = f.categoria_id
 		LEFT JOIN paises p ON p.id = f.pais_id
+		LEFT JOIN feed_stats fs ON fs.fuente_nombre = f.nombre
 		WHERE %s
 		ORDER BY p.nombre NULLS LAST, f.activo DESC, f.fallos ASC, c.nombre NULLS LAST, f.nombre
 		LIMIT $%d OFFSET $%d

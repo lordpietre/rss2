@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -117,31 +116,100 @@ func downloadImage(imgURL, destPath string) error {
 	return err
 }
 
+// fetchWikipediaInfo tries multiple Wikipedia sources in order of priority.
+// Returns the first successful result, or nil if none found.
+// Languages: es (primary), en (fallback for foreign names)
+// Also tries name variants (stripped accents) to increase match rate.
 func fetchWikipediaInfo(ctx context.Context, valor string) (*WikiSummary, error) {
-	// Normalize the value to be wiki-compatible
-	title := strings.ReplaceAll(strings.TrimSpace(valor), " ", "_")
-	encodedTitle := url.PathEscape(title)
+	clean := strings.TrimSpace(valor)
+	if clean == "" {
+		return nil, nil
+	}
 
-	// Check cache first
-	cacheKey := fmt.Sprintf("wiki:summary:%s", encodedTitle)
-	if cache.Client != nil {
-		if cached, err := cache.Get(ctx, cacheKey); err == nil && cached != "" {
-			var summary WikiSummary
-			if err := json.Unmarshal([]byte(cached), &summary); err == nil {
-				logger.Debug().Str("valor", valor).Msg("Cache hit for Wikipedia")
-				return &summary, nil
+	// Build variants: original, without accents (for English fallback)
+	variants := []string{clean}
+	if stripped := stripAccents(clean); stripped != clean {
+		variants = append(variants, stripped)
+	}
+
+	// Try each variant across both languages
+	for _, variant := range variants {
+		sources := []struct {
+			lang       string
+			title      string
+			apiBase    string
+			searchBase string
+		}{
+			{"es", toWikiTitle(variant), "https://es.wikipedia.org/api/rest_v1/page/summary/", "https://es.wikipedia.org/w/api.php?action=opensearch&format=json&search="},
+			{"en", toWikiTitle(variant), "https://en.wikipedia.org/api/rest_v1/page/summary/", "https://en.wikipedia.org/w/api.php?action=opensearch&format=json&search="},
+		}
+
+		for _, src := range sources {
+			// Check cache
+			cacheKey := fmt.Sprintf("wiki:summary:%s:%s", src.lang, src.title)
+			if cache.Client != nil {
+				if cached, err := cache.Get(ctx, cacheKey); err == nil && cached != "" {
+					var summary WikiSummary
+					if err := json.Unmarshal([]byte(cached), &summary); err == nil {
+						logger.Debug().Str("valor", valor).Str("variant", variant).Str("lang", src.lang).Msg("Cache hit")
+						return &summary, nil
+					}
+				}
+			}
+
+			// Try direct page
+			summary, err := fetchDirectPage(ctx, src.apiBase, src.title)
+			if err == nil && summary != nil {
+				logger.Info().Str("valor", valor).Str("variant", variant).Str("lang", src.lang).Msg("Found via direct page")
+				cacheResult(ctx, cacheKey, summary)
+				return summary, nil
+			}
+
+			// Try search API
+			summary, err = fetchViaSearch(ctx, src.searchBase, src.title)
+			if err == nil && summary != nil {
+				logger.Info().Str("valor", valor).Str("variant", variant).Str("lang", src.lang).Msg("Found via search API")
+				cacheResult(ctx, cacheKey, summary)
+				return summary, nil
 			}
 		}
 	}
 
-	apiURL := fmt.Sprintf("https://es.wikipedia.org/api/rest_v1/page/summary/%s", encodedTitle)
+	return nil, nil
+}
+
+func stripAccents(s string) string {
+	// Remove common diacritics found in European names
+	s = strings.NewReplacer(
+		"é", "e", "è", "e", "ê", "e", "ë", "e",
+		"à", "a", "â", "a", "ä", "a",
+		"ù", "u", "û", "u", "ü", "u",
+		"ì", "i", "î", "i", "ï", "i",
+		"ò", "o", "ô", "o", "ö", "o",
+		"ñ", "n", "ç", "c",
+		"É", "E", "È", "E", "Ê", "E", "Ë", "E",
+		"À", "A", "Â", "A", "Ä", "A",
+		"Ù", "U", "Û", "U", "Ü", "U",
+		"Ì", "I", "Î", "I", "Ï", "I",
+		"Ò", "O", "Ô", "O", "Ö", "O",
+		"Ñ", "N", "Ç", "C",
+	).Replace(s)
+	return s
+}
+
+func toWikiTitle(s string) string {
+	// Replace spaces with underscores, keep accents (Wikipedia handles UTF-8)
+	return strings.ReplaceAll(s, " ", "_")
+}
+
+func fetchDirectPage(ctx context.Context, apiBase, title string) (*WikiSummary, error) {
+	apiURL := apiBase + title
 
 	client := &http.Client{Timeout: 30 * time.Second}
-	req, err := http.NewRequest("GET", apiURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
 	if err != nil {
 		return nil, err
 	}
-	// Per MediaWiki API policy: https://meta.wikimedia.org/wiki/User-Agent_policy
 	req.Header.Set("User-Agent", "RSS2-WikiWorker/1.0 (https://github.com/proyecto/rss2)")
 
 	resp, err := client.Do(req)
@@ -150,11 +218,8 @@ func fetchWikipediaInfo(ctx context.Context, valor string) (*WikiSummary, error)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == 429 {
-		return nil, fmt.Errorf("HTTP 429: Too Many Requests (Rate Limited)")
-	}
-	if resp.StatusCode == 404 {
-		return nil, nil // Not found, but handled successfully without error
+	if resp.StatusCode == 404 || resp.StatusCode == 429 {
+		return nil, nil // Not found or rate limited, try next source
 	}
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
@@ -165,20 +230,71 @@ func fetchWikipediaInfo(ctx context.Context, valor string) (*WikiSummary, error)
 		return nil, err
 	}
 
-	// Filter out disambiguation pages
+	// Reject disambiguation pages to avoid wrong associations
 	if summary.Type == "disambiguation" {
-		return nil, nil // Treat as not found to strictly avoid incorrect tooltips
-	}
-
-	// Store in cache for 48 hours (Wikipedia data is relatively stable)
-	if cache.Client != nil {
-		if data, err := json.Marshal(summary); err == nil {
-			cache.Set(ctx, cacheKey, string(data), 48*time.Hour)
-			logger.Debug().Str("valor", valor).Msg("Cached Wikipedia result")
-		}
+		return nil, nil
 	}
 
 	return &summary, nil
+}
+
+func fetchViaSearch(ctx context.Context, searchBase, title string) (*WikiSummary, error) {
+	// OpenSearch API returns [query, [titles], [descriptions], [urls]]
+	apiURL := searchBase + title + "&limit=1&namespace=0&redirects=resolve"
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "RSS2-WikiWorker/1.0 (https://github.com/proyecto/rss2)")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+
+	var results []json.RawMessage
+	if err := json.NewDecoder(resp.Body).Decode(&results); err != nil {
+		return nil, err
+	}
+
+	// OpenSearch returns: [searchTerm, [titles], [descriptions], [urls]]
+	// We need at least 2 items with a non-empty title in [1]
+	if len(results) < 2 {
+		return nil, nil
+	}
+
+	var titles []string
+	if err := json.Unmarshal(results[1], &titles); err != nil {
+		return nil, nil
+	}
+	if len(titles) == 0 || titles[0] == "" {
+		return nil, nil
+	}
+
+	// Fetch the actual page for the found title
+	searchTitle := strings.ReplaceAll(titles[0], " ", "_")
+	// Extract language from searchBase to build direct URL
+	lang := "es"
+	if strings.Contains(searchBase, "en.wikipedia") {
+		lang = "en"
+	}
+	directBase := fmt.Sprintf("https://%s.wikipedia.org/api/rest_v1/page/summary/", lang)
+	return fetchDirectPage(ctx, directBase, searchTitle)
+}
+
+func cacheResult(ctx context.Context, cacheKey string, summary *WikiSummary) {
+	if cache.Client != nil {
+		if data, err := json.Marshal(summary); err == nil {
+			cache.Set(ctx, cacheKey, string(data), 48*time.Hour)
+		}
+	}
 }
 
 func processTag(ctx context.Context, tag Tag) {

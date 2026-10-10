@@ -27,6 +27,11 @@ services:
     networks:
       - backend
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
@@ -205,6 +210,11 @@ services:
       db:
         condition: service_healthy
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 512M
 
   # Scheduler: noticias -> traducciones pendientes (las consume el translator)
   translation-scheduler:
@@ -235,6 +245,11 @@ services:
       db:
         condition: service_healthy
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 256M
 
   # Langdetect: noticias.lang (lo necesita el scheduler para encolar traducciones)
   langdetect:
@@ -263,6 +278,11 @@ services:
       db:
         condition: service_healthy
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 256M
 
   # NER (spaCy es_core_news_lg sobre traducciones done): tags -> Populares/Evolución/Alertas
   ner:
@@ -291,6 +311,11 @@ services:
       db:
         condition: service_healthy
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
 
   # Wiki: enriquece tags (persona/organizacion) con resumen+imagen de Wikipedia.
   # Reutiliza la imagen backend (el binario /wiki-worker ya se compila en
@@ -325,6 +350,11 @@ services:
       db:
         condition: service_healthy
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
 
   # Topics: clasifica noticias (news_topics) y puebla noticias.pais_id
   # Reutiliza la imagen backend (sin build: evita el conflicto AlreadyExists
@@ -356,6 +386,11 @@ services:
       timeout: 5s
       retries: 3
       start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 512M
 
   # Embeddings locales (sentence-transformers, CPU): traducciones done
   # → traduccion_embeddings. Sustituto del Ollama retirado; alimenta a
@@ -431,6 +466,11 @@ services:
       timeout: 5s
       retries: 3
       start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
 
   # Scraper: completa resumen<200 y explora fuentes_url activas.
   # Sin fuentes_url sembradas solo hace enriquecimiento (también útil).
@@ -462,6 +502,11 @@ services:
       timeout: 5s
       retries: 3
       start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 512M
 
   # Discovery: fuentes_url → feeds (directos si hay categoria+pais,
   # si no a feeds_pending para revisión). Dedupe por ON CONFLICT(url).
@@ -492,6 +537,11 @@ services:
       timeout: 5s
       retries: 3
       start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 512M
 
   # ------------------------------------------------------------------------------
   # BACKEND UNIFICADO (Go) - Un solo binario, múltiples subcomandos
@@ -521,6 +571,12 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     deploy:
       resources:
         limits:
@@ -542,6 +598,12 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   # ------------------------------------------------------------------------------
   # NGINX (Gateway - Puerto 8888)
@@ -557,9 +619,17 @@ services:
       - frontend
       - backend
     depends_on:
-      - frontend
-      - backend
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   # ------------------------------------------------------------------------------
   # MONITOREO (Opcional - activar con profile monitoring)
