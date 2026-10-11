@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import { apiService, Stats } from '../services/api'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { 
   Globe, TrendingUp, Activity, Newspaper, 
   MapPin, Radio, Languages, ArrowUp, ArrowDown, Clock, Hash
 } from 'lucide-react'
 import { useState, useMemo } from 'react'
+import { WorldMap } from '../components/ui/WorldMap'
 
 // Simple SVG-based bar chart component
 function MiniBarChart({ data, color }: { data: Array<{ hour: string; total: number }>; color: string }) {
@@ -83,6 +84,13 @@ export function GlobalMonitor() {
   })
 
   const [timeRange, setTimeRange] = useState<'12h' | '24h' | '2d' | '3d'>('24h')
+  const [selectedCountry, setSelectedCountry] = useState<number | undefined>()
+  const navigate = useNavigate()
+
+  const handleCountryClick = (countryId: number) => {
+    setSelectedCountry(countryId)
+    navigate(`/search?country_id=${countryId}`)
+  }
 
   // Get translation activity data based on time range
   const activityData = useMemo(() => {
@@ -288,42 +296,23 @@ export function GlobalMonitor() {
           )}
         </div>
 
-        {/* Countries */}
+        {/* Countries Map */}
         <div className="panel">
           <h2 className="text-lg font-semibold text-gray-50 flex items-center gap-2 mb-4">
             <MapPin className="h-5 w-5 text-primary-50" />
-            Top Countries
+            Global Coverage
           </h2>
-          <div className="space-y-3">
-            {stats?.top_countries?.slice(0, 10).map((country, idx) => {
-              const width = (country.count / maxCountryCount) * 100
-              return (
-                <Link
-                  key={country.pais_id}
-                  to={`/search?country_id=${country.pais_id}`}
-                  className="flex items-center gap-3 group"
-                >
-                  <span className="w-5 text-center text-lg">{country.flag_emoji}</span>
-                  <span className="w-6 text-xs font-mono text-gray-500">{idx + 1}</span>
-                  <span className="flex-1 text-sm text-gray-300 group-hover:text-primary-50 truncate">
-                    {country.pais_nombre}
-                  </span>
-                  <div className="w-20 h-2 bg-gray-800 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full rounded-full transition-all group-hover:bg-primary-50"
-                      style={{ width: `${width}%`, backgroundColor: '#72FF8A' }}
-                    />
-                  </div>
-                  <span className="w-16 text-right text-xs font-mono text-gray-400">
-                    {country.count.toLocaleString()}
-                  </span>
-                </Link>
-              )
-            })}
+          <div className="h-64">
+            <WorldMap 
+              countries={stats?.top_countries || []}
+              selectedCountry={selectedCountry}
+              onCountryClick={handleCountryClick}
+              maxCount={maxCountryCount}
+            />
           </div>
           <Link 
             to="/feeds"
-            className="block mt-4 text-center text-xs text-primary-300 hover:text-primary-50"
+            className="block mt-3 text-center text-xs text-primary-300 hover:text-primary-50"
           >
             View all countries →
           </Link>
