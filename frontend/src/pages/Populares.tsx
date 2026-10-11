@@ -4,7 +4,7 @@ import { api } from '../services/api'
 import { WikiTooltip } from '../components/ui/WikiTooltip'
 import { SaveSearchModal } from '../components/SaveSearchModal'
 import { useApiSavedSearches } from '../hooks/useApiFavorites'
-import { Bookmark } from 'lucide-react'
+import { Bookmark, Network, ChevronDown, ChevronUp } from 'lucide-react'
 
 interface Entity {
   valor: string
@@ -31,19 +31,17 @@ interface ConfigModal {
 }
 
 const TIPOS = [
-  { value: 'persona', label: '👤 Persona', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
-  { value: 'organizacion', label: '🏢 Organización', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' },
-  { value: 'lugar', label: '📍 Lugar', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' },
-  { value: 'tema', label: '📰 Tema', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' },
+  { value: 'persona', label: '👤 Person', color: 'bg-blue-900/30 text-blue-400 border border-blue-500/30' },
+  { value: 'organizacion', label: '🏢 Organization', color: 'bg-purple-900/30 text-purple-400 border border-purple-500/30' },
+  { value: 'lugar', label: '📍 Place', color: 'bg-green-900/30 text-green-400 border border-green-500/30' },
+  { value: 'tema', label: '📰 Topic', color: 'bg-amber-900/30 text-amber-400 border border-amber-500/30' },
 ]
 
 const TIMELINE_WINDOWS: { key: string; label: string; title: string; days: number }[] = [
-  { key: '1', label: '24h', title: 'últimas 24 horas', days: 1 },
-  { key: '2', label: '2 días', title: 'últimos 2 días', days: 2 },
-  { key: '3', label: '3 días', title: 'últimos 3 días', days: 3 },
-  { key: '4', label: '4 días', title: 'últimos 4 días', days: 4 },
-  { key: '5', label: '5 días', title: 'últimos 5 días', days: 5 },
-  { key: '7', label: '7 días', title: 'últimos 7 días', days: 7 },
+  { key: '1', label: '24h', title: 'last 24 hours', days: 1 },
+  { key: '2', label: '2d', title: 'last 2 days', days: 2 },
+  { key: '3', label: '3d', title: 'last 3 days', days: 3 },
+  { key: '7', label: '7d', title: 'last 7 days', days: 7 },
 ]
 
 function getTipoInfo(tipo: string) {
@@ -69,15 +67,15 @@ export function Populares() {
   const [expandedEntities, setExpandedEntities] = useState<Set<string>>(new Set())
   const [allExpanded, setAllExpanded] = useState(false)
 
-  // News-by-entity modal state
   const [newsModal, setNewsModal] = useState<Entity | null>(null)
   const [newsModalMode, setNewsModalMode] = useState<'news' | 'timeline'>('news')
-  const [timelineLabel, setTimelineLabel] = useState('últimas 24 horas')
+  const [timelineLabel, setTimelineLabel] = useState('last 24 hours')
   const [entityNews, setEntityNews] = useState<any[]>([])
   const [newsLoading, setNewsLoading] = useState(false)
   const [newsTotal, setNewsTotal] = useState(0)
+  const [newsError, setNewsError] = useState<string | null>(null)
+  const newsAbortRef = useRef<AbortController | null>(null)
 
-  // Form state for configure modal
   const [newTipo, setNewTipo] = useState('')
   const [aliasInput, setAliasInput] = useState('')
   const [canonicalInput, setCanonicalInput] = useState('')
@@ -139,44 +137,88 @@ export function Populares() {
   }
 
   const openNews = async (entity: Entity) => {
+    // Cancel any pending request
+    if (newsAbortRef.current) {
+      newsAbortRef.current.abort()
+    }
+    newsAbortRef.current = new AbortController()
+    
     setNewsModalMode('news')
     setNewsModal(entity)
     setNewsLoading(true)
     setEntityNews([])
     setNewsTotal(0)
+    setNewsError(null)
+    
+    const timeout = setTimeout(() => {
+      if (newsAbortRef.current) {
+        newsAbortRef.current.abort()
+        setNewsError('Request timed out. This entity may have too much data.')
+        setNewsLoading(false)
+      }
+    }, 20000)
+    
     try {
       const params = new URLSearchParams()
       params.append('valor', entity.valor)
       params.append('tipo', entity.tipo)
       params.append('per_page', '30')
-      const res = await api.get(`/entities/news?${params}`)
+      const res = await api.get(`/entities/news?${params}`, { signal: newsAbortRef.current.signal })
+      clearTimeout(timeout)
       setEntityNews(res.data.news || [])
       setNewsTotal(res.data.total || 0)
-    } catch (err) {
+    } catch (err: any) {
+      clearTimeout(timeout)
+      if (err.name === 'AbortError' || err.name === 'CanceledError') {
+        return
+      }
       console.error(err)
+      setNewsError('Failed to load news. Please try again.')
     } finally {
       setNewsLoading(false)
     }
   }
 
   const openTimeline = async (entity: Entity, win: typeof TIMELINE_WINDOWS[number]) => {
+    // Cancel any pending request
+    if (newsAbortRef.current) {
+      newsAbortRef.current.abort()
+    }
+    newsAbortRef.current = new AbortController()
+    
     setTimelineLabel(win.title)
     setNewsModalMode('timeline')
     setNewsModal(entity)
     setNewsLoading(true)
     setEntityNews([])
     setNewsTotal(0)
+    setNewsError(null)
+    
+    const timeout = setTimeout(() => {
+      if (newsAbortRef.current) {
+        newsAbortRef.current.abort()
+        setNewsError('Request timed out. This entity may have too much data.')
+        setNewsLoading(false)
+      }
+    }, 20000)
+    
     try {
       const params = new URLSearchParams()
       params.append('valor', entity.valor)
       params.append('tipo', entity.tipo)
       params.append('days', String(win.days))
       params.append('per_page', '50')
-      const res = await api.get(`/entities/news?${params}`)
+      const res = await api.get(`/entities/news?${params}`, { signal: newsAbortRef.current.signal })
+      clearTimeout(timeout)
       setEntityNews(res.data.news || [])
       setNewsTotal(res.data.total || 0)
-    } catch (err) {
+    } catch (err: any) {
+      clearTimeout(timeout)
+      if (err.name === 'AbortError' || err.name === 'CanceledError') {
+        return
+      }
       console.error(err)
+      setNewsError('Failed to load news. Please try again.')
     } finally {
       setNewsLoading(false)
     }
@@ -190,11 +232,11 @@ export function Populares() {
         valor: configModal.entity.valor,
         new_tipo: newTipo,
       })
-      setSuccessMsg(`✅ Tipo cambiado a "${getTipoInfo(newTipo).label}"`)
-      setConfigModal(null) // Cerrar modal
+      setSuccessMsg(`✅ Type changed to "${getTipoInfo(newTipo).label}"`)
+      setConfigModal(null)
       fetchEntities()
     } catch (err: any) {
-      setSuccessMsg(`❌ Error: ${err?.response?.data?.error || 'Error desconocido'}`)
+      setSuccessMsg(`❌ Error: ${err?.response?.data?.error || 'Unknown error'}`)
     } finally {
       setSaving(false)
     }
@@ -203,29 +245,22 @@ export function Populares() {
   const handleSaveAlias = async () => {
     if (!canonicalInput.trim() || !aliasInput.trim()) return
     setSaving(true)
-    
-    // Split input by newlines or commas, trim spaces, and remove empty entries
-    const aliasesList = aliasInput
-      .split(/[\n,]+/)
-      .map(a => a.trim())
-      .filter(a => a.length > 0)
-
+    const aliasesList = aliasInput.split(/[\n,]+/).map(a => a.trim()).filter(a => a.length > 0)
     if (aliasesList.length === 0) {
       setSaving(false)
       return
     }
-
     try {
       await api.post('/admin/aliases', {
         aliases: aliasesList,
         canonical_name: canonicalInput.trim(),
         tipo: configModal?.entity.tipo || newTipo,
       })
-      setSuccessMsg(`✅ ${aliasesList.length} alias creados y fusionados en "${canonicalInput}"`)
+      setSuccessMsg(`✅ ${aliasesList.length} aliases created and merged into "${canonicalInput}"`)
       setAliasInput('')
-      fetchEntities() // Refresh popular entity metrics
+      fetchEntities()
     } catch (err: any) {
-      setSuccessMsg(`❌ Error: ${err?.response?.data?.error || 'Ya existe este alias'}`)
+      setSuccessMsg(`❌ Error: ${err?.response?.data?.error || 'Alias already exists'}`)
     } finally {
       setSaving(false)
     }
@@ -250,12 +285,10 @@ export function Populares() {
     const formData = new FormData()
     formData.append('file', file)
     try {
-      const res = await api.post('/admin/aliases/import', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      })
-      alert(`✅ Importados: ${res.data.inserted}, Omitidos: ${res.data.skipped}`)
+      const res = await api.post('/admin/aliases/import', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+      alert(`✅ Imported: ${res.data.inserted}, Skipped: ${res.data.skipped}`)
       e.target.value = ''
-    } catch { alert('❌ Error al importar CSV') }
+    } catch { alert('❌ Error importing CSV') }
   }
 
   const handleBackupDB = async () => {
@@ -270,97 +303,64 @@ export function Populares() {
       link.click()
       link.remove()
     } catch (err: any) {
-      alert('❌ Error al generar backup. Verifica que pg_dump esté disponible.')
+      alert('❌ Error generating backup. Check that pg_dump is available.')
     }
   }
 
   const selectedCountry = countries.find(c => c.id.toString() === countryId)
 
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
         <div>
+          <h1 className="text-2xl font-bold text-gray-50">Entity Network</h1>
+          <p className="text-sm text-gray-400 mt-1">Explore entities, people, places and organizations</p>
+        </div>
+      </div>
+
+      {/* Header Actions */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <div className="flex gap-2">
           <button
             onClick={() => setAllExpanded(p => !p)}
-            className="px-3 py-1.5 text-sm border rounded hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600 transition-colors"
-            title="Expandir/collapse todo"
+            className="px-3 py-1.5 text-sm border border-gray-700 rounded hover:bg-gray-800 transition-colors"
           >
-            {allExpanded ? '← Contraer todas' : '→ Expandir todas'}
-          </button>
-          <button
-            onClick={() => setExpandedEntities(new Set<string>())}
-            className="px-3 py-1.5 text-sm border rounded hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600 transition-colors"
-            title="Contraer todas"
-          >
-            ← Contraer
-          </button>
-          <button
-            onClick={() => setExpandedEntities(prev => new Set(prev).add('all'))}
-            className="px-3 py-1.5 text-sm border rounded hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600 transition-colors"
-            title="Expandir todas"
-          >
-            Expandir →
+            {allExpanded ? <><ChevronUp className="w-4 h-4 inline" /> Collapse all</> : <><ChevronDown className="w-4 h-4 inline" /> Expand all</>}
           </button>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button
-            onClick={handleExportAliases}
-            className="px-3 py-1.5 text-sm border rounded hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600"
-          >
-            📤 Exportar aliases
+          <button onClick={handleExportAliases} className="px-3 py-1.5 text-sm border border-gray-700 rounded hover:bg-gray-800">
+            📤 Export aliases
           </button>
-          <label className="px-3 py-1.5 text-sm border rounded hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600 cursor-pointer">
-            📥 Importar aliases
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv"
-              onChange={handleImportAliases}
-              className="hidden"
-            />
+          <label className="px-3 py-1.5 text-sm border border-gray-700 rounded hover:bg-gray-800 cursor-pointer">
+            📥 Import aliases
+            <input ref={fileInputRef} type="file" accept=".csv" onChange={handleImportAliases} className="hidden" />
           </label>
-          <button
-            onClick={handleBackupDB}
-            className="px-3 py-1.5 text-sm bg-amber-500 hover:bg-amber-600 text-white rounded font-medium"
-          >
-            💾 Backup BBDD
+          <button onClick={handleBackupDB} className="px-3 py-1.5 text-sm bg-amber-600 hover:bg-amber-500 text-white rounded font-medium">
+            💾 Backup DB
           </button>
           {hasEntityFilters && (
-            <button
-              onClick={() => setShowSaveModal(true)}
-              className="px-3 py-1.5 text-sm border rounded hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600 transition-colors"
-              title="Guardar esta búsqueda"
-            >
-              <Bookmark className="h-4 w-4 inline mr-1" />
-              Guardar
+            <button onClick={() => setShowSaveModal(true)} className="px-3 py-1.5 text-sm border border-gray-700 rounded hover:bg-gray-800">
+              <Bookmark className="h-4 w-4 inline mr-1" /> Save
             </button>
           )}
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="panel">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Tipo</label>
-            <select
-              value={tipo}
-              onChange={(e) => setTipo(e.target.value)}
-              className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
-            >
+            <label className="block text-xs font-mono uppercase text-gray-400 mb-2">Type</label>
+            <select value={tipo} onChange={(e) => setTipo(e.target.value)} className="input">
               {TIPOS.map(t => (
                 <option key={t.value} value={t.value}>{t.label}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">País</label>
-            <select
-              value={countryId}
-              onChange={(e) => setCountryId(e.target.value)}
-              className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
-            >
+            <label className="block text-xs font-mono uppercase text-gray-400 mb-2">Country</label>
+            <select value={countryId} onChange={(e) => setCountryId(e.target.value)} className="input">
               <option value="">🌍 Global</option>
               {countries.map(c => (
                 <option key={c.id} value={c.id}>{c.nombre}</option>
@@ -368,44 +368,36 @@ export function Populares() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Categoría</label>
-            <select
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
-            >
-              <option value="">Todas las categorías</option>
+            <label className="block text-xs font-mono uppercase text-gray-400 mb-2">Category</label>
+            <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="input">
+              <option value="">All categories</option>
               {categories.map(c => (
                 <option key={c.id} value={c.id}>{c.nombre}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Ordenar por</label>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
-            >
-              <option value="count">Más menciones</option>
-              <option value="name">Nombre A-Z</option>
-              <option value="recent">Más recientes</option>
+            <label className="block text-xs font-mono uppercase text-gray-400 mb-2">Sort by</label>
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="input">
+              <option value="count">Most mentions</option>
+              <option value="name">Name A-Z</option>
+              <option value="recent">Most recent</option>
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Buscar</label>
+            <label className="block text-xs font-mono uppercase text-gray-400 mb-2">Search</label>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && setActiveSearch(searchQuery)}
-                placeholder="Término o alias..."
-                className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+                placeholder="Term or alias..."
+                className="input flex-1"
               />
               <button
                 onClick={() => setActiveSearch(searchQuery)}
-                className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                className="btn-secondary px-3"
               >
                 🔍
               </button>
@@ -414,117 +406,74 @@ export function Populares() {
         </div>
       </div>
 
-      {/* Listado de entidades */}
+      {/* Entity List */}
       {loading ? (
-        <div className="text-center py-12 text-gray-400">Cargando...</div>
+        <div className="panel p-16 flex justify-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-50" />
+        </div>
       ) : entities.length === 0 ? (
-        <div className="text-center py-12 text-gray-400">No se encontraron entidades</div>
+        <div className="panel p-16 text-center text-gray-400">
+          <Network className="w-12 h-12 mx-auto mb-4 text-gray-600" />
+          No entities found
+        </div>
       ) : (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-          <div className="p-4 bg-gray-50 dark:bg-gray-700 border-b dark:border-gray-700">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
-              <span className="text-sm font-medium text-gray-500">{entities.length} entidades</span>
-              <div className="flex gap-1">
-                <button
-                  onClick={() => setExpandedEntities(new Set<string>())}
-                  className="px-2 py-1 text-[10px] text-gray-500 hover:text-blue-600 dark:hover:text-blue-300 rounded"
-                  title="Contraer todas"
-                >
-                  ←
-                </button>
-                <button
-                  onClick={() => setExpandedEntities(prev => new Set(prev).add('all'))}
-                  className="px-2 py-1 text-[10px] text-gray-500 hover:text-blue-600 dark:hover:text-blue-300 rounded"
-                  title="Expandir todas"
-                >
-                  Expandir →
-                </button>
-              </div>
+        <div className="panel overflow-hidden">
+          <div className="p-4 border-b border-gray-700">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-400 font-mono">{entities.length} entities</span>
             </div>
           </div>
           <div className="p-4 space-y-2">
-            {entities.map((entity, idx) => {
+            {entities.map((entity) => {
               const isExpanded = allExpanded || expandedEntities.has(entity.valor)
               const tipoInfo = getTipoInfo(entity.tipo)
               return (
-                <div
-                  key={entity.valor}
-                  className={`rounded-lg ${isExpanded ? 'bg-gray-50 dark:bg-gray-700/50' : ''} transition-colors duration-300 ease-in-out`}
-                >
-                  <div className="flex items-center justify-between px-2 py-2 border-b dark:border-gray-700 last:border-0">
-                    <div className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors min-w-0" onClick={() => setExpandedEntities(prev => {
-                        const next = new Set(prev)
-                        if (next.has(entity.valor)) {
-                          next.delete(entity.valor)
-                        } else {
-                          next.add(entity.valor)
-                        }
-                        return next
-                      })}>
+                <div key={entity.valor} className={`rounded-lg ${isExpanded ? 'bg-gray-800/50' : ''} transition-colors`}>
+                  <div 
+                    className="flex items-center justify-between px-2 py-2 cursor-pointer hover:bg-gray-800 transition-colors"
+                    onClick={() => setExpandedEntities(prev => {
+                      const next = new Set(prev)
+                      if (next.has(entity.valor)) next.delete(entity.valor)
+                      else next.add(entity.valor)
+                      return next
+                    })}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
                       {entity.image_path && (
-                        <img
-                          src={entity.image_path}
-                          alt={entity.valor}
-                          className="w-10 h-10 object-cover rounded-lg shrink-0 bg-gray-100 dark:bg-gray-700"
-                          onError={(e) => (e.currentTarget.style.display = 'none')}
-                        />
+                        <img src={entity.image_path} alt={entity.valor} className="w-16 h-16 object-cover rounded-xl shrink-0 bg-gray-800 border border-gray-700" onError={(e) => e.currentTarget.style.display = 'none'} />
                       )}
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <WikiTooltip
-                            name={entity.valor}
-                            summary={entity.wiki_summary}
-                            imagePath={entity.image_path}
-                            wikiUrl={entity.wiki_url}
-                          >
-                            <span className="font-medium text-blue-600 dark:text-blue-300 hover:underline transition-colors">
-                              {entity.valor}
-                            </span>
+                          <WikiTooltip name={entity.valor} summary={entity.wiki_summary} imagePath={entity.image_path} wikiUrl={entity.wiki_url}>
+                            <span className="font-semibold text-lg text-primary-50 hover:text-primary-300 transition-colors">{entity.valor}</span>
                           </WikiTooltip>
-                          <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">
-                            #{entity.count} menciones
-                          </span>
+                          <span className="text-sm text-gray-500 shrink-0 font-mono">#{entity.count}</span>
                         </div>
                         {entity.wiki_summary && (
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">
-                            {entity.wiki_summary}
-                          </p>
+                          <p className="text-sm text-gray-400 mt-1 line-clamp-2 leading-relaxed">{entity.wiki_summary}</p>
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${tipoInfo.color}`}>
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center px-3 py-1 rounded-lg text-sm font-semibold ${tipoInfo.color}`}>
                         {tipoInfo.label}
                       </span>
-                      <span>{entity.count}</span>
+                      <span className="text-gray-500">{entity.count}</span>
                     </div>
                   </div>
                   {isExpanded && (
                     <div className="p-3 pt-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <button
-                          onClick={() => openNews(entity)}
-                          className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                          title="Ver noticias donde se menciona"
-                        >
-                          🔍 Ver noticias
+                      <div className="flex items-center gap-2 mb-2">
+                        <button onClick={() => openNews(entity)} className="px-2 py-1 text-xs rounded border border-gray-700 hover:bg-gray-800 transition-colors">
+                          🔍 View news
                         </button>
-                        <button
-                          onClick={() => openConfig(entity)}
-                          className="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                          title="Configurar entidad"
-                        >
-                          ⚙️ Configurar
+                        <button onClick={() => openConfig(entity)} className="px-2 py-1 text-xs rounded border border-gray-700 hover:bg-gray-800 transition-colors">
+                          ⚙️ Configure
                         </button>
                       </div>
-                      <div className="flex flex-wrap items-center justify-center gap-1">
+                      <div className="flex flex-wrap gap-1">
                         {TIMELINE_WINDOWS.map((win) => (
-                          <button
-                            key={win.key}
-                            onClick={() => openTimeline(entity, win)}
-                            className="inline-flex items-center px-1.5 py-0.5 text-[10px] rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-                            title={win.title}
-                          >
+                          <button key={win.key} onClick={() => openTimeline(entity, win)} className="inline-flex items-center px-2 py-0.5 text-xs rounded bg-primary-900/30 text-primary-50 hover:bg-primary-900/50 border border-primary-500/30 transition-colors" title={win.title}>
                             {win.label}
                           </button>
                         ))}
@@ -538,27 +487,15 @@ export function Populares() {
         </div>
       )}
 
-      {/* Pagination Controls */}
+      {/* Pagination */}
       {!loading && entities.length > 0 && totalPages > 1 && (
-        <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-          <div>
-            Página <span className="font-semibold text-gray-900 dark:text-white">{page}</span> de <span className="font-semibold text-gray-900 dark:text-white">{totalPages}</span>
+        <div className="flex items-center justify-between gap-4 bg-gray-900 p-4 rounded-lg border border-gray-700">
+          <div className="text-gray-400 text-sm">
+            Page <span className="font-semibold text-gray-50">{page}</span> of <span className="font-semibold text-gray-50">{totalPages}</span>
           </div>
           <div className="flex gap-2">
-            <button
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page <= 1}
-              className="px-4 py-2 border rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-600 dark:hover:bg-gray-700 transition-colors"
-            >
-              Anterior
-            </button>
-            <button
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages}
-              className="px-4 py-2 border rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-600 dark:hover:bg-gray-700 transition-colors"
-            >
-              Siguiente
-            </button>
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1} className="btn-secondary disabled:opacity-50">Previous</button>
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="btn-secondary disabled:opacity-50">Next</button>
           </div>
         </div>
       )}
@@ -566,123 +503,61 @@ export function Populares() {
       {/* Configure Modal */}
       {configModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={closeConfig}>
-          <div
-            className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md"
-            onClick={e => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b dark:border-gray-700">
+          <div className="bg-gray-900 rounded-xl shadow-2xl w-full max-w-md border border-gray-700" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-4 px-6 py-4 border-b border-gray-700">
+              {configModal.entity.image_path && (
+                <img src={configModal.entity.image_path} alt={configModal.entity.valor} className="w-20 h-20 object-cover rounded-xl border-2 border-gray-600" />
+              )}
               <div>
-                <h2 className="text-lg font-bold">Configurar entidad</h2>
-                <p className="text-sm text-gray-500 mt-0.5">"{configModal.entity.valor}"</p>
+                <h2 className="text-xl font-bold text-gray-50">{configModal.entity.valor}</h2>
+                <p className="text-sm text-gray-400 mt-1">Configure entity</p>
               </div>
-              <button
-                onClick={closeConfig}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl leading-none"
-              >
-                ✕
+              <button onClick={closeConfig} className="text-gray-400 hover:text-gray-200 text-xl leading-none">✕</button>
+            </div>
+            <div className="flex border-b border-gray-700">
+              <button onClick={() => { setActiveTab('tipo'); setSuccessMsg('') }} className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'tipo' ? 'border-b-2 border-primary-50 text-primary-50' : 'text-gray-400 hover:text-gray-200'}`}>
+                🔄 Change type
+              </button>
+              <button onClick={() => { setActiveTab('alias'); setSuccessMsg('') }} className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'alias' ? 'border-b-2 border-primary-50 text-primary-50' : 'text-gray-400 hover:text-gray-200'}`}>
+                🔁 Create alias
               </button>
             </div>
-
-            {/* Tabs */}
-            <div className="flex border-b dark:border-gray-700">
-              <button
-                onClick={() => { setActiveTab('tipo'); setSuccessMsg('') }}
-                className={`flex-1 py-3 text-sm font-medium transition-colors ${
-                  activeTab === 'tipo'
-                    ? 'border-b-2 border-blue-500 text-blue-600'
-                    : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-                }`}
-              >
-                🔄 Cambiar tipo
-              </button>
-              <button
-                onClick={() => { setActiveTab('alias'); setSuccessMsg('') }}
-                className={`flex-1 py-3 text-sm font-medium transition-colors ${
-                  activeTab === 'alias'
-                    ? 'border-b-2 border-blue-500 text-blue-600'
-                    : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-                }`}
-              >
-                🔁 Crear alias
-              </button>
-            </div>
-
-            {/* Tab Content */}
             <div className="p-6">
               {activeTab === 'tipo' && (
                 <div>
-                  <p className="text-sm text-gray-500 mb-4">
-                    Mover "<strong>{configModal.entity.valor}</strong>" a otra categoría. Afecta a todos los tags con este valor en la base de datos.
+                  <p className="text-sm text-gray-400 mb-4">
+                    Move "<strong>{configModal.entity.valor}</strong>" to another category. Affects all tags with this value in the database.
                   </p>
                   <div className="grid grid-cols-2 gap-2 mb-4">
                     {TIPOS.map(t => (
-                      <button
-                        key={t.value}
-                        onClick={() => setNewTipo(t.value)}
-                        className={`px-3 py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${
-                          newTipo === t.value
-                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                            : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
-                        }`}
-                      >
+                      <button key={t.value} onClick={() => setNewTipo(t.value)} className={`px-4 py-3 rounded-xl border-2 text-base font-semibold transition-all ${newTipo === t.value ? 'border-primary-50 bg-primary-900/30 text-primary-50' : 'border-gray-700 hover:border-gray-600'}`}>
                         {t.label}
-                        {t.value === configModal.entity.tipo && (
-                          <span className="ml-1 text-xs text-gray-400">(actual)</span>
-                        )}
+                        {t.value === configModal.entity.tipo && <span className="ml-1 text-xs text-gray-500">(current)</span>}
                       </button>
                     ))}
                   </div>
-                  {successMsg && (
-                    <p className="text-sm mb-3 py-2 px-3 rounded bg-gray-50 dark:bg-gray-700">{successMsg}</p>
-                  )}
-                  <button
-                    onClick={handleSaveTipo}
-                    disabled={saving || newTipo === configModal.entity.tipo}
-                    className="w-full py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium text-sm transition-colors"
-                  >
-                    {saving ? 'Guardando...' : 'Cambiar tipo'}
+                  {successMsg && <p className="text-sm mb-3 py-2 px-3 rounded bg-gray-800">{successMsg}</p>}
+                  <button onClick={handleSaveTipo} disabled={saving || newTipo === configModal.entity.tipo} className="w-full py-2 bg-primary-600 hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium text-sm transition-colors">
+                    {saving ? 'Saving...' : 'Change type'}
                   </button>
                 </div>
               )}
-
               {activeTab === 'alias' && (
                 <div>
-                  <p className="text-sm text-gray-500 mb-4">
-                    Crea un alias para normalizar variantes del mismo nombre. El alias se mapeará al nombre canónico que definas.
+                  <p className="text-sm text-gray-400 mb-4">
+                    Create an alias to normalize name variants. The alias will map to the canonical name you define.
                   </p>
                   <div className="mb-3">
-                    <label className="block text-sm font-medium mb-1">
-                      Aliases <span className="text-gray-400 font-normal">(separados por comas o saltos de línea)</span>
-                    </label>
-                    <textarea
-                      value={aliasInput}
-                      onChange={e => setAliasInput(e.target.value)}
-                      className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 text-sm min-h-[80px] resize-y"
-                      placeholder="ej: donald trump, el presidente, dictador&#10;trump"
-                    />
+                    <label className="block text-sm font-medium mb-1">Aliases <span className="text-gray-500 font-normal">(separated by commas or newlines)</span></label>
+                    <textarea value={aliasInput} onChange={e => setAliasInput(e.target.value)} className="input min-h-[80px] resize-y" placeholder="e.g.: donald trump, the president&#10;trump" />
                   </div>
                   <div className="mb-4">
-                    <label className="block text-sm font-medium mb-1">
-                      Nombre canónico <span className="text-gray-400 font-normal">(nombre correcto y normalizado)</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={canonicalInput}
-                      onChange={e => setCanonicalInput(e.target.value)}
-                      className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 text-sm"
-                      placeholder="ej: Donald Trump"
-                    />
+                    <label className="block text-sm font-medium mb-1">Canonical name <span className="text-gray-500 font-normal">(correct normalized name)</span></label>
+                    <input type="text" value={canonicalInput} onChange={e => setCanonicalInput(e.target.value)} className="input" placeholder="e.g.: Donald Trump" />
                   </div>
-                  {successMsg && (
-                    <p className="text-sm mb-3 py-2 px-3 rounded bg-gray-50 dark:bg-gray-700">{successMsg}</p>
-                  )}
-                  <button
-                    onClick={handleSaveAlias}
-                    disabled={saving || !aliasInput.trim() || !canonicalInput.trim()}
-                    className="w-full py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium text-sm transition-colors"
-                  >
-                    {saving ? 'Creando...' : 'Crear alias'}
+                  {successMsg && <p className="text-sm mb-3 py-2 px-3 rounded bg-gray-800">{successMsg}</p>}
+                  <button onClick={handleSaveAlias} disabled={saving || !aliasInput.trim() || !canonicalInput.trim()} className="w-full py-2 bg-green-600 hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium text-sm transition-colors">
+                    {saving ? 'Creating...' : 'Create alias'}
                   </button>
                 </div>
               )}
@@ -691,81 +566,64 @@ export function Populares() {
         </div>
       )}
 
-      {/* News-by-entity Modal */}
+      {/* News Modal */}
       {newsModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setNewsModal(null)}>
-          <div
-            className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-6 py-4 border-b dark:border-gray-700">
+          <div className="bg-gray-900 rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col border border-gray-700" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
               <div>
-                <h2 className="text-lg font-bold">
-                  {newsModalMode === 'timeline'
-                    ? <>📈 Timeline de &quot;{newsModal.valor}&quot;</>
-                    : <>Noticias sobre &quot;{newsModal.valor}&quot;</>}
+                <h2 className="text-lg font-bold text-gray-50">
+                  {newsModalMode === 'timeline' ? <>📈 Timeline of &quot;{newsModal.valor}&quot;</> : <>News about &quot;{newsModal.valor}&quot;</>}
                 </h2>
-                <p className="text-sm text-gray-500 mt-0.5">
-                  {newsModalMode === 'timeline'
-                    ? `Últimas ${Math.min(entityNews.length, 50)} noticias · ${timelineLabel} (${getTipoInfo(newsModal.tipo).label})`
-                    : `${newsTotal} noticias encontradas (${getTipoInfo(newsModal.tipo).label})`}
+                <p className="text-sm text-gray-400 mt-0.5">
+                  {newsModalMode === 'timeline' ? `Latest ${Math.min(entityNews.length, 50)} news · ${timelineLabel} (${getTipoInfo(newsModal.tipo).label})` : `${newsTotal} news found (${getTipoInfo(newsModal.tipo).label})`}
                 </p>
               </div>
-              <button
-                onClick={() => setNewsModal(null)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl leading-none"
-              >
-                ✕
-              </button>
+              <button onClick={() => setNewsModal(null)} className="text-gray-400 hover:text-gray-200 text-xl leading-none">✕</button>
             </div>
-
             <div className="p-4 overflow-y-auto">
-              {newsLoading ? (
-                <div className="text-center py-10 text-gray-400">Cargando...</div>
+              {newsError ? (
+                <div className="text-center py-10">
+                  <p className="text-rss-red mb-3">{newsError}</p>
+                  <button 
+                    onClick={() => newsModal && openNews(newsModal)} 
+                    className="btn-secondary text-sm"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : newsLoading ? (
+                <div className="text-center py-10 flex flex-col items-center">
+                  <div className="w-8 h-8 border-2 border-gray-700 border-t-primary-50 rounded-full animate-spin mb-3" />
+                  <span className="text-gray-400">Loading news...</span>
+                </div>
               ) : entityNews.length === 0 ? (
                 <div className="text-center py-10 text-gray-400">
-                  {newsModalMode === 'timeline'
-                    ? `No hay noticias de esta entidad para ${timelineLabel}.`
-                    : 'No hay noticias que mencionen a esta entidad.'}
+                  {newsModalMode === 'timeline' ? `No news for this entity in ${timelineLabel}.` : 'No news mentions this entity.'}
                 </div>
               ) : newsModalMode === 'timeline' ? (
-                <ol className="relative border-l-2 border-blue-200 dark:border-blue-800 ml-2 space-y-4">
+                <ol className="relative border-l-2 border-primary-500/30 ml-2 space-y-4">
                   {entityNews.map((n) => (
                     <li key={n.id} className="ml-4 relative">
-                      <span className="absolute -left-[21px] top-2 h-3 w-3 rounded-full bg-blue-500 ring-2 ring-blue-100 dark:ring-blue-900" />
+                      <span className="absolute -left-[21px] top-2 h-3 w-3 rounded-full bg-primary-500 ring-2 ring-primary-900" />
                       <div className="flex items-baseline gap-2">
                         {n.fecha && (
-                          <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 shrink-0 tabular-nums">
+                          <span className="text-[11px] font-semibold text-primary-400 shrink-0 tabular-nums">
                             {new Date(n.fecha).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         )}
                         {n.fecha && (
-                          <span className="text-[10px] text-gray-400 shrink-0 tabular-nums">
+                          <span className="text-[10px] text-gray-500 shrink-0 tabular-nums">
                             {new Date(n.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' })}
                           </span>
                         )}
                       </div>
-                      <Link
-                        to={`/news/${n.id}`}
-                        onClick={() => setNewsModal(null)}
-                        className="block p-3 mt-1 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border border-gray-100 dark:border-gray-700"
-                      >
+                      <Link to={`/news/${n.id}`} onClick={() => setNewsModal(null)} className="block p-3 mt-1 rounded-lg hover:bg-gray-800 transition-colors border border-gray-700">
                         <div className="flex items-start gap-3">
-                          {n.imagen_url && (
-                            <img
-                              src={n.imagen_url}
-                              alt=""
-                              className="w-20 h-14 object-cover rounded-md shrink-0"
-                              onError={(e) => (e.currentTarget.style.display = 'none')}
-                            />
-                          )}
+                          {n.imagen_url && <img src={n.imagen_url} alt="" className="w-20 h-14 object-cover rounded-md shrink-0" onError={(e) => e.currentTarget.style.display = 'none'} />}
                           <div className="min-w-0">
-                            <div className="font-medium text-sm line-clamp-2">
-                              {n.title_translated || n.titulo}
-                            </div>
-                            <p className="text-xs text-gray-500 mt-1 line-clamp-2">
-                              {n.summary_translated || n.resumen}
-                            </p>
+                            <div className="font-medium text-sm text-gray-50 line-clamp-2">{n.title_translated || n.titulo}</div>
+                            <p className="text-xs text-gray-400 mt-1 line-clamp-2">{n.summary_translated || n.resumen}</p>
                           </div>
                         </div>
                       </Link>
@@ -776,32 +634,13 @@ export function Populares() {
                 <ul className="space-y-2">
                   {entityNews.map((n) => (
                     <li key={n.id}>
-                      <Link
-                        to={`/news/${n.id}`}
-                        onClick={() => setNewsModal(null)}
-                        className="block p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border border-gray-100 dark:border-gray-700"
-                      >
+                      <Link to={`/news/${n.id}`} onClick={() => setNewsModal(null)} className="block p-3 rounded-lg hover:bg-gray-800 transition-colors border border-gray-700">
                         <div className="flex items-start gap-3">
-                          {n.imagen_url && (
-                            <img
-                              src={n.imagen_url}
-                              alt=""
-                              className="w-20 h-14 object-cover rounded-md shrink-0"
-                              onError={(e) => (e.currentTarget.style.display = 'none')}
-                            />
-                          )}
+                          {n.imagen_url && <img src={n.imagen_url} alt="" className="w-20 h-14 object-cover rounded-md shrink-0" onError={(e) => e.currentTarget.style.display = 'none'} />}
                           <div className="min-w-0">
-                            <div className="font-medium text-sm line-clamp-2">
-                              {n.title_translated || n.titulo}
-                            </div>
-                            <p className="text-xs text-gray-500 mt-1 line-clamp-2">
-                              {n.summary_translated || n.resumen}
-                            </p>
-                            {n.fecha && (
-                              <span className="text-[11px] text-gray-400 mt-1 block">
-                                {new Date(n.fecha).toLocaleDateString('es-ES')}
-                              </span>
-                            )}
+                            <div className="font-medium text-sm text-gray-50 line-clamp-2">{n.title_translated || n.titulo}</div>
+                            <p className="text-xs text-gray-400 mt-1 line-clamp-2">{n.summary_translated || n.resumen}</p>
+                            {n.fecha && <span className="text-[11px] text-gray-500 mt-1 block font-mono">{new Date(n.fecha).toLocaleDateString('es-ES')}</span>}
                           </div>
                         </div>
                       </Link>
@@ -824,7 +663,7 @@ export function Populares() {
           if (activeSearch) params.q = activeSearch
           createSearch('entity', label, params)
         }}
-        typeLabel={`búsqueda de ${getTipoInfo(tipo).label}`}
+        typeLabel={`search of ${getTipoInfo(tipo).label}`}
       />
     </div>
   )

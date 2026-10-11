@@ -77,20 +77,20 @@ function SavedSearchCard({ search, onRemove, onUpdateLabel, onUse }: {
                   onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(); if (e.key === 'Escape') setEditing(false) }}
                   className="input py-1 px-2 text-sm flex-1" autoFocus />
                 <button onClick={handleSaveEdit} className="p-1 text-green-600"><Check className="h-4 w-4" /></button>
-                <button onClick={() => setEditing(false)} className="p-1 text-gray-500"><X className="h-4 w-4" /></button>
+                <button onClick={() => setEditing(false)} className="p-1 text-gray-400"><X className="h-4 w-4" /></button>
               </div>
             ) : (
               <>
-                <span className="font-semibold text-gray-900">{search.label}</span>
-                <button onClick={() => setEditing(true)} className="p-1 text-gray-400 hover:text-gray-600" title="Editar">
+                <span className="font-semibold text-gray-50">{search.label}</span>
+                <button onClick={() => setEditing(true)} className="p-1 text-gray-400 hover:text-gray-300" title="Editar">
                   <Edit2 className="h-3 w-3" />
                 </button>
               </>
             )}
           </div>
-          {paramsDisplay && <p className="text-xs text-gray-500 mb-2">{paramsDisplay}</p>}
+          {paramsDisplay && <p className="text-xs text-gray-400 mb-2">{paramsDisplay}</p>}
           <div className="flex items-center gap-3 mt-2 text-xs text-gray-400">
-            <button onClick={handleExecute} className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-700 font-medium">
+            <button onClick={handleExecute} className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-400 font-medium">
               <Play className="h-3 w-3" /> Ejecutar
             </button>
             <span>{search.use_count} usos</span>
@@ -113,7 +113,7 @@ function FavoriteCard({ news, onRemove, onAddToList }: {
   onAddToList: (news: News) => void
 }) {
   return (
-    <div className="card p-6 hover:shadow-md transition-shadow">
+    <div className="card p-5 hover:border-rss-green-dim transition-shadow">
       <div className="flex gap-4">
         {news.imagen_url && (
           <img src={news.imagen_url} alt={news.titulo} className="w-32 h-24 object-cover rounded-lg flex-shrink-0" />
@@ -121,10 +121,10 @@ function FavoriteCard({ news, onRemove, onAddToList }: {
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">
+              <h3 className="text-lg font-semibold text-gray-50 line-clamp-2">
                 {news.title_translated || news.titulo}
               </h3>
-              <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+              <p className="text-sm text-gray-300 mt-1 line-clamp-2">
                 {news.summary_translated || news.resumen}
               </p>
             </div>
@@ -137,7 +137,7 @@ function FavoriteCard({ news, onRemove, onAddToList }: {
               </button>
             </div>
           </div>
-          <div className="flex items-center gap-4 mt-3 text-sm text-gray-500">
+          <div className="flex items-center gap-4 mt-3 text-sm text-gray-400">
             <span className="flex items-center gap-1"><Newspaper className="h-4 w-4" />{news.fuente_nombre}</span>
             <span className="flex items-center gap-1"><Calendar className="h-4 w-4" />{formatDate(news.fecha)}</span>
           </div>
@@ -174,12 +174,12 @@ function ListCard({ list, onOpen, onDelete }: {
                 }}
                 className="input py-1 px-2 text-sm flex-1" autoFocus />
               <button onClick={() => { onOpen(list.id, editName, list.keywords); setEditing(false) }} className="p-1 text-green-600"><Check className="h-4 w-4" /></button>
-              <button onClick={() => setEditing(false)} className="p-1 text-gray-500"><X className="h-4 w-4" /></button>
+              <button onClick={() => setEditing(false)} className="p-1 text-gray-400"><X className="h-4 w-4" /></button>
             </div>
           ) : (
             <button onClick={() => onOpen(list.id, list.name, list.keywords)} className="flex-1 text-left">
-              <span className="font-semibold text-gray-900 hover:text-primary-600">{list.name}</span>
-              <span className="text-sm text-gray-500 ml-2">{list.item_count} noticias</span>
+              <span className="font-semibold text-gray-50 hover:text-primary-300">{list.name}</span>
+              <span className="text-sm text-gray-400 ml-2">{list.item_count} noticias</span>
               {list.keywords && (
                 <span className="ml-2 text-xs text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full">
                   ✨
@@ -189,7 +189,7 @@ function ListCard({ list, onOpen, onDelete }: {
           )}
         </div>
         <div className="flex items-center gap-1">
-          <button onClick={() => setEditing(true)} className="p-1 text-gray-400 hover:text-gray-600" title="Renombrar">
+          <button onClick={() => setEditing(true)} className="p-1 text-gray-400 hover:text-gray-300" title="Renombrar">
             <Edit2 className="h-4 w-4" />
           </button>
           <button onClick={() => onDelete(list.id)} className="p-1 text-red-500 hover:text-red-600" title="Eliminar lista">
@@ -198,7 +198,7 @@ function ListCard({ list, onOpen, onDelete }: {
         </div>
       </div>
       {list.keywords && !editing && (
-        <p className="text-xs text-gray-500 mt-2 truncate">{list.keywords}</p>
+        <p className="text-xs text-gray-400 mt-2 truncate">{list.keywords}</p>
       )}
     </div>
   )
@@ -260,30 +260,30 @@ function ListDetailView({
                 onKeyDown={e => { if (e.key === 'Enter') { onRename(editName); setEditing(false) }; if (e.key === 'Escape') setEditing(false) }}
                 className="input py-1 px-2 text-lg font-bold" autoFocus />
               <button onClick={() => { onRename(editName); setEditing(false) }} className="p-1 text-green-600"><Check className="h-5 w-5" /></button>
-              <button onClick={() => setEditing(false)} className="p-1 text-gray-500"><X className="h-5 w-5" /></button>
+              <button onClick={() => setEditing(false)} className="p-1 text-gray-400"><X className="h-5 w-5" /></button>
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold text-gray-900">{listName}</h1>
-              <button onClick={() => setEditing(true)} className="p-1 text-gray-400 hover:text-gray-600">
+              <h1 className="text-2xl font-bold text-gray-50">{listName}</h1>
+              <button onClick={() => setEditing(true)} className="p-1 text-gray-400 hover:text-gray-300">
                 <Edit2 className="h-4 w-4" />
               </button>
             </div>
           )}
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-gray-500">{news.length} noticias</span>
+          <span className="text-gray-400">{news.length} noticias</span>
           <div className="flex items-center border rounded-lg overflow-hidden">
             <button
               onClick={() => setViewMode('grid')}
-              className={`p-2 ${viewMode === 'grid' ? 'bg-primary-100 text-primary-600' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+              className={`p-2 ${viewMode === 'grid' ? 'bg-primary-100 text-primary-600' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
               title="Vista de cuadrícula"
             >
               <LayoutGrid className="h-4 w-4" />
             </button>
             <button
               onClick={() => setViewMode('timeline')}
-              className={`p-2 ${viewMode === 'timeline' ? 'bg-primary-100 text-primary-600' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+              className={`p-2 ${viewMode === 'timeline' ? 'bg-primary-100 text-primary-600' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
               title="Vista de timeline"
             >
               <Clock className="h-4 w-4" />
@@ -297,7 +297,7 @@ function ListDetailView({
       <div className="card p-4 mb-6 bg-gradient-to-r from-primary-50 to-blue-50">
         <div className="flex items-center gap-2 mb-3">
           <Sparkles className="h-5 w-5 text-primary-600" />
-          <span className="font-semibold text-gray-900">Palabras clave</span>
+          <span className="font-semibold text-gray-50">Palabras clave</span>
           {editingKeywords ? (
             <div className="flex items-center gap-2 ml-auto">
               <input
@@ -310,28 +310,28 @@ function ListDetailView({
                 autoFocus
               />
               <button onClick={handleSaveKeywords} className="p-1 text-green-600"><Check className="h-4 w-4" /></button>
-              <button onClick={() => setEditingKeywords(false)} className="p-1 text-gray-500"><X className="h-4 w-4" /></button>
+              <button onClick={() => setEditingKeywords(false)} className="p-1 text-gray-400"><X className="h-4 w-4" /></button>
             </div>
           ) : (
             <>
-              <button onClick={() => { setEditKeywords(keywords); setEditingKeywords(true) }} className="ml-auto p-1 text-gray-400 hover:text-gray-600">
+              <button onClick={() => { setEditKeywords(keywords); setEditingKeywords(true) }} className="ml-auto p-1 text-gray-400 hover:text-gray-300">
                 <Edit2 className="h-4 w-4" />
               </button>
             </>
           )}
         </div>
         {keywords ? (
-          <p className="text-sm text-gray-600">{keywords}</p>
+          <p className="text-sm text-gray-300">{keywords}</p>
         ) : (
           <p className="text-sm text-gray-400 italic">No hay palabras clave configuradas</p>
         )}
-        <p className="text-xs text-gray-500 mt-1">El sistema busca noticias relacionadas automáticamente</p>
+        <p className="text-xs text-gray-400 mt-1">El sistema busca noticias relacionadas automáticamente</p>
       </div>
 
       {/* Tags Cloud Section */}
       {tags.length > 0 && (
         <div className="card p-4 mb-6">
-          <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+          <h3 className="font-semibold text-gray-50 mb-3 flex items-center gap-2">
             <span>🏷️</span> Etiquetas de la lista
           </h3>
           <TagCloud tags={tags} />
@@ -346,7 +346,7 @@ function ListDetailView({
             className="flex items-center gap-2 w-full text-left"
           >
             <Lightbulb className="h-5 w-5 text-primary-600" />
-            <span className="font-semibold text-gray-900">
+            <span className="font-semibold text-gray-50">
               Noticias relacionadas encontradas ({relatedNews.length})
             </span>
             <span className="ml-auto text-gray-400">{showRelated ? '▲' : '▼'}</span>
@@ -355,19 +355,19 @@ function ListDetailView({
           {showRelated && (
             <div className="mt-4 space-y-3">
               {relatedNews.map(n => (
-                <div key={n.id} className="flex gap-3 p-2 bg-white rounded-lg hover:bg-gray-50">
+                <div key={n.id} className="flex gap-3 p-2 bg-gray-900 rounded-lg hover:bg-gray-800">
                   {n.imagen_url && (
                     <img src={n.imagen_url} alt={n.titulo} className="w-16 h-16 object-cover rounded flex-shrink-0" />
                   )}
                   <div className="flex-1 min-w-0">
-                    <Link to={`/news/${n.id}`} className="text-sm font-medium text-gray-900 hover:text-primary-600 line-clamp-2">
+                    <Link to={`/news/${n.id}`} className="text-sm font-medium text-gray-50 hover:text-primary-300 line-clamp-2">
                       {n.title_translated || n.titulo}
                     </Link>
-                    <p className="text-xs text-gray-500 mt-0.5">{n.fuente_nombre}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{n.fuente_nombre}</p>
                     {onAddRelatedNews && (
                       <button
                         onClick={() => onAddRelatedNews(n)}
-                        className="mt-1 text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1"
+                        className="mt-1 text-xs text-primary-600 hover:text-primary-400 flex items-center gap-1"
                       >
                         <Plus className="h-3 w-3" /> Añadir a lista
                       </button>
@@ -384,8 +384,8 @@ function ListDetailView({
       {news.length === 0 ? (
         <div className="card p-12 text-center">
           <Folder className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-700 mb-2">Lista vacía</h2>
-          <p className="text-gray-500">Añade noticias desde el carrusel de noticias</p>
+          <h2 className="text-xl font-semibold text-gray-200 mb-2">Lista vacía</h2>
+          <p className="text-gray-400">Añade noticias desde el carrusel de noticias</p>
         </div>
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -396,7 +396,7 @@ function ListDetailView({
                   <img src={n.imagen_url} alt={n.titulo} className="w-full h-36 object-cover rounded-t-xl" />
                 )}
                 <div className="p-3">
-                  <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
+                  <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
                     <Newspaper className="h-3 w-3" />
                     <span className="truncate">{n.fuente_nombre}</span>
                     {n.title_translated && (
@@ -405,17 +405,17 @@ function ListDetailView({
                       </span>
                     )}
                   </div>
-                  <h3 className="text-sm font-semibold text-gray-900 line-clamp-2 mb-1">
+                  <h3 className="text-sm font-semibold text-gray-50 line-clamp-2 mb-1">
                     {n.title_translated || n.titulo}
                   </h3>
-                  <p className="text-xs text-gray-600 line-clamp-2">
+                  <p className="text-xs text-gray-300 line-clamp-2">
                     {n.summary_translated || n.resumen}
                   </p>
                 </div>
               </Link>
               <button
                 onClick={() => onRemoveNews(n.id)}
-                className="absolute top-2 right-2 bg-white/90 hover:bg-red-50 text-red-500 p-1.5 rounded-full shadow"
+                className="absolute top-2 right-2 bg-gray-900/90 hover:bg-red-50 text-red-500 p-1.5 rounded-full shadow"
                 title="Quitar de lista"
               >
                 <Minus className="h-4 w-4" />
@@ -445,7 +445,7 @@ function ListDetailView({
                             <span className="text-sm font-bold text-primary-600 dark:text-primary-400 tabular-nums block">
                               {new Date(n.fecha).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
                             </span>
-                            <span className="text-[11px] text-gray-500 tabular-nums">
+                            <span className="text-[11px] text-gray-400 tabular-nums">
                               {new Date(n.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
                             </span>
                           </>
@@ -467,7 +467,7 @@ function ListDetailView({
                       <img src={n.imagen_url} alt={n.titulo} className="w-full h-36 object-cover rounded-t-xl" />
                     )}
                     <div className="p-3">
-                      <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
+                      <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
                         <Newspaper className="h-3 w-3" />
                         <span className="truncate">{n.fuente_nombre}</span>
                         {n.title_translated && (
@@ -476,10 +476,10 @@ function ListDetailView({
                           </span>
                         )}
                       </div>
-                      <h3 className="text-sm font-semibold text-gray-900 line-clamp-2 mb-1">
+                      <h3 className="text-sm font-semibold text-gray-50 line-clamp-2 mb-1">
                         {n.title_translated || n.titulo}
                       </h3>
-                      <p className="text-xs text-gray-600 line-clamp-2">
+                      <p className="text-xs text-gray-300 line-clamp-2">
                         {n.summary_translated || n.resumen}
                       </p>
                       {n.fecha && (
@@ -494,7 +494,7 @@ function ListDetailView({
                   </Link>
                   <button
                     onClick={() => onRemoveNews(n.id)}
-                    className="absolute top-2 right-2 bg-white/90 hover:bg-red-50 text-red-500 p-1.5 rounded-full shadow"
+                    className="absolute top-2 right-2 bg-gray-900/90 hover:bg-red-50 text-red-500 p-1.5 rounded-full shadow"
                     title="Quitar de lista"
                   >
                     <Minus className="h-4 w-4" />
@@ -646,29 +646,29 @@ export function Favorites() {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-200 mb-6">
+      <div className="flex border-b border-gray-700 mb-6">
         <button onClick={() => setTab('news')}
-          className={`px-4 py-2 font-medium border-b-2 transition-colors ${tab === 'news' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+          className={`px-4 py-2 font-medium border-b-2 transition-colors ${tab === 'news' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-400 hover:text-gray-200'}`}>
           <span className="flex items-center gap-2">
             <Heart className="h-4 w-4" />
             Noticias guardadas
-            <span className="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-full">{favorites.length}</span>
+            <span className="text-xs bg-gray-800 dark:bg-gray-700 px-2 py-0.5 rounded-full">{favorites.length}</span>
           </span>
         </button>
         <button onClick={() => setTab('lists')}
-          className={`px-4 py-2 font-medium border-b-2 transition-colors ${tab === 'lists' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+          className={`px-4 py-2 font-medium border-b-2 transition-colors ${tab === 'lists' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-400 hover:text-gray-200'}`}>
           <span className="flex items-center gap-2">
             <Folder className="h-4 w-4" />
             Listas
-            <span className="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-full">{lists.length}</span>
+            <span className="text-xs bg-gray-800 dark:bg-gray-700 px-2 py-0.5 rounded-full">{lists.length}</span>
           </span>
         </button>
         <button onClick={() => setTab('searches')}
-          className={`px-4 py-2 font-medium border-b-2 transition-colors ${tab === 'searches' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+          className={`px-4 py-2 font-medium border-b-2 transition-colors ${tab === 'searches' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-400 hover:text-gray-200'}`}>
           <span className="flex items-center gap-2">
             <Search className="h-4 w-4" />
             Búsquedas guardadas
-            <span className="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-full">{searches.length}</span>
+            <span className="text-xs bg-gray-800 dark:bg-gray-700 px-2 py-0.5 rounded-full">{searches.length}</span>
           </span>
         </button>
       </div>
@@ -678,8 +678,8 @@ export function Favorites() {
         favorites.length === 0 ? (
           <div className="card p-12 text-center">
             <Heart className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-700 mb-2">No hay noticias guardadas</h2>
-            <p className="text-gray-500">Guarda noticias en favoritos haciendo clic en el corazón de cualquier noticia.</p>
+            <h2 className="text-xl font-semibold text-gray-200 mb-2">No hay noticias guardadas</h2>
+            <p className="text-gray-400">Guarda noticias en favoritos haciendo clic en el corazón de cualquier noticia.</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -712,8 +712,8 @@ export function Favorites() {
           {lists.length === 0 ? (
             <div className="card p-12 text-center">
               <Folder className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h2 className="text-xl font-semibold text-gray-700 mb-2">No hay listas creadas</h2>
-              <p className="text-gray-500">Crea listas para agrupar noticias por tema.</p>
+              <h2 className="text-xl font-semibold text-gray-200 mb-2">No hay listas creadas</h2>
+              <p className="text-gray-400">Crea listas para agrupar noticias por tema.</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -743,8 +743,8 @@ export function Favorites() {
           {searches.length === 0 ? (
             <div className="card p-12 text-center">
               <Search className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h2 className="text-xl font-semibold text-gray-700 mb-2">No hay búsquedas guardadas</h2>
-              <p className="text-gray-500">Guarda tus búsquedas haciendo clic en el botón "💾" en Search o Populares.</p>
+              <h2 className="text-xl font-semibold text-gray-200 mb-2">No hay búsquedas guardadas</h2>
+              <p className="text-gray-400">Guarda tus búsquedas haciendo clic en el botón "💾" en Search o Populares.</p>
             </div>
           ) : (
             <div className="space-y-4">

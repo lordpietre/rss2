@@ -53,25 +53,28 @@ export function Account() {
   }
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Account</h1>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-50">Account</h1>
+        <p className="text-sm text-gray-400 mt-1">Manage your profile and preferences</p>
+      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-2">
-          <form onSubmit={handleUpdate} className="card p-6">
+          <form onSubmit={handleUpdate} className="panel">
             <div className="flex items-center gap-3 mb-6">
-              <div className="h-16 w-16 rounded-full bg-primary-100 flex items-center justify-center">
-                <User className="h-8 w-8 text-primary-600" />
+              <div className="h-16 w-16 rounded-full bg-gray-800 flex items-center justify-center">
+                <User className="h-8 w-8 text-primary-50" />
               </div>
               <div>
-                <h2 className="text-xl font-semibold">{user.username}</h2>
-                <p className="text-gray-500 text-sm">{user.email}</p>
+                <h2 className="text-xl font-semibold text-gray-50">{user.username}</h2>
+                <p className="text-gray-400 text-sm">{user.email}</p>
               </div>
             </div>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-xs font-mono uppercase text-gray-400 mb-2">
                   Username
                 </label>
                 <input
@@ -83,7 +86,7 @@ export function Account() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-xs font-mono uppercase text-gray-400 mb-2">
                   Email
                 </label>
                 <input
@@ -95,7 +98,7 @@ export function Account() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-xs font-mono uppercase text-gray-400 mb-2">
                   New Password (leave blank to keep current)
                 </label>
                 <input
@@ -108,7 +111,7 @@ export function Account() {
               </div>
 
               {message && (
-                <div className="p-3 bg-green-50 text-green-700 rounded-lg">
+                <div className="p-3 bg-primary-900/30 text-primary-50 rounded-lg border border-primary-500/30">
                   {message}
                 </div>
               )}
@@ -122,20 +125,20 @@ export function Account() {
         </div>
 
         <div>
-          <div className="card p-6">
-            <h3 className="font-semibold mb-4">Account Info</h3>
+          <div className="panel">
+            <h3 className="font-semibold text-gray-50 mb-4">Account Info</h3>
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-500">User ID:</span>
-                <span className="font-medium">{user.id}</span>
+                <span className="text-gray-400">User ID:</span>
+                <span className="font-mono text-gray-300">{user.id}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Role:</span>
-                <span className="font-medium">{user.is_admin ? 'Admin' : 'User'}</span>
+                <span className="text-gray-400">Role:</span>
+                <span className="text-primary-50">{user.is_admin ? 'Admin' : 'User'}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Member since:</span>
-                <span className="font-medium">
+                <span className="text-gray-400">Member since:</span>
+                <span className="text-gray-300">
                   {new Date(user.created_at).toLocaleDateString()}
                 </span>
               </div>
@@ -143,7 +146,7 @@ export function Account() {
 
             <button
               onClick={handleLogout}
-              className="btn-danger w-full mt-6 flex items-center justify-center gap-2"
+              className="btn-secondary w-full mt-6 flex items-center justify-center gap-2 border-rss-red/50 text-rss-red hover:bg-rss-red/10"
             >
               <LogOut className="h-4 w-4" />
               Logout

@@ -105,6 +105,14 @@ export interface Country {
   continente: string
 }
 
+export interface Idioma {
+  codigo: string
+  nombre: string
+  nombre_en: string
+  flag_emoji: string
+  activo: boolean
+}
+
 export interface MentionPoint {
   fecha: string
   count: number
@@ -167,7 +175,7 @@ export interface Stats {
 }
 
 export const apiService = {
-  getNews: async (params: { page?: number; per_page?: number; q?: string; category_id?: string; country_id?: string; translated_only?: string; semantic?: string }): Promise<NewsListResponse> => {
+  getNews: async (params: { page?: number; per_page?: number; q?: string; category_id?: string; country_id?: string; translated_only?: string; semantic?: string; lang_to?: string }): Promise<NewsListResponse> => {
     const { data } = await api.get('/news', { params })
     return data
   },
@@ -243,9 +251,14 @@ export const apiService = {
     return data
   },
 
-  getEntityMentions: async (params: { values: string[]; days?: number }): Promise<MentionsResponse> => {
+  getIdiomas: async (): Promise<Idioma[]> => {
+    const { data } = await api.get('/idiomas')
+    return data.idiomas || []
+  },
+
+  getEntityMentions: async (params: { values: string[]; hours?: number }): Promise<MentionsResponse> => {
     const { data } = await api.get('/entities/mentions', {
-      params: { values: params.values.join(','), days: params.days || 30 },
+      params: { values: params.values.join(','), hours: params.hours || 720 },
     })
     return data
   },

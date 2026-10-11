@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 
-const COLORS = ['#2563eb', '#dc2626', '#16a34a', '#d97706', '#7c3aed', '#0891b2', '#db2777', '#65a30d']
+const COLORS = ['#72FF8A', '#78B9FF', '#FFC66D', '#FF5F64', '#B794F4', '#89B4FA', '#F5A623', '#F472B6']
 
 export interface ChartSeries {
   valor: string

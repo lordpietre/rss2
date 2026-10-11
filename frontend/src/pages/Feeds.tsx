@@ -73,8 +73,8 @@ export function Feeds() {
     },
     onError: (error: any) => {
       const message = error?.response?.status === 401 
-        ? 'Debes iniciar sesión para importar archivos' 
-        : error?.response?.data?.error || 'Error al importar el archivo'
+        ? 'You must be logged in to import files' 
+        : error?.response?.data?.error || 'Error importing file'
       setImportResult({ imported: 0, skipped: 0, failed: 0, message })
     },
   })
@@ -131,12 +131,16 @@ export function Feeds() {
   }
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-8">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-50">Sources Management</h1>
+          <p className="text-sm text-gray-400 mt-1">RSS feeds monitoring and configuration</p>
+        </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button onClick={() => fileInputRef.current?.click()} className="btn-secondary flex items-center gap-2">
             <Upload className="h-4 w-4" />
-            Importar CSV
+            Import CSV
           </button>
           <input
             ref={fileInputRef}
@@ -147,48 +151,48 @@ export function Feeds() {
           />
           <button onClick={handleExport} className="btn-secondary flex items-center gap-2">
             <Download className="h-4 w-4" />
-            Exportar
+            Export
           </button>
           <button onClick={() => setShowAddForm(!showAddForm)} className="btn-primary flex items-center gap-2">
             <Plus className="h-4 w-4" />
-            Añadir Feed
+            Add Feed
           </button>
         </div>
       </div>
 
       {importResult && (
-        <div className={`card p-4 mb-4 ${importResult.failed > 0 || importResult.message.includes('Error') || importResult.message.includes('Debes') ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
-          <p className={importResult.failed > 0 || importResult.message.includes('Error') || importResult.message.includes('Debes') ? 'text-red-800' : 'text-green-800'}>
+        <div className={`panel ${importResult.failed > 0 || importResult.message.includes('Error') || importResult.message.includes('logged') ? 'border-rss-red/50' : 'border-primary-50/50'}`}>
+          <p className={importResult.failed > 0 || importResult.message.includes('Error') || importResult.message.includes('logged') ? 'text-rss-red' : 'text-primary-50'}>
             {importResult.message}
           </p>
           {importResult.imported > 0 && (
-            <p className="text-sm text-green-600 mt-1">
-              Importados: {importResult.imported}, Omitidos: {importResult.skipped}, Errores: {importResult.failed}
+            <p className="text-sm text-gray-400 mt-1">
+              Imported: {importResult.imported}, Skipped: {importResult.skipped}, Failed: {importResult.failed}
             </p>
           )}
-          <button onClick={() => setImportResult(null)} className="text-sm text-gray-500 underline mt-2">
-            Cerrar
+          <button onClick={() => setImportResult(null)} className="text-sm text-gray-400 underline mt-2">
+            Close
           </button>
         </div>
       )}
 
-      <div className="card p-4 mb-6">
+      <div className="panel">
         <div className="flex flex-wrap gap-4 items-center">
           <select
             value={filtroActivo}
             onChange={(e) => { setFiltroActivo(e.target.value); setPage(1) }}
             className="input w-auto"
           >
-            <option value="">Todos</option>
-            <option value="true">Activos</option>
-            <option value="false">Inactivos</option>
+            <option value="">All</option>
+            <option value="true">Active</option>
+            <option value="false">Inactive</option>
           </select>
           <select
             value={filtroCategoria}
             onChange={(e) => { setFiltroCategoria(e.target.value); setPage(1) }}
             className="input w-auto"
           >
-            <option value="">Todas las categorías</option>
+            <option value="">All categories</option>
             {categorias?.map((cat) => (
               <option key={cat.id} value={cat.id}>{cat.nombre}</option>
             ))}
@@ -198,7 +202,7 @@ export function Feeds() {
             onChange={(e) => { setFiltroPais(e.target.value); setPage(1) }}
             className="input w-auto"
           >
-            <option value="">Todos los países</option>
+            <option value="">All countries</option>
             {paises?.map((pais) => (
               <option key={pais.id} value={pais.id}>{pais.nombre}</option>
             ))}
@@ -206,28 +210,28 @@ export function Feeds() {
           {filtroActivo === 'false' && filtroPais && (
             <button
               onClick={() => {
-                if (confirm(`¿Eliminar todos los feeds inactivos del país seleccionado? (${feedsData?.total || 0} feeds)`)) {
+                if (confirm(`Delete all inactive feeds from selected country? (${feedsData?.total || 0} feeds)`)) {
                   deleteInactiveFeeds.mutate({ paisId: filtroPais })
                 }
               }}
               disabled={deleteInactiveFeeds.isPending}
-              className="btn-danger flex items-center gap-2"
+              className="btn-secondary flex items-center gap-2 border-rss-red/50 text-rss-red"
             >
               <Trash className="h-4 w-4" />
-              {deleteInactiveFeeds.isPending ? 'Eliminando...' : 'Eliminar todos inactivos'}
+              {deleteInactiveFeeds.isPending ? 'Deleting...' : 'Delete all inactive'}
             </button>
           )}
         </div>
       </div>
 
       {showAddForm && (
-        <form onSubmit={handleSubmit} className="card p-6 mb-8">
-          <h2 className="text-lg font-semibold mb-4">Nuevo Feed</h2>
+        <form onSubmit={handleSubmit} className="panel">
+          <h2 className="text-lg font-semibold text-gray-50 mb-4">New Feed</h2>
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <input
                 type="text"
-                placeholder="Nombre *"
+                placeholder="Name *"
                 value={newFeed.nombre}
                 onChange={(e) => setNewFeed({ ...newFeed, nombre: e.target.value })}
                 className="input"
@@ -235,7 +239,7 @@ export function Feeds() {
               />
               <input
                 type="url"
-                placeholder="URL del feed RSS *"
+                placeholder="RSS Feed URL *"
                 value={newFeed.url}
                 onChange={(e) => setNewFeed({ ...newFeed, url: e.target.value })}
                 className="input"
@@ -244,7 +248,7 @@ export function Feeds() {
             </div>
             <input
               type="text"
-              placeholder="Descripción"
+              placeholder="Description"
               value={newFeed.descripcion}
               onChange={(e) => setNewFeed({ ...newFeed, descripcion: e.target.value })}
               className="input"
@@ -255,7 +259,7 @@ export function Feeds() {
                 onChange={(e) => setNewFeed({ ...newFeed, categoria_id: e.target.value })}
                 className="input"
               >
-                <option value="">Categoría</option>
+                <option value="">Category</option>
                 {categorias?.map((cat) => (
                   <option key={cat.id} value={cat.id}>{cat.nombre}</option>
                 ))}
@@ -265,14 +269,14 @@ export function Feeds() {
                 onChange={(e) => setNewFeed({ ...newFeed, pais_id: e.target.value })}
                 className="input"
               >
-                <option value="">País</option>
+                <option value="">Country</option>
                 {paises?.map((pais) => (
                   <option key={pais.id} value={pais.id}>{pais.nombre}</option>
                 ))}
               </select>
               <input
                 type="text"
-                placeholder="Idioma (ej: es, en, fr)"
+                placeholder="Language (e.g. es, en, fr)"
                 value={newFeed.idioma}
                 onChange={(e) => setNewFeed({ ...newFeed, idioma: e.target.value })}
                 className="input"
@@ -280,45 +284,45 @@ export function Feeds() {
             </div>
             <div className="flex gap-2">
               <button type="submit" className="btn-primary" disabled={createFeed.isPending}>
-                {createFeed.isPending ? 'Añadiendo...' : 'Añadir'}
+                {createFeed.isPending ? 'Adding...' : 'Add'}
               </button>
               <button type="button" onClick={() => setShowAddForm(false)} className="btn-secondary">
-                Cancelar
+                Cancel
               </button>
             </div>
           </div>
         </form>
       )}
 
-      <div className="text-sm text-gray-500 mb-4">
+      <div className="text-sm text-gray-400">
         Total: {feedsData?.total || 0} feeds
       </div>
 
       {isLoading ? (
         <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-50"></div>
         </div>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="panel overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b">
+            <thead className="border-b border-gray-700">
               <tr>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Nombre</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">URL</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Idioma</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Categoría</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">País</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Estado</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Noticias</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Errores</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Acciones</th>
+                <th className="px-4 py-3 text-left text-xs font-mono uppercase text-gray-400">Name</th>
+                <th className="px-4 py-3 text-left text-xs font-mono uppercase text-gray-400">URL</th>
+                <th className="px-4 py-3 text-left text-xs font-mono uppercase text-gray-400">Lang</th>
+                <th className="px-4 py-3 text-left text-xs font-mono uppercase text-gray-400">Category</th>
+                <th className="px-4 py-3 text-left text-xs font-mono uppercase text-gray-400">Country</th>
+                <th className="px-4 py-3 text-left text-xs font-mono uppercase text-gray-400">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-mono uppercase text-gray-400">News</th>
+                <th className="px-4 py-3 text-left text-xs font-mono uppercase text-gray-400">Errors</th>
+                <th className="px-4 py-3 text-left text-xs font-mono uppercase text-gray-400">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="divide-y divide-gray-800">
               {feedsData?.feeds?.map((feed) => (
-                <tr key={feed.id} className="hover:bg-gray-50">
+                <tr key={feed.id} className="hover:bg-gray-800/50">
                   <td className="px-4 py-3">
-                    <div className="font-medium text-gray-900">{feed.nombre}</div>
+                    <div className="font-medium text-gray-50">{feed.nombre}</div>
                     {feed.descripcion && (
                       <div className="text-xs text-gray-500 truncate max-w-xs">{feed.descripcion}</div>
                     )}
@@ -328,28 +332,28 @@ export function Feeds() {
                       href={feed.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-primary-600 hover:underline flex items-center gap-1 text-sm"
+                      className="text-primary-300 hover:text-primary-50 flex items-center gap-1 text-sm"
                     >
                       <ExternalLink className="h-3 w-3" />
-                      Ver
+                      View
                     </a>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{feed.idioma || '-'}</td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{feed.categoria || '-'}</td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{feed.pais || '-'}</td>
+                  <td className="px-4 py-3 text-sm text-gray-400 font-mono">{feed.idioma || '-'}</td>
+                  <td className="px-4 py-3 text-sm text-gray-400">{feed.categoria || '-'}</td>
+                  <td className="px-4 py-3 text-sm text-gray-400">{feed.pais || '-'}</td>
                   <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-1 rounded ${feed.activo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                      {feed.activo ? 'Activo' : 'Inactivo'}
+                    <span className={`text-xs px-2 py-1 rounded ${feed.activo ? 'bg-primary-900/30 text-primary-50' : 'bg-gray-800 text-gray-400'}`}>
+                      {feed.activo ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{feed.noticias_count || 0}</td>
+                  <td className="px-4 py-3 text-sm text-gray-400">{feed.noticias_count || 0}</td>
                   <td className="px-4 py-3">
                     {feed.fallos && feed.fallos > 0 ? (
-                      <span className="text-red-600 text-sm" title={feed.last_error || ''}>
+                      <span className="text-rss-red text-sm font-mono" title={feed.last_error || ''}>
                         {feed.fallos}
                       </span>
                     ) : (
-                      <span className="text-gray-400">-</span>
+                      <span className="text-gray-600">-</span>
                     )}
                   </td>
                   <td className="px-4 py-3">
@@ -357,8 +361,8 @@ export function Feeds() {
                       {feed.fallos && feed.fallos > 0 && (
                         <button
                           onClick={() => reactivateFeed.mutate(feed.id)}
-                          className="p-1 rounded text-orange-600 hover:text-orange-700"
-                          title={`Reactivar (${feed.fallos} errores)`}
+                          className="p-1 rounded text-amber-400 hover:text-amber-300"
+                          title={`Reactivate (${feed.fallos} errors)`}
                           disabled={reactivateFeed.isPending}
                         >
                           <AlertCircle className="h-4 w-4" />
@@ -366,19 +370,19 @@ export function Feeds() {
                       )}
                       <button
                         onClick={() => toggleFeed.mutate(feed.id)}
-                        className={`p-1 rounded ${feed.activo ? 'text-gray-400 hover:text-red-600' : 'text-green-600 hover:text-green-700'}`}
-                        title={feed.activo ? 'Desactivar' : 'Activar'}
+                        className={`p-1 rounded ${feed.activo ? 'text-gray-400 hover:text-rss-red' : 'text-primary-50 hover:text-primary-300'}`}
+                        title={feed.activo ? 'Deactivate' : 'Activate'}
                       >
                         {feed.activo ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
                       </button>
                       <button
                         onClick={() => {
-                          if (confirm('¿Eliminar este feed?')) {
+                          if (confirm('Delete this feed?')) {
                             deleteFeed.mutate(feed.id)
                           }
                         }}
-                        className="p-1 text-red-600 hover:text-red-700"
-                        title="Eliminar"
+                        className="p-1 text-gray-400 hover:text-rss-red"
+                        title="Delete"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -392,24 +396,24 @@ export function Feeds() {
       )}
 
       {!isLoading && feedsData && feedsData.total_pages > 1 && (
-        <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-          <div>
-            Página <span className="font-semibold text-gray-900 dark:text-white">{page}</span> de <span className="font-semibold text-gray-900 dark:text-white">{feedsData.total_pages}</span>
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm bg-gray-900 p-4 rounded-lg border border-gray-700">
+          <div className="text-gray-400">
+            Page <span className="font-semibold text-gray-50">{page}</span> of <span className="font-semibold text-gray-50">{feedsData.total_pages}</span>
           </div>
           <div className="flex gap-2">
             <button
               onClick={() => setPage(p => Math.max(1, p - 1))}
               disabled={page <= 1}
-              className="px-4 py-2 border rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-600 dark:hover:bg-gray-700 transition-colors"
+              className="btn-secondary disabled:opacity-50"
             >
-              Anterior
+              Previous
             </button>
             <button
               onClick={() => setPage(p => Math.min(feedsData.total_pages, p + 1))}
               disabled={page >= feedsData.total_pages}
-              className="px-4 py-2 border rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-600 dark:hover:bg-gray-700 transition-colors"
+              className="btn-secondary disabled:opacity-50"
             >
-              Siguiente
+              Next
             </button>
           </div>
         </div>

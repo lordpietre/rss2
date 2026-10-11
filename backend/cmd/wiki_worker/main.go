@@ -476,7 +476,7 @@ func Main() {
 
 			logger.Info().Msgf("Recuperados %d tags para procesar...", len(tags))
 
-			baseDelay := 10  // segundos base entre requests (más conservador para Wikipedia)
+			baseDelay := 1  // segundos base entre requests (más agresivo para Wikipedia)
 			maxDelay := 60   // máximo delay cuando hay errores
 			currentDelay := baseDelay
 		 consecutiveErrors := 0

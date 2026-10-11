@@ -70,7 +70,9 @@ var (
 	// `fold` (minúsculas y sin acentos), por eso las claves van sin tildes.
 	reCTA = regexp.MustCompile(`\b(haga clic|haz clic|haz click|click aqui|leer mas|ver mas|mas informacion|` +
 		`suscribete|publicidad|anunciar|politica de privacidad|terminos de uso|terminos y condiciones|` +
-		`aviso legal|newsletters?|advertisement|read more|click here|sign up)\b`)
+		`aviso legal|newsletters?|advertisement|read more|click here|sign up|` +
+		`zum vergroessern|zum vergrössern|clic para agrandir|clique para ampliar|` +
+		`klik untuk memperbesar|afbeelding vergroten|图片放大|画像をクリック|单击放大)\b`)
 )
 
 // TAIL: una entidad que termina en palabra funcional es un recorte de frase

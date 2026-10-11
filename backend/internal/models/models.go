@@ -38,12 +38,13 @@ type NewsWithTranslations struct {
 	ContentTranslated *string   `json:"content_translated"`
 	LangTranslated    *string   `json:"lang_translated"`
 	Entities          []Entity  `json:"entities,omitempty"`
+	ClusterID         *int64    `json:"cluster_id,omitempty"` // Event cluster this news belongs to
 }
 
 type Entity struct {
 	Valor           string     `json:"valor"`
 	Tipo            string     `json:"tipo"`
-	Apellido        string     `json:"apellido"`
+	Apellido        *string    `json:"apellido,omitempty"`
 	Count           int        `json:"count"`
 	WikiSummary     *string    `json:"wiki_summary"`
 	WikiURL         *string    `json:"wiki_url"`
@@ -238,4 +239,17 @@ type SuccessResponse struct {
 type ErrorResponse struct {
 	Error   string `json:"error"`
 	Message string `json:"message,omitempty"`
+}
+
+type Idioma struct {
+	Codigo    string `json:"codigo"`
+	Nombre    string `json:"nombre"`
+	NombreEn  string `json:"nombre_en"`
+	FlagEmoji string `json:"flag_emoji"`
+	Activo    bool   `json:"activo"`
+}
+
+type IdiomaListResponse struct {
+	Idiomas []Idioma `json:"idiomas"`
+	Total   int      `json:"total"`
 }

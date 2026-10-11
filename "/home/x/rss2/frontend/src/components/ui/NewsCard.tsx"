@@ -1,0 +1,193 @@
+import { Link } from 'react-router-dom'
+import { Heart, FolderPlus, Newspaper, Globe, MapPin } from 'lucide-react'
+import { formatDistanceToNow } from 'date-fns'
+import { es } from 'date-fns/locale'
+import { useState, useRef } from 'react'
+import { News } from '../../services/api'
+import { ShareButtons } from './ShareButtons'
+
+interface NewsCardProps {
+  news: News
+  showFavoriteButton?: boolean
+  showListButton?: boolean
+  showShareButtons?: boolean
+  isFavorite?: boolean
+  countryName?: string
+  onToggleFavorite?: (news: News) => void
+  onAddToList?: (news: News) => void
+  className?: string
+}
+
+export function NewsCard({
+  news,
+  showFavoriteButton = true,
+  showListButton = true,
+  showShareButtons = false,
+  isFavorite = false,
+  countryName,
+  onToggleFavorite,
+  onAddToList,
+  className = ''
+}: NewsCardProps) {
+  const [showHover, setShowHover] = useState(false)
+  const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleMouseEnter = () => {
+    hoverTimeout.current = setTimeout(() => {
+      setShowHover(true)
+    }, 800) // 800ms delay
+  }
+
+  const handleMouseLeave = () => {
+    if (hoverTimeout.current) {
+      clearTimeout(hoverTimeout.current)
+      hoverTimeout.current = null
+    }
+    setShowHover(false)
+  }
+
+  const handleFavoriteClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onToggleFavorite?.(news)
+  }
+
+  const handleListClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onAddToList?.(news)
+  }
+
+  return (
+    <div className="relative">
+      <Link 
+        to={`/news/${news.id}`} 
+        className={`card hover:border-rss-green-dim transition-all duration-200 flex gap-4 p-5 ${className}`}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        {/* Image - Larger */}
+        {news.imagen_url && news.imagen_url.trim() && (
+          <img
+            src={news.imagen_url}
+            alt=""
+            className="w-36 h-28 object-cover rounded-lg shrink-0"
+          />
+        )}
+
+        {/* Content */}
+        <div className="flex-1 min-w-0 flex flex-col">
+          {/* Meta row */}
+          <div className="flex items-center gap-3 text-sm text-gray-500 mb-2 flex-wrap">
+            {news.fuente_nombre && (
+              <span className="flex items-center gap-1 truncate max-w-[180px]">
+                <Newspaper className="h-3.5 w-3.5 shrink-0" />
+                {news.fuente_nombre}
+              </span>
+            )}
+            {news.fecha && (
+              <span className="shrink-0">
+                {formatDistanceToNow(new Date(news.fecha), { addSuffix: true, locale: es })}
+              </span>
+            )}
+            {countryName && (
+              <span className="flex items-center gap-1 shrink-0 text-emerald-500">
+                <MapPin className="h-3.5 w-3.5" />
+                {countryName}
+              </span>
+            )}
+            {news.lang_translated && (
+              <span className="flex items-center gap-1 shrink-0 px-2 py-0.5 bg-primary-900/30 text-primary-50 rounded text-xs">
+                <Globe className="h-3 w-3" />
+                Translated
+              </span>
+            )}
+          </div>
+
+          {/* Title - Larger and more prominent */}
+          <h3 className="text-xl font-semibold text-gray-50 mb-2 line-clamp-2 leading-snug">
+            {news.title_translated || news.titulo}
+          </h3>
+
+          {/* Summary - Better readability */}
+          <p className="text-base text-gray-400 line-clamp-3 leading-relaxed flex-1">
+            {news.summary_translated || news.resumen}
+          </p>
+
+          {/* Action buttons */}
+          <div className="flex items-center gap-2 mt-3">
+            {showFavoriteButton && onToggleFavorite && (
+              <button
+                onClick={handleFavoriteClick}
+                className={`p-2 rounded-lg transition-colors ${
+                  isFavorite
+                    ? 'text-red-500 bg-red-500/10 hover:bg-red-500/20'
+                    : 'text-gray-400 hover:text-red-500 hover:bg-red-500/10'
+                }`}
+                title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+              >
+                <Heart className={`h-4 w-4 ${isFavorite ? 'fill-current' : ''}`} />
+              </button>
+            )}
+            {showListButton && onAddToList && (
+              <button
+                onClick={handleListClick}
+                className="p-2 rounded-lg text-gray-400 hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
+                title="Add to list"
+              >
+                <FolderPlus className="h-4 w-4" />
+              </button>
+            )}
+            {showShareButtons && (
+              <ShareButtons news={news} size="md" />
+            )}
+          </div>
+        </div>
+      </Link>
+
+      {/* Hover tooltip with full content */}
+      {showHover && (
+        <div 
+          className="absolute z-50 left-0 top-full mt-3 w-[600px] bg-gray-900/95 backdrop-blur rounded-xl shadow-2xl border border-gray-700 p-6"
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        >
+          <h3 className="text-xl font-bold text-gray-50 mb-3 leading-snug">
+            {news.title_translated || news.titulo}
+          </h3>
+          <p className="text-base text-gray-300 mb-4 leading-relaxed">
+            {news.summary_translated || news.resumen}
+          </p>
+          {(news.content_translated || news.contenido) && (
+            <p className="text-sm text-gray-500 mb-4 max-h-40 overflow-y-auto leading-relaxed">
+              {news.content_translated || news.contenido}
+            </p>
+          )}
+          <div className="flex items-center gap-4 text-sm text-gray-400">
+            {news.fuente_nombre && (
+              <span className="font-medium text-gray-300">{news.fuente_nombre}</span>
+            )}
+            {news.fecha && (
+              <span>
+                {new Date(news.fecha).toLocaleDateString('es-ES', { 
+                  day: 'numeric', 
+                  month: 'short', 
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+              </span>
+            )}
+            {countryName && (
+              <span className="flex items-center gap-1 text-emerald-500">
+                <MapPin className="h-4 w-4" />
+                {countryName}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+"

@@ -1,6 +1,6 @@
 # RSS2 Workers Makefile
 
-.PHONY: all build clean deps ingestor scraper discovery topics related server test parity sanitize sanitize-dry-run sanitize-restore sanitize-local entities-scan entities-scan-apply entities-scan-local alerts-prune alerts-prune-apply alerts-prune-local
+.PHONY: all build clean deps ingestor scraper discovery topics related server test parity sanitize sanitize-dry-run sanitize-restore sanitize-local entities-scan entities-scan-apply entities-scan-local alerts-prune alerts-prune-apply alerts-prune-local event-clustering
 
 # Binary output directory
 BIN_DIR := bin
@@ -12,6 +12,7 @@ SCRAPER := $(BIN_DIR)/scraper
 DISCOVERY := $(BIN_DIR)/discovery
 TOPICS := $(BIN_DIR)/topics
 RELATED := $(BIN_DIR)/related
+EVENT_CLUSTERING := $(BIN_DIR)/event_clustering
 
 all: deps build
 
@@ -20,7 +21,7 @@ deps:
 	cd backend && go mod tidy
 
 # Build all workers
-build: ingestor scraper discovery topics related server
+build: ingestor scraper discovery topics related event-clustering server
 
 # Ingestor
 ingestor:
@@ -42,6 +43,9 @@ topics:
 
 related:
 	cd backend && go build -o $(RELATED) ./cmd/related
+
+event-clustering:
+	cd backend && go build -o $(EVENT_CLUSTERING) ./cmd/event_clustering
 
 # Clean
 clean:
@@ -111,6 +115,9 @@ run-topics:
 
 run-related:
 	DB_HOST=localhost DB_PORT=5432 DB_NAME=rss DB_USER=rss DB_PASS=rss RELATED_SLEEP=10 $(RELATED)
+
+run-event-clustering:
+	DB_HOST=localhost DB_PORT=5432 DB_NAME=rss DB_USER=rss DB_PASS=rss CLUSTERING_SLEEP=900 CLUSTERING_BATCH=500 $(EVENT_CLUSTERING)
 
 # Docker builds (vía compose: los Dockerfiles legacy de raíz se eliminaron;
 # los workers Go reutilizan la imagen backend, ver docker-compose.yml)

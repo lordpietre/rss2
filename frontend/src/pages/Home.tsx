@@ -7,7 +7,6 @@ import { Search, Globe, X, Sparkles, Bookmark } from 'lucide-react'
 import { SkeletonNewsList, NoResultsFound, CompactNewsCard, ExpandedNewsModal } from '../components/ui'
 import { NewsCard } from '../components/ui/NewsCard'
 import { CreateListModal } from '../components/CreateListModal'
-import { SaveSearchModal } from '../components/SaveSearchModal'
 import { useApiFavorites, useApiLists, useApiSavedSearches } from '../hooks/useApiFavorites'
 import { useSearchHistory } from '../hooks/useSearchHistory'
 
@@ -20,44 +19,29 @@ export function Home() {
   const translatedOnly = searchParams.get('translated_only') === 'true'
   const semantic = searchParams.get('semantic') === 'true'
   
-  // Local state for search input
   const [localQuery, setLocalQuery] = useState(q)
-  
-  // List modal state
   const [showListModal, setShowListModal] = useState(false)
   const [selectedNewsForList, setSelectedNewsForList] = useState<News | null>(null)
   const { favorites, toggleFavorite, isFavorite } = useApiFavorites()
   const { lists, createList, addToList } = useApiLists()
   
-  // Search history
   const { history, addToHistory, clearHistory, removeFromHistory } = useSearchHistory()
   const [showHistory, setShowHistory] = useState(false)
   const historyRef = useRef<HTMLDivElement>(null)
   
-  // Expanded modal for hover/touch
   const [expandedNews, setExpandedNews] = useState<News | null>(null)
-
-  // Save search modal state
-  const [showSaveModal, setShowSaveModal] = useState(false)
   const { createSearch } = useApiSavedSearches()
 
-  // Detect if we're in search mode (for grid layout)
   const isSearchMode = !!q || !!categoryId || !!countryId
-
-  // Use compact cards only when there's actual text/category/country search, not just translated filter
   const useCompactCards = !!q || !!categoryId || !!countryId
 
-  // Load the user's most frequent search terms (dynamic tags) when logged in
   useEffect(() => {
     if (!localStorage.getItem('token')) return
     api.get('/search/suggestions')
-      .then((res) => {
-        // Merge with local history
-      })
+      .then((res) => { })
       .catch(() => {})
   }, [])
 
-  // Close history dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (historyRef.current && !historyRef.current.contains(e.target as Node)) {
@@ -78,7 +62,6 @@ export function Home() {
     queryFn: apiService.getCountries,
   })
 
-  // Helper to get country name by ID
   const getCountryName = (countryId: number | undefined) => {
     if (!countryId || !countries) return undefined
     const country = countries.find(c => c.id === countryId)
@@ -102,12 +85,10 @@ export function Home() {
     const formData = new FormData(e.currentTarget)
     const query = formData.get('q') as string
     
-    // Add to history if not empty
     if (query?.trim()) {
       addToHistory(query.trim())
     }
     
-    // Log search if logged in
     if (localStorage.getItem('token') && query) {
       api.post('/searchlog', { q: String(query) }).catch(() => {})
     }
@@ -202,25 +183,22 @@ export function Home() {
     setSelectedNewsForList(null)
   }
 
-  // Update localQuery when URL changes
   useEffect(() => {
     setLocalQuery(q)
   }, [q])
 
   return (
-    <div>
-      {/* Header - Only show count, not title */}
+    <div className="space-y-6">
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
-          <div className="text-sm text-gray-500">
-            {data?.total || 0} noticias
+          <div className="text-sm text-gray-400">
+            {data?.total?.toLocaleString() || 0} news
             {isSearchMode && q && (
-              <span className="ml-1">para "<strong>{q}</strong>"</span>
+              <span className="ml-1">for "<strong className="text-gray-50">{q}</strong>"</span>
             )}
           </div>
         </div>
         
-        {/* Search Box with History */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
           <div className="relative md:col-span-2" ref={historyRef}>
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -231,52 +209,51 @@ export function Home() {
                   value={localQuery}
                   onChange={(e) => setLocalQuery(e.target.value)}
                   onFocus={() => setShowHistory(true)}
-                  placeholder="Buscar noticias..."
+                  placeholder="Search news..."
                   className="input pl-10 pr-10 w-full"
                 />
                 {localQuery && (
                   <button
                     type="button"
                     onClick={handleClearSearch}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-1"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200 transition-colors p-1"
                   >
                     <X className="h-4 w-4" />
                   </button>
                 )}
               </div>
               <button type="submit" className="btn-primary">
-                Buscar
+                Search
               </button>
             </form>
             
-            {/* History Dropdown */}
             {showHistory && history.length > 0 && (
-              <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden">
-                <div className="flex justify-between items-center px-3 py-2 border-b border-gray-200 dark:border-gray-700">
-                  <span className="text-xs text-gray-500">Búsquedas recientes</span>
+              <div className="absolute z-50 w-full mt-1 bg-gray-900 border border-gray-700 rounded-lg shadow-lg overflow-hidden">
+                <div className="flex justify-between items-center px-3 py-2 border-b border-gray-700">
+                  <span className="text-xs text-gray-400">Recent searches</span>
                   <button 
                     onClick={clearHistory} 
-                    className="text-xs text-red-500 hover:underline"
+                    className="text-xs text-rss-red hover:underline"
                   >
-                    Limpiar todo
+                    Clear all
                   </button>
                 </div>
                 {history.map((term) => (
                   <div
                     key={term}
-                    className="flex items-center justify-between px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors"
+                    className="flex items-center justify-between px-3 py-2 hover:bg-gray-800 cursor-pointer transition-colors"
                     onClick={() => handleHistoryClick(term)}
                   >
                     <div className="flex items-center gap-2">
                       <Search className="h-4 w-4 text-gray-400" />
-                      <span className="text-sm text-gray-700 dark:text-gray-300">{term}</span>
+                      <span className="text-sm text-gray-300">{term}</span>
                     </div>
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
                         removeFromHistory(term)
                       }}
-                      className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                      className="p-1 text-gray-400 hover:text-rss-red transition-colors"
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -291,7 +268,7 @@ export function Home() {
             onChange={(e) => handleFilterChange('category_id', e.target.value)}
             className="input"
           >
-            <option value="">Todas las categorías</option>
+            <option value="">All categories</option>
             {categories?.map((cat) => (
               <option key={cat.id} value={cat.id}>{cat.nombre}</option>
             ))}
@@ -302,7 +279,7 @@ export function Home() {
             onChange={(e) => handleFilterChange('country_id', e.target.value)}
             className="input"
           >
-            <option value="">Todos los países</option>
+            <option value="">All countries</option>
             {countries?.map((country) => (
               <option key={country.id} value={country.id}>{country.nombre}</option>
             ))}
@@ -314,12 +291,12 @@ export function Home() {
             onClick={toggleTranslated}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
               translatedOnly 
-                ? 'bg-primary-600 text-white border-primary-600' 
-                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                ? 'bg-primary-50 text-gray-900 border-primary-50' 
+                : 'bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700'
             }`}
           >
             <Globe className="h-4 w-4" />
-            Solo traducidas
+            Translated only
           </button>
 
           <button
@@ -327,30 +304,38 @@ export function Home() {
             className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
               semantic 
                 ? 'bg-purple-600 text-white border-purple-600' 
-                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                : 'bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700'
             }`}
           >
             <Sparkles className="h-4 w-4" />
-            Búsqueda semántica
+            Semantic search
           </button>
           
           {isSearchMode && (
             <button
               onClick={() => setSearchParams({ page: '1' })}
-              className="text-sm text-gray-500 hover:text-gray-700"
+              className="text-sm text-gray-400 hover:text-gray-200"
             >
-              Limpiar filtros
+              Clear filters
             </button>
           )}
 
           {isSearchMode && (
             <button
-              onClick={() => setShowSaveModal(true)}
-              className="flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 font-medium"
-              title="Guardar esta búsqueda"
+              onClick={() => {
+                const params: Record<string, any> = {}
+                if (q) params.q = q
+                if (categoryId) params.categoria = categoryId
+                if (countryId) params.pais = countryId
+                if (translatedOnly) params.lang = 'es'
+                const label = q || `Search ${new Date().toLocaleDateString('es-ES')}`
+                createSearch('news', label, params)
+              }}
+              className="flex items-center gap-1 text-sm text-primary-300 hover:text-primary-50 font-medium"
+              title="Save this search"
             >
               <Bookmark className="h-4 w-4" />
-              Guardar
+              Save
             </button>
           )}
         </div>
@@ -359,13 +344,13 @@ export function Home() {
       {isLoading ? (
         <SkeletonNewsList count={6} />
       ) : error ? (
-        <div className="text-center py-12 text-red-600">
-          Error al cargar noticias
+        <div className="text-center py-12 text-rss-red">
+          Error loading news
           <button
             onClick={() => window.location.reload()}
             className="btn-primary mt-4"
           >
-            Reintentar
+            Retry
           </button>
         </div>
       ) : data?.news?.length === 0 ? (
@@ -375,7 +360,6 @@ export function Home() {
         />
       ) : (
         <>
-          {/* News Grid */}
           <div className='grid gap-4 md:grid-cols-2'>
             {data?.news?.map((news) => 
               useCompactCards ? (
@@ -408,9 +392,9 @@ export function Home() {
                 disabled={page <= 1}
                 className="btn-secondary disabled:opacity-50"
               >
-                Anterior
+                Previous
               </button>
-              <span className="flex items-center px-4 text-gray-600">
+              <span className="flex items-center px-4 text-gray-400 font-mono">
                 {page} / {data.total_pages}
               </span>
               <button
@@ -418,7 +402,7 @@ export function Home() {
                 disabled={page >= data.total_pages}
                 className="btn-secondary disabled:opacity-50"
               >
-                Siguiente
+                Next
               </button>
             </div>
           )}
@@ -434,7 +418,6 @@ export function Home() {
         onSelectList={handleSelectList}
       />
 
-      {/* Expanded News Modal for hover/touch */}
       <ExpandedNewsModal
         news={expandedNews}
         isFavorite={expandedNews ? isFavorite(expandedNews.id) : false}
@@ -442,22 +425,6 @@ export function Home() {
         onClose={() => setExpandedNews(null)}
         onToggleFavorite={toggleFavorite}
         onAddToList={handleAddToList}
-      />
-
-      {/* Save Search Modal */}
-      <SaveSearchModal
-        isOpen={showSaveModal}
-        onClose={() => setShowSaveModal(false)}
-        onSave={(label) => {
-          const params: Record<string, any> = {}
-          if (q) params.q = q
-          if (categoryId) params.categoria = categoryId
-          if (countryId) params.pais = countryId
-          if (translatedOnly) params.lang = 'es'
-          createSearch('news', label, params)
-          setShowSaveModal(false)
-        }}
-        typeLabel="búsqueda"
       />
     </div>
   )

@@ -131,7 +131,7 @@ def store_cache(pairs, ttl: int = CACHE_TTL):
         pipe = r.pipeline(transaction=False)
         for k, v in pairs:
             if v:
-                pipe.setex(k, ttl, v)
+                pipe.set(k, v, ex=ttl)
         pipe.execute()
     except Exception as e:
         LOG.warning(f"Redis cache store error: {e}")
@@ -150,6 +150,73 @@ def clean_text(text: str) -> str:
     text = text.replace("&quot;", '"')
     text = re.sub(r"\s+", " ", text)
     return text.strip()
+
+
+def calculate_confidence(original: str, translated: str) -> float:
+    """
+    Calculate a confidence score between 0.0 and 1.0 based on:
+    - Length ratio between translated and original text
+    - Detection of repeated tokens in translation
+    - Whether the translation is empty
+    """
+    if not translated or not translated.strip():
+        return 0.0
+
+    orig_len = len(original)
+    trans_len = len(translated)
+
+    # Empty translation check
+    if not trans_len:
+        return 0.0
+
+    # Length ratio score (0.0 to 0.4 points)
+    # Ideal ratio is around 0.8-1.2 for similar length after translation
+    # Penalize very short or very long translations
+    if orig_len > 0:
+        ratio = trans_len / orig_len
+        if ratio <= 0:
+            length_score = 0.0
+        elif ratio < 0.3:
+            length_score = ratio / 0.3 * 0.2  # 0 to 0.2 for very short
+        elif ratio <= 1.5:
+            length_score = 0.2 + ((ratio - 0.3) / 1.2) * 0.2  # 0.2 to 0.4 for reasonable
+        elif ratio <= 3.0:
+            length_score = 0.4 - ((ratio - 1.5) / 1.5) * 0.15  # 0.4 to 0.25 for long
+        else:
+            length_score = 0.25 - min((ratio - 3.0) / 2.0 * 0.1, 0.1)  # 0.25 to 0.15 for very long
+    else:
+        length_score = 0.2 if trans_len > 10 else 0.0
+
+    # Repeated tokens check (0.0 to 0.4 points)
+    # Count repeated n-grams (words appearing consecutively)
+    words = translated.split()
+    if len(words) >= 4:
+        # Check for repeated bigrams and trigrams
+        bigram_count = 0
+        trigram_count = 0
+        for i in range(len(words) - 1):
+            if words[i] == words[i + 1]:
+                bigram_count += 1
+        for i in range(len(words) - 2):
+            if words[i] == words[i + 1] == words[i + 2]:
+                trigram_count += 1
+
+        repeat_ratio = (bigram_count * 2 + trigram_count * 3) / len(words)
+        repeat_score = max(0.0, 0.4 - repeat_ratio * 4)
+    else:
+        repeat_score = 0.4
+
+    # Empty/translated content check (0.0 to 0.2 points)
+    trans_stripped = translated.strip()
+    if not trans_stripped:
+        content_score = 0.0
+    elif len(trans_stripped) < 3:
+        content_score = 0.05
+    else:
+        content_score = 0.2
+
+    confidence = min(1.0, max(0.0, length_score + repeat_score + content_score))
+    return round(confidence, 4)
 
 
 # =============================================================================
@@ -384,10 +451,12 @@ def process_batch(conn, rows):
         contenido = (r.get("contenido") or "").strip()
 
         if lang_from == lang_to:
+            # Same language: copy original text with confidence 1.0
             cursor = conn.cursor()
             cursor.execute("""
                 UPDATE traducciones 
-                SET titulo_trad = %s, resumen_trad = %s, contenido_trad = %s, status = 'done' 
+                SET titulo_trad = %s, resumen_trad = %s, contenido_trad = %s, 
+                    status = 'done', confidence = 1.0, locked_at = NULL
                 WHERE id = %s
             """, (titulo, resumen, contenido, r.get("tr_id")))
             conn.commit()
@@ -465,14 +534,27 @@ def process_group(conn, lang_from: str, lang_to: str, items: List[dict]):
             if not tb:
                 tb = item["resumen"]
 
-            updates.append((tt, tb, tc, item["tr_id"]))
+            # Calculate confidence based on original vs translated content
+            orig_titulo = item["titulo"] or ""
+            orig_resumen = item["resumen"] or ""
+            orig_contenido = item["contenido"] or ""
+
+            # Confidence for each field
+            conf_titulo = calculate_confidence(orig_titulo, tt)
+            conf_resumen = calculate_confidence(orig_resumen, tb)
+            conf_contenido = calculate_confidence(orig_contenido, tc)
+
+            # Average confidence (weighted towards resumen as it's most representative)
+            avg_confidence = round((conf_titulo * 0.2 + conf_resumen * 0.4 + conf_contenido * 0.4), 4)
+
+            updates.append((tt, tb, tc, avg_confidence, item["tr_id"]))
 
         if updates:
             cursor = conn.cursor()
             cursor.executemany("""
                 UPDATE traducciones 
                 SET titulo_trad = %s, resumen_trad = %s, contenido_trad = %s, 
-                    status = 'done', locked_at = NULL
+                    status = 'done', confidence = %s, locked_at = NULL
                 WHERE id = %s
             """, updates)
             conn.commit()
@@ -484,13 +566,50 @@ def process_group(conn, lang_from: str, lang_to: str, items: List[dict]):
         LOG.error(f"Batch group error {lang_from} -> {lang_to}: {e}")
         try:
             cursor = conn.cursor()
+            tr_ids = [i["tr_id"] for i in items]
+
+            # Get current retry_count for these items
             cursor.execute("""
-                UPDATE traducciones SET status = 'error', locked_at = NULL 
-                WHERE id = ANY(ARRAY[{','.join(['%s'] * len(items))}])
-            """, [i["tr_id"] for i in items])
+                SELECT id, COALESCE(retry_count, 0) as retry_count 
+                FROM traducciones 
+                WHERE id = ANY(%s)
+            """, (tr_ids,))
+            current_counts = {row["id"]: row["retry_count"] for row in cursor.fetchall()}
+
+            # Determine which items should be retried vs marked as error
+            retry_tr_ids = []
+            error_tr_ids = []
+            for tr_id in tr_ids:
+                current_retry = current_counts.get(tr_id, 0)
+                if current_retry < 3:
+                    retry_tr_ids.append(tr_id)
+                else:
+                    error_tr_ids.append(tr_id)
+
+            # Update items to be retried: increment retry_count and set pending
+            if retry_tr_ids:
+                for tr_id in retry_tr_ids:
+                    current_retry = current_counts.get(tr_id, 0)
+                    cursor.execute("""
+                        UPDATE traducciones 
+                        SET status = 'pending', retry_count = %s, locked_at = NULL
+                        WHERE id = %s
+                    """, (current_retry + 1, tr_id))
+                LOG.warning(f"Scheduled {len(retry_tr_ids)} translations for retry (count: {[current_counts.get(t, 0) + 1 for t in retry_tr_ids]})")
+
+            # Update items that exceeded max retries
+            if error_tr_ids:
+                cursor.execute(f"""
+                    UPDATE traducciones 
+                    SET status = 'error', locked_at = NULL 
+                    WHERE id = ANY(ARRAY[{','.join(['%s'] * len(error_tr_ids))}])
+                """, error_tr_ids)
+                LOG.error(f"Marked {len(error_tr_ids)} translations as permanent error after max retries")
+
             conn.commit()
             cursor.close()
-        except:
+        except Exception as ex:
+            LOG.error(f"Error in retry handling: {ex}")
             conn.rollback()
 
 

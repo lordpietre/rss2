@@ -349,6 +349,14 @@ func Main() {
 		api.GET("/entities/mentions", handlers.GetEntityMentions)
 		api.GET("/last-names", handlers.GetLastNames)
 
+		// Languages available for translation
+		api.GET("/idiomas", handlers.GetIdiomas)
+
+		// Event clusters
+		api.GET("/events", handlers.GetEvents)
+		api.GET("/events/breaking", handlers.GetBreakingEvents)
+		api.GET("/events/:id", handlers.GetEventByID)
+
 		api.GET("/alerts", middleware.AuthRequired(), handlers.GetAlertas)
 		api.POST("/alerts/:id/read", middleware.AuthRequired(), handlers.MarkAlertaRead)
 		api.POST("/alerts/:id/dismiss", middleware.AuthRequired(), handlers.MarkAlertaDismiss)
@@ -399,6 +407,7 @@ func Main() {
 			admin.POST("/aliases/import", handlers.ImportAliases)
 			admin.GET("/ingest/stats", handlers.GetIngestStats)
 			admin.POST("/entities/retype", handlers.PatchEntityTipo)
+			admin.POST("/entities/refresh-stats", handlers.RefreshEntityStats)
 			admin.GET("/backup", handlers.BackupDatabase)
 			admin.GET("/backup/news", handlers.BackupNewsZipped)
 			admin.POST("/restore", handlers.RestoreDatabase)
@@ -455,6 +464,17 @@ func Main() {
 	handlers.StartJobAssigner()
 	handlers.StartAlertScanner()
 	handlers.StartStaleJobCleanup() // Cleanup stuck jobs from disconnected workers
+
+	// Refresh entity stats on startup (in background to not block server start)
+	go func() {
+		time.Sleep(5 * time.Second) // Wait for DB to be ready
+		log.Info().Msg("Refreshing entity stats on startup...")
+		if err := handlers.RefreshEntityStatsStartup(); err != nil {
+			log.Error().Err(err).Msg("Failed to refresh entity stats on startup")
+		} else {
+			log.Info().Msg("Entity stats refreshed successfully")
+		}
+	}()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)

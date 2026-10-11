@@ -855,7 +855,7 @@ func GetListRelatedNews(c *gin.Context) {
 		       t.contenido_trad as content_translated, t.lang_to as lang_translated
 		FROM noticias n
 		LEFT JOIN traducciones t ON n.id = t.noticia_id AND t.lang_to = 'es'
-		WHERE n.tsv @@ to_tsquery('spanish', $1)
+		WHERE n.search_vector_es @@ to_tsquery('spanish', $1)
 		  AND n.id NOT IN (SELECT noticia_id FROM user_list_items WHERE list_id = $2)
 		ORDER BY n.fecha DESC NULLS LAST
 		LIMIT 20
@@ -1006,7 +1006,7 @@ func GetSuggestedNews(c *gin.Context) {
 		       t.contenido_trad as content_translated, t.lang_to as lang_translated
 		FROM noticias n
 		LEFT JOIN traducciones t ON n.id = t.noticia_id AND t.lang_to = 'es'
-		WHERE n.tsv @@ to_tsquery('spanish', $1)
+		WHERE n.search_vector_es @@ to_tsquery('spanish', $1)
 		  AND n.fecha >= NOW() - INTERVAL '7 days'
 		  AND n.id NOT IN (
 		      SELECT uli.noticia_id

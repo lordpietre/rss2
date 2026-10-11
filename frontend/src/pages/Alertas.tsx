@@ -5,10 +5,10 @@ import { CheckCheck, ChevronDown, ChevronUp, FileText, XCircle } from 'lucide-re
 import { WikiTooltip } from '../components/ui/WikiTooltip'
 
 const TIPO_LABEL: Record<string, string> = {
-  persona: 'Persona',
-  lugar: 'Lugar',
-  organizacion: 'Organización',
-  tema: 'Tema',
+  persona: 'Person',
+  lugar: 'Place',
+  organizacion: 'Organization',
+  tema: 'Topic',
 }
 
 export function Alertas() {
@@ -79,83 +79,95 @@ export function Alertas() {
   }
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-8 flex-wrap gap-3">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-50">Alert Center</h1>
+          <p className="text-sm text-gray-400 mt-1">Activity spike detection and monitoring</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="px-3 py-1 rounded-full bg-rss-red/20 text-rss-red text-sm font-mono">
+            {nuevas} new
+          </span>
+        </div>
+      </div>
+
+      <div className="flex justify-between items-center flex-wrap gap-3">
         <div className="flex items-center gap-2 flex-wrap">
           <select
             value={tipoFiltro}
             onChange={(e) => setTipoFiltro(e.target.value)}
             className="input w-auto text-sm"
-            aria-label="Filtrar por tipo"
+            aria-label="Filter by type"
           >
-            <option value="">Todos los tipos</option>
-            <option value="persona">Personas</option>
-            <option value="organizacion">Organizaciones</option>
-            <option value="lugar">Lugares</option>
-            <option value="tema">Temas</option>
+            <option value="">All types</option>
+            <option value="persona">People</option>
+            <option value="organizacion">Organizations</option>
+            <option value="lugar">Places</option>
+            <option value="tema">Topics</option>
           </select>
           <select
             value={estadoFiltro}
             onChange={(e) => setEstadoFiltro(e.target.value)}
             className="input w-auto text-sm"
-            aria-label="Filtrar por estado"
+            aria-label="Filter by status"
           >
-            <option value="">Sin descartadas</option>
-            <option value="nueva">Nuevas</option>
-            <option value="leida">Leídas</option>
-            <option value="descartada">Descartadas</option>
+            <option value="">Active alerts</option>
+            <option value="nueva">New</option>
+            <option value="leida">Read</option>
+            <option value="descartada">Dismissed</option>
           </select>
           <button onClick={markAll} className="btn-secondary flex items-center gap-2" disabled={nuevas === 0}>
             <CheckCheck className="h-4 w-4" />
-            Marcar todas como leídas
+            Mark all read
           </button>
         </div>
       </div>
 
-      <p className="text-gray-500 dark:text-gray-400 -mt-4 mb-6">
-        Aviso cuando un concepto aparece ≥5 veces en una hora y multiplica ×5 su media previa
-        (los temas exigen más; se revisa cada hora).
+      <p className="text-xs text-gray-400 -mt-2">
+        Alerts when a concept appears ≥5 times in an hour and multiplies ×5 its previous average
+        (topics require more; reviewed hourly).
         {nuevas > 0 && (
-          <span className="ml-1 text-primary-600 font-semibold">Tienes {nuevas} sin leer.</span>
+          <span className="ml-2 text-rss-red font-semibold">{nuevas} unread.</span>
         )}
         {total > 0 && (
-          <span className="ml-1">{total} en total.</span>
+          <span className="ml-2">{total} total.</span>
         )}
       </p>
 
       {loading ? (
-        <div className="card p-16 flex justify-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600" />
+        <div className="panel flex justify-center py-16">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-50" />
         </div>
       ) : alertas.length === 0 ? (
-        <div className="card p-16 text-center text-gray-500 dark:text-gray-400">
-          No hay alertas todavía. El sistema revisa cada hora los picos de actividad.
+        <div className="panel text-center py-16 text-gray-400">
+          No alerts yet. The system reviews activity spikes every hour.
         </div>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="panel overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 dark:bg-gray-800 border-b">
+            <thead className="border-b border-gray-700">
               <tr>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Concepto</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Tipo</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Fecha</th>
-                <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white">Noticias</th>
-                <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white">Media previa</th>
-                <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white">Ratio</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Estado</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Acciones</th>
+                <th className="px-4 py-3 text-left text-xs font-mono uppercase text-gray-400">Concept</th>
+                <th className="px-4 py-3 text-left text-xs font-mono uppercase text-gray-400">Type</th>
+                <th className="px-4 py-3 text-left text-xs font-mono uppercase text-gray-400">Period</th>
+                <th className="px-4 py-3 text-right text-xs font-mono uppercase text-gray-400">News</th>
+                <th className="px-4 py-3 text-right text-xs font-mono uppercase text-gray-400">Baseline</th>
+                <th className="px-4 py-3 text-right text-xs font-mono uppercase text-gray-400">Ratio</th>
+                <th className="px-4 py-3 text-left text-xs font-mono uppercase text-gray-400">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-mono uppercase text-gray-400">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+            <tbody className="divide-y divide-gray-800">
               {alertas.map((a) => (
-                <tr key={a.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                <tr key={a.id} className="hover:bg-gray-800/50">
                   <td className="px-4 py-3">
                     <div className="flex items-start gap-3 min-w-0">
                       {a.image_path && (
                         <img
                           src={a.image_path}
                           alt={a.valor}
-                          className="w-12 h-12 object-cover rounded-lg shrink-0 bg-gray-100 dark:bg-gray-700"
+                          className="w-12 h-12 object-cover rounded-lg shrink-0 bg-gray-800"
                           onError={(e) => (e.currentTarget.style.display = 'none')}
                         />
                       )}
@@ -166,10 +178,10 @@ export function Alertas() {
                           imagePath={a.image_path || undefined}
                           wikiUrl={a.wiki_url || undefined}
                         >
-                          <span className="font-medium">{a.valor}</span>
+                          <span className="font-medium text-gray-50">{a.valor}</span>
                         </WikiTooltip>
                         {a.wiki_summary && (
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2 max-w-xs">
+                          <p className="text-xs text-gray-500 mt-0.5 line-clamp-2 max-w-xs">
                             {a.wiki_summary}
                           </p>
                         )}
@@ -177,48 +189,48 @@ export function Alertas() {
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="text-xs px-2 py-1 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+                    <span className="text-xs px-2 py-1 rounded bg-gray-800 text-gray-300">
                       {TIPO_LABEL[a.tipo] || a.tipo}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{a.periodo}</td>
-                  <td className="px-4 py-3 text-right text-sm text-gray-900 dark:text-white">{a.hits}</td>
-                  <td className="px-4 py-3 text-right text-sm text-gray-500 dark:text-gray-400">{a.baseline.toFixed(1)}</td>
+                  <td className="px-4 py-3 text-sm text-gray-400 font-mono">{a.periodo}</td>
+                  <td className="px-4 py-3 text-right text-sm text-gray-50">{a.hits}</td>
+                  <td className="px-4 py-3 text-right text-sm text-gray-400">{a.baseline.toFixed(1)}</td>
                   <td className="px-4 py-3 text-right">
-                    <span className={`text-sm font-semibold ${a.ratio >= 10 ? 'text-red-600' : 'text-orange-600'}`}>
+                    <span className={`text-sm font-semibold ${a.ratio >= 10 ? 'text-rss-red' : 'text-amber-400'}`}>
                       ×{a.ratio.toFixed(1)}
                     </span>
                   </td>
                   <td className="px-4 py-3">
                     <span className={`text-xs px-2 py-1 rounded ${
                       a.status === 'nueva'
-                        ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300'
+                        ? 'bg-rss-red/20 text-rss-red'
                         : a.status === 'descartada'
-                          ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
-                          : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                          ? 'bg-amber-900/20 text-amber-400'
+                          : 'bg-gray-800 text-gray-400'
                     }`}>
-                      {a.status === 'nueva' ? 'Nueva' : a.status === 'descartada' ? 'Descartada' : 'Leída'}
+                      {a.status === 'nueva' ? 'New' : a.status === 'descartada' ? 'Dismissed' : 'Read'}
                     </span>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <button onClick={() => openNews(a)} className="btn-secondary text-xs py-1 px-3 flex items-center gap-1">
+                      <button onClick={() => openNews(a)} className="btn-ghost text-xs py-1 px-2 flex items-center gap-1">
                         <FileText className="h-3.5 w-3.5" />
-                        Noticias
+                        News
                       </button>
                       {a.status === 'nueva' && (
-                        <button onClick={() => markRead(a.id)} className="btn-secondary text-xs py-1 px-3">
-                          Marcar leída
+                        <button onClick={() => markRead(a.id)} className="btn-ghost text-xs py-1 px-2">
+                          Mark read
                         </button>
                       )}
                       {a.status !== 'descartada' && (
                         <button
                           onClick={() => dismiss(a.id)}
-                          title="Es una falsa alerta: no volverá a mostrarse"
-                          className="btn-secondary text-xs py-1 px-3 flex items-center gap-1 text-amber-700 dark:text-amber-300"
+                          title="False alert: won't show again"
+                          className="btn-ghost text-xs py-1 px-2 flex items-center gap-1 text-amber-400"
                         >
                           <XCircle className="h-3.5 w-3.5" />
-                          Descartar
+                          Dismiss
                         </button>
                       )}
                     </div>
@@ -230,33 +242,33 @@ export function Alertas() {
         </div>
       )}
 
-      <div className="mt-6 flex items-center justify-end gap-2">
+      <div className="flex items-center justify-end gap-2">
         <button
           onClick={() => setLimit(limit > 50 ? 50 : 200)}
           className="btn-secondary flex items-center gap-2 text-sm"
         >
           {limit > 50 ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          Mostrar {limit > 50 ? 'menos' : 'más'} ({limit})
+          {limit > 50 ? 'Show less' : 'Show more'} ({limit})
         </button>
       </div>
 
-      {/* Noticias relacionadas del concepto */}
+      {/* News modal */}
       {newsModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setNewsModal(null)}>
           <div
-            className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
+            className="bg-gray-900 rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col border border-gray-700"
             onClick={e => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-6 py-4 border-b dark:border-gray-700">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
               <div>
-                <h2 className="text-lg font-bold">Noticias sobre &quot;{newsModal.valor}&quot;</h2>
-                <p className="text-sm text-gray-500 mt-0.5">
-                  {newsTotal} noticias encontradas · {TIPO_LABEL[newsModal.tipo] || newsModal.tipo} · {newsModal.periodo}
+                <h2 className="text-lg font-bold text-gray-50">News about &quot;{newsModal.valor}&quot;</h2>
+                <p className="text-sm text-gray-400 mt-0.5">
+                  {newsTotal} news found · {TIPO_LABEL[newsModal.tipo] || newsModal.tipo} · {newsModal.periodo}
                 </p>
               </div>
               <button
                 onClick={() => setNewsModal(null)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl leading-none"
+                className="text-gray-400 hover:text-gray-200 text-xl leading-none"
               >
                 ✕
               </button>
@@ -264,9 +276,9 @@ export function Alertas() {
 
             <div className="p-4 overflow-y-auto">
               {newsLoading ? (
-                <div className="text-center py-10 text-gray-400">Cargando...</div>
+                <div className="text-center py-10 text-gray-400">Loading...</div>
               ) : entityNews.length === 0 ? (
-                <div className="text-center py-10 text-gray-400">No hay noticias que mencionen a este concepto.</div>
+                <div className="text-center py-10 text-gray-400">No news mentions this concept.</div>
               ) : (
                 <ul className="space-y-2">
                   {entityNews.map((n) => (
@@ -274,7 +286,7 @@ export function Alertas() {
                       <Link
                         to={`/news/${n.id}`}
                         onClick={() => setNewsModal(null)}
-                        className="block p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border border-gray-100 dark:border-gray-700"
+                        className="block p-3 rounded-lg hover:bg-gray-800 transition-colors border border-gray-700"
                       >
                         <div className="flex items-start gap-3">
                           {n.imagen_url && (
@@ -286,14 +298,14 @@ export function Alertas() {
                             />
                           )}
                           <div className="min-w-0">
-                            <div className="font-medium text-sm line-clamp-2">
+                            <div className="font-medium text-sm text-gray-50 line-clamp-2">
                               {n.title_translated || n.titulo}
                             </div>
-                            <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                            <p className="text-xs text-gray-400 mt-1 line-clamp-2">
                               {n.summary_translated || n.resumen}
                             </p>
                             {n.fecha && (
-                              <span className="text-[11px] text-gray-400 mt-1 block">
+                              <span className="text-[11px] text-gray-500 mt-1 block font-mono">
                                 {new Date(n.fecha).toLocaleDateString('es-ES')}
                               </span>
                             )}

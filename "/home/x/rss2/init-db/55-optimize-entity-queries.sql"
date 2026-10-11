@@ -1,0 +1,8 @@
+-- Optimize entity search queries by adding lowercase valor index
+-- This improves GetEntityMentions queries from 6+ seconds to ~30ms for common entities
+
+-- Index for case-insensitive tag lookups
+CREATE INDEX IF NOT EXISTS idx_tags_valor_lower ON public.tags USING btree (lower(valor));
+
+-- Composite index for entity alias joins (frequently used in GetEntityMentions)
+CREATE INDEX IF NOT EXISTS idx_entity_aliases_canonical ON public.entity_aliases (lower(canonical_name));

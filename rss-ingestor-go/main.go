@@ -34,6 +34,11 @@ type Config struct {
 	HostDelay    time.Duration
 }
 
+var (
+	isRunning   bool
+	runMu       sync.Mutex
+)
+
 // Feed represents a row in the feeds table
 type Feed struct {
 	ID           int
@@ -498,13 +503,33 @@ func main() {
 	initDB()
 
 	// Run immediately on start
+	runMu.Lock()
+	isRunning = true
+	runMu.Unlock()
 	ingestCycle()
+	runMu.Lock()
+	isRunning = false
+	runMu.Unlock()
 
 	// Scheduler loop
 	ticker := time.NewTicker(config.PokeInterval)
 	defer ticker.Stop()
 
 	for range ticker.C {
-		ingestCycle()
+		runMu.Lock()
+		if isRunning {
+			log.Printf("[Scheduler] Previous cycle still running, skipping this tick")
+			runMu.Unlock()
+			continue
+		}
+		isRunning = true
+		runMu.Unlock()
+
+		go func() {
+			ingestCycle()
+			runMu.Lock()
+			isRunning = false
+			runMu.Unlock()
+		}()
 	}
 }

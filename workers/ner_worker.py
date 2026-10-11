@@ -46,6 +46,13 @@ DB = dict(
 NER_LANG = os.environ.get("NER_LANG", "es").strip().lower()
 BATCH = int(os.environ.get("NER_BATCH", 64))
 
+# Model language mapping - spaCy models for each target language
+NER_MODELS = {
+    "es": "es_core_news_lg",
+    "en": "en_core_web_lg",
+}
+DEFAULT_MODEL = "es_core_news_lg"
+
 # ==========================================================
 # Mapeo de entidades spaCy → nuestro modelo SQL
 # ==========================================================
@@ -379,14 +386,55 @@ def extract_entities_and_topics(nlp, text: str) -> Tuple[List[Tuple[str, str]], 
 # ==========================================================
 # Worker principal
 # ==========================================================
+
+# Global NLP models per language
+NLP_MODELS = {}
+
+def load_nlp_models():
+    """Load spaCy models for supported languages."""
+    global NLP_MODELS, STOPWORDS
+    models_to_load = {
+        "es": "es_core_news_lg",
+        "en": "en_core_web_lg",
+    }
+    
+    for lang, model_name in models_to_load.items():
+        try:
+            log.info(f"Cargando modelo spaCy {model_name} para {lang}...")
+            nlp = spacy.load(model_name, disable=["lemmatizer", "textcat"])
+            NLP_MODELS[lang] = nlp
+            log.info(f"Modelo {model_name} cargado correctamente.")
+        except Exception as e:
+            log.warning(f"No se pudo cargar {model_name}: {e}. El idioma {lang} no tendrá NER.")
+    
+    # Default STOPWORDS from Spanish model
+    if "es" in NLP_MODELS:
+        STOPWORDS = set(NLP_MODELS["es"].Defaults.stop_words)
+    elif "en" in NLP_MODELS:
+        STOPWORDS = set(NLP_MODELS["en"].Defaults.stop_words)
+    else:
+        STOPWORDS = set()
+
+def get_nlp_for_lang(lang: str):
+    """Get the appropriate NLP model for a language."""
+    if lang in NLP_MODELS:
+        return NLP_MODELS[lang]
+    # Fallback to Spanish if available, otherwise first available
+    if "es" in NLP_MODELS:
+        return NLP_MODELS["es"]
+    if NLP_MODELS:
+        return list(NLP_MODELS.values())[0]
+    return None
+
 def main():
     global STOPWORDS
 
-    # Cargar spaCy
-    log.info("Cargando modelo spaCy es_core_news_lg...")
-    nlp = spacy.load("es_core_news_lg", disable=["lemmatizer", "textcat"])
-    STOPWORDS = set(nlp.Defaults.stop_words)
-    log.info("Modelo spaCy cargado correctamente.")
+    # Cargar modelos spaCy para todos los idiomas soportados
+    load_nlp_models()
+    
+    if not NLP_MODELS:
+        log.error("No se pudo cargar ningún modelo spaCy. Saliendo.")
+        return
 
     # Cargar configuración de entidades
     load_entity_config()
@@ -398,19 +446,20 @@ def main():
             load_db_blocklist()
             with get_conn() as conn:
                 with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+                    # Procesar traducciones para todos los idiomas supported
                     cur.execute(
                         """
-                        SELECT t.id, t.titulo_trad, t.resumen_trad, t.noticia_id
+                        SELECT t.id, t.titulo_trad, t.resumen_trad, t.noticia_id, t.lang_to
                         FROM traducciones t
                         WHERE t.status = 'done'
-                          AND t.lang_to = %s
+                          AND t.lang_to = ANY(%s)
                           AND NOT EXISTS (
                               SELECT 1 FROM tags_noticia tn WHERE tn.traduccion_id = t.id
                           )
                         ORDER BY t.id DESC
                         LIMIT %s;
                         """,
-                        (NER_LANG, BATCH),
+                        (list(NLP_MODELS.keys()), BATCH),
                     )
 
                     rows = cur.fetchall()
@@ -426,6 +475,12 @@ def main():
                     for r in rows:
                         noticia_id = r["noticia_id"]
                         traduccion_id = r["id"]
+                        lang_to = r["lang_to"]
+                        
+                        nlp = get_nlp_for_lang(lang_to)
+                        if nlp is None:
+                            log.warning(f"No hay modelo NER para {lang_to}, saltando traduccion {traduccion_id}")
+                            continue
                         
                         text = f"{r['titulo_trad'] or ''}\n{r['resumen_trad'] or ''}".strip()
                         if not text:

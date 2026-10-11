@@ -32,6 +32,15 @@ services:
         limits:
           cpus: '4'
           memory: 4G
+    command: >
+      postgres
+      -c shared_buffers=1GB
+      -c effective_cache_size=2GB
+      -c work_mem=64MB
+      -c maintenance_work_mem=512MB
+      -c max_connections=200
+      -c autovacuum_max_workers=3
+      -c wal_level=replica
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
@@ -284,7 +293,7 @@ services:
           cpus: '1'
           memory: 256M
 
-  # NER (spaCy es_core_news_lg sobre traducciones done): tags -> Populares/Evolución/Alertas
+  # NER (spaCy models es_core_news_lg + en_core_web_lg sobre traducciones done): tags -> Populares/Evolución/Alertas
   ner:
     build:
       context: .
@@ -303,7 +312,6 @@ services:
       DB_NAME: ${POSTGRES_DB:-rss}
       DB_USER: ${POSTGRES_USER:-rss}
       DB_PASS: ${POSTGRES_PASSWORD}
-      NER_LANG: es
       NER_BATCH: 64
     networks:
       - backend
@@ -462,6 +470,43 @@ services:
     healthcheck:
       # Verifica que el binario esté corriendo
       test: ["CMD-SHELL", "grep -q related /proc/1/cmdline"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+
+  # Event Clustering: agrupar noticias del mismo evento usando embeddings.
+  # Usa pgvector para similitud coseno y clustering incremental.
+  event-clustering:
+    image: rss2-backend
+    container_name: rss2_event_clustering
+    entrypoint: ["/event_clustering"]
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-rss}
+      DB_USER: ${POSTGRES_USER:-rss}
+      DB_PASS: ${POSTGRES_PASSWORD}
+      CLUSTERING_SLEEP: 900
+      CLUSTERING_BATCH: 500
+      CLUSTERING_MIN_SIM: 0.85
+      CLUSTERING_TIME_WINDOW: 72
+    networks:
+      - backend
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      # Verifica que el binario esté corriendo
+      test: ["CMD-SHELL", "grep -q event_clustering /proc/1/cmdline"]
       interval: 30s
       timeout: 5s
       retries: 3

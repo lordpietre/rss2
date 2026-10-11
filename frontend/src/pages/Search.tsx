@@ -100,15 +100,22 @@ export function Search() {
   }
 
   return (
-    <div>
-      <form onSubmit={handleSearch} className="card p-4 mb-6">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-50">News Intelligence</h1>
+          <p className="text-sm text-gray-400 mt-1">Search and explore news across all sources</p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSearch} className="panel">
         <div className="flex flex-wrap gap-4 items-end">
           <div className="flex-1 min-w-[200px]">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
+            <label className="block text-xs font-mono uppercase text-gray-400 mb-2">Search</label>
             <input
               name="q"
               defaultValue={q}
-              placeholder="Palabras clave..."
+              placeholder="Keywords..."
               list="user-search-suggestions"
               className="input w-full"
             />
@@ -118,26 +125,26 @@ export function Search() {
           </div>
           
           <div className="w-32">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Idioma</label>
+            <label className="block text-xs font-mono uppercase text-gray-400 mb-2">Language</label>
             <select name="lang" defaultValue={lang} className="input w-full">
-              <option value="">Todos</option>
+              <option value="">All</option>
               <option value="es">Español</option>
-              <option value="en">Inglés</option>
-              <option value="fr">Francés</option>
-              <option value="pt">Portugués</option>
-              <option value="de">Alemán</option>
+              <option value="en">English</option>
+              <option value="fr">Français</option>
+              <option value="pt">Português</option>
+              <option value="de">Deutsch</option>
               <option value="it">Italiano</option>
-              <option value="ru">Ruso</option>
-              <option value="zh">Chino</option>
-              <option value="ja">Japonés</option>
-              <option value="ar">Árabe</option>
+              <option value="ru">Русский</option>
+              <option value="zh">中文</option>
+              <option value="ja">日本語</option>
+              <option value="ar">العربية</option>
             </select>
           </div>
 
           <div className="w-40">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
+            <label className="block text-xs font-mono uppercase text-gray-400 mb-2">Category</label>
             <select name="categoria_id" defaultValue={categoria} className="input w-full">
-              <option value="">Todas</option>
+              <option value="">All</option>
               {categorias?.map((cat) => (
                 <option key={cat.id} value={cat.id}>{cat.nombre}</option>
               ))}
@@ -145,9 +152,9 @@ export function Search() {
           </div>
 
           <div className="w-40">
-            <label className="block text-sm font-medium text-gray-700 mb-1">País</label>
+            <label className="block text-xs font-mono uppercase text-gray-400 mb-2">Country</label>
             <select name="pais_id" defaultValue={pais} className="input w-full">
-              <option value="">Todos</option>
+              <option value="">All</option>
               {paises?.map((p) => (
                 <option key={p.id} value={p.id}>{p.nombre}</option>
               ))}
@@ -160,7 +167,7 @@ export function Search() {
           
           {(categoria || pais || lang) && (
             <button type="button" onClick={clearFilters} className="btn-secondary">
-              Limpiar
+              Clear
             </button>
           )}
           {hasFilters && (
@@ -168,7 +175,7 @@ export function Search() {
               type="button"
               onClick={() => setShowSaveModal(true)}
               className="btn-secondary"
-              title="Guardar esta búsqueda"
+              title="Save this search"
             >
               <Bookmark className="h-5 w-5" />
             </button>
@@ -177,7 +184,7 @@ export function Search() {
       </form>
 
       {data && data.total > 0 && (
-        <p className="text-gray-600 mb-4">{data.total} resultados encontrados</p>
+        <p className="text-sm text-gray-400">{data.total.toLocaleString()} results found</p>
       )}
 
       {isLoading ? (
@@ -211,9 +218,9 @@ export function Search() {
             disabled={page <= 1}
             className="btn-secondary disabled:opacity-50"
           >
-            Anterior
+            Previous
           </button>
-          <span className="flex items-center px-4 text-gray-600">
+          <span className="flex items-center px-4 text-gray-400 font-mono text-sm">
             {page} / {data.total_pages}
           </span>
           <button
@@ -221,7 +228,7 @@ export function Search() {
             disabled={page >= data.total_pages}
             className="btn-secondary disabled:opacity-50"
           >
-            Siguiente
+            Next
           </button>
         </div>
       )}
@@ -237,7 +244,7 @@ export function Search() {
           if (pais) params.pais = pais
           createSearch('news', label, params)
         }}
-        typeLabel="búsqueda de noticias"
+        typeLabel="news search"
       />
 
       <CreateListModal

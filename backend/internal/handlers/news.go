@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 	"github.com/rss2/backend/internal/cache"
 	"github.com/rss2/backend/internal/config"
 	"github.com/rss2/backend/internal/db"
@@ -25,6 +27,50 @@ func getTargetLang(c *gin.Context) string {
 		lang = cfg.DefaultLang
 	}
 	return lang
+}
+
+// GetIdiomas returns all active languages available for translation
+// @Summary List available languages
+// @Description Returns all active languages configured for translation
+// @Tags idiomas
+// @Produce json
+// @Success 200 {object} models.IdiomaListResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /api/idiomas [get]
+func GetIdiomas(c *gin.Context) {
+	rows, err := db.GetPool().Query(c.Request.Context(), `
+		SELECT codigo, nombre, nombre_en, flag_emoji, activo
+		FROM idiomas_disponibles
+		ORDER BY nombre ASC
+	`)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to fetch languages", Message: err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	var idiomas []models.Idioma
+	for rows.Next() {
+		var i models.Idioma
+		var flagEmoji sql.NullString
+		if err := rows.Scan(&i.Codigo, &i.Nombre, &i.NombreEn, &flagEmoji, &i.Activo); err != nil {
+			log.Printf("GetIdiomas: scan error: %v", err)
+			continue
+		}
+		if flagEmoji.Valid {
+			i.FlagEmoji = flagEmoji.String
+		}
+		idiomas = append(idiomas, i)
+	}
+
+	if idiomas == nil {
+		idiomas = []models.Idioma{}
+	}
+
+	c.JSON(http.StatusOK, models.IdiomaListResponse{
+		Idiomas: idiomas,
+		Total:   len(idiomas),
+	})
 }
 
 // GetSharePreview returns an HTML page with Open Graph meta tags for social sharing
@@ -251,14 +297,18 @@ func GetNews(c *gin.Context) {
 
 	if query != "" {
 		if translatedOnly {
-			// With translated_only, search the translated fields too so users can
-			// find translated news by the target language wording.
-			where += fmt.Sprintf(" AND (n.titulo ILIKE $%d OR n.resumen ILIKE $%d OR t.titulo_trad ILIKE $%d OR t.resumen_trad ILIKE $%d)", argNum, argNum, argNum, argNum)
+			// Use FTS on both original (n.search_vector_es) and translated (t.search_vector_es) content
+			// t.search_vector_es contains the Spanish translation
+			where += fmt.Sprintf(" AND (n.search_vector_es @@ plainto_tsquery('spanish', $%d) OR t.search_vector_es @@ plainto_tsquery('spanish', $%d))", argNum, argNum+1)
+			args = append(args, query, query) // Need same query twice for both sides of OR
+			argNum += 2
 		} else {
-			where += fmt.Sprintf(" AND (n.titulo ILIKE $%d OR n.resumen ILIKE $%d)", argNum, argNum)
+			// Use Full-Text Search with existing index on search_vector_es
+			// plainto_tsquery converts user input to tsquery format
+			where += fmt.Sprintf(" AND n.search_vector_es @@ plainto_tsquery('spanish', $%d)", argNum)
+			args = append(args, query)
+			argNum++
 		}
-		args = append(args, "%"+query+"%")
-		argNum++
 	}
 	if categoryID != "" {
 		where += fmt.Sprintf(" AND n.categoria_id = $%d", argNum)
@@ -274,35 +324,75 @@ func GetNews(c *gin.Context) {
 		where += " AND t.status = 'done' AND t.titulo_trad IS NOT NULL AND t.titulo_trad != n.titulo"
 	}
 
+	// Count results for page 1 - now fast with FTS index
 	var total int
-	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM noticias n LEFT JOIN traducciones t ON t.noticia_id = n.id AND t.lang_to = $%d WHERE %s", argNum, where)
-	args = append(args, targetLang)
-	err := db.GetPool().QueryRow(c.Request.Context(), countQuery, args...).Scan(&total)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to count news", Message: err.Error()})
-		return
+	if page == 1 {
+		if query == "" {
+			// Browse mode - need to count properly with translatedOnly filter
+			if translatedOnly {
+				// Count only news that have translations done
+				countQuery := `
+					SELECT COUNT(*) FROM noticias n
+					INNER JOIN traducciones t ON t.noticia_id = n.id AND t.lang_to = $1
+					WHERE t.status = 'done' AND t.titulo_trad IS NOT NULL AND t.titulo_trad != n.titulo`
+				err := db.GetPool().QueryRow(c.Request.Context(), countQuery, targetLang).Scan(&total)
+				if err != nil {
+					log.Printf("Count query error (translatedOnly): %v", err)
+					total = 0
+				}
+			} else {
+				// Use approximate count for all news
+				countQuery := "SELECT reltuples::bigint FROM pg_class WHERE relname = 'noticias'"
+				db.GetPool().QueryRow(c.Request.Context(), countQuery).Scan(&total)
+			}
+		} else {
+			// Build separate query for COUNT with proper JOIN
+			if translatedOnly {
+				// Need JOIN with traducciones for translatedOnly
+				countQuery := fmt.Sprintf(`
+					SELECT COUNT(*) FROM noticias n
+					INNER JOIN traducciones t ON t.noticia_id = n.id AND t.lang_to = $3
+					WHERE %s`, where)
+				countArgs := []interface{}{query, query, targetLang}
+				err := db.GetPool().QueryRow(c.Request.Context(), countQuery, countArgs...).Scan(&total)
+				if err != nil {
+					log.Printf("Count query error: %v", err)
+					total = 0
+				}
+			} else {
+				countArgs := []interface{}{query}
+				countQuery := fmt.Sprintf("SELECT COUNT(*) FROM noticias n WHERE %s", where)
+				err := db.GetPool().QueryRow(c.Request.Context(), countQuery, countArgs...).Scan(&total)
+				if err != nil {
+					log.Printf("Count query error: %v", err)
+					total = 0
+				}
+			}
+		}
 	}
 
-	if total == 0 {
-		c.JSON(http.StatusOK, models.NewsListResponse{
-			News:       []models.NewsWithTranslations{},
-			Total:      0,
-			Page:       page,
-			PerPage:    perPage,
-			TotalPages: 0,
-		})
-		return
+	// Append targetLang for the JOIN condition (needed for main query)
+	args = append(args, targetLang)
+
+	var joinType string
+	if translatedOnly {
+		joinType = "INNER JOIN"
+	} else {
+		joinType = "LEFT JOIN"
 	}
 
 	sqlQuery := `
-		SELECT n.id, COALESCE(n.titulo, ''), COALESCE(n.resumen, ''), COALESCE(n.contenido, '') AS contenido, n.url, n.fecha, n.imagen_url, 
+		SELECT n.id, COALESCE(n.titulo, ''), COALESCE(n.resumen, ''), COALESCE(n.contenido, '') AS contenido, n.url, n.fecha, n.imagen_url,
 		       n.categoria_id, n.pais_id, n.fuente_nombre, n.lang,
 		       t.titulo_trad,
 		       t.resumen_trad,
 		       t.contenido_trad,
-		       t.lang_to as lang_trad
+		       t.lang_to as lang_trad,
+		       ec.id as cluster_id
 		FROM noticias n
-		LEFT JOIN traducciones t ON t.noticia_id = n.id AND t.lang_to = $` + strconv.Itoa(argNum) + `
+		` + joinType + ` traducciones t ON t.noticia_id = n.id AND t.lang_to = $` + strconv.Itoa(argNum) + `
+		LEFT JOIN noticia_clusters nc ON nc.noticia_id = n.id
+		LEFT JOIN event_clusters ec ON nc.cluster_id = ec.id
 		WHERE ` + where + `
 		ORDER BY n.fecha DESC LIMIT $` + strconv.Itoa(argNum+1) + ` OFFSET $` + strconv.Itoa(argNum+2)
 
@@ -322,11 +412,13 @@ func GetNews(c *gin.Context) {
 		var fecha *time.Time
 		var imagenURL, fuenteNombre, langRaw *string
 		var categoriaID, paisID *int32
+		var clusterID sql.NullInt64
 
 		err := rows.Scan(
 			&id, &titulo, &resumen, &contenido, &url, &fecha, &imagenURL,
 			&categoriaID, &paisID, &fuenteNombre, &langRaw,
 			&n.TitleTranslated, &n.SummaryTranslated, &n.ContentTranslated, &n.LangTranslated,
+			&clusterID,
 		)
 		if err != nil {
 			log.Printf("GetNews: scan error: %v", err)
@@ -364,10 +456,22 @@ func GetNews(c *gin.Context) {
 			t := strings.TrimSpace(*n.LangTranslated)
 			n.LangTranslated = &t
 		}
+		if clusterID.Valid {
+			n.ClusterID = &clusterID.Int64
+		}
 		newsList = append(newsList, n)
 	}
 
-	totalPages := (total + perPage - 1) / perPage
+	// For search queries (query != ""), total stays 0 - frontend shows "Page X" without "of Y"
+	// For browse mode (query == ""), total is already set from pg_class
+
+	var totalPages int
+	if total == 0 && len(newsList) > 0 {
+		// We don't know total, but we have results - show at least 1 page
+		totalPages = 1
+	} else {
+		totalPages = (total + perPage - 1) / perPage
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"news":        newsList,
@@ -518,7 +622,7 @@ func GetNewsByID(c *gin.Context) {
 	id := c.Param("id")
 	targetLang := getTargetLang(c)
 
-	// Combined query to fetch news with entities in one round trip
+	// Combined query to fetch news with entities and cluster in one round trip
 	sqlQuery := `
 		SELECT 
 			n.id, COALESCE(n.titulo, ''), COALESCE(n.resumen, ''), COALESCE(n.contenido, '') AS contenido, n.url, n.fecha, n.imagen_url, 
@@ -536,7 +640,8 @@ func GetNewsByID(c *gin.Context) {
 		               'wiki_url', ent.wiki_url,
 		               'image_path', ent.image_path
 		           )
-		       ) FILTER (WHERE ent.valor IS NOT NULL) as entities
+		       ) FILTER (WHERE ent.valor IS NOT NULL) as entities,
+		       ec.id as cluster_id
 		FROM noticias n
 		LEFT JOIN traducciones t ON t.noticia_id = n.id AND t.lang_to = $1
 		LEFT JOIN (
@@ -546,10 +651,13 @@ func GetNewsByID(c *gin.Context) {
 			JOIN traducciones tr ON tn.traduccion_id = tr.id
 			WHERE t.tipo IN ('persona', 'organizacion')
 		) ent ON ent.noticia_id = n.id
+		LEFT JOIN noticia_clusters nc ON nc.noticia_id = n.id
+		LEFT JOIN event_clusters ec ON nc.cluster_id = ec.id
 		WHERE n.id = $2
 		GROUP BY n.id, n.titulo, n.resumen, n.contenido, n.url, n.fecha, n.imagen_url, 
 		         n.categoria_id, n.pais_id, n.fuente_nombre, n.lang,
-		         t.titulo_trad, t.resumen_trad, t.contenido_trad, t.lang_to
+		         t.titulo_trad, t.resumen_trad, t.contenido_trad, t.lang_to,
+		         ec.id
 	`
 
 	var n models.NewsWithTranslations
@@ -558,12 +666,14 @@ func GetNewsByID(c *gin.Context) {
 	var imagenURL, fuenteNombre, langRaw *string
 	var categoriaID, paisID *int32
 	var entitiesJSON *string
+	var clusterID sql.NullInt64
 
 	err := db.GetPool().QueryRow(c.Request.Context(), sqlQuery, targetLang, id).Scan(
 		&id, &titulo, &resumen, &contenido, &url, &fecha, &imagenURL,
 		&categoriaID, &paisID, &fuenteNombre, &langRaw,
 		&n.TitleTranslated, &n.SummaryTranslated, &n.ContentTranslated, &n.LangTranslated,
 		&entitiesJSON,
+		&clusterID,
 	)
 	if err != nil {
 		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: "News not found"})
@@ -601,6 +711,11 @@ func GetNewsByID(c *gin.Context) {
 	if n.LangTranslated != nil {
 		t := strings.TrimSpace(*n.LangTranslated)
 		n.LangTranslated = &t
+	}
+
+	// Set cluster_id if news belongs to an event
+	if clusterID.Valid {
+		n.ClusterID = &clusterID.Int64
 	}
 
 	// Parse entities from JSON
@@ -665,8 +780,81 @@ func GetEntities(c *gin.Context) {
 
 	offset := (page - 1) * perPage
 
-	where := "t.tipo = $1"
-	args := []interface{}{entityType}
+	// Check if we should use precomputed entity_stats (only for unfiltered queries)
+	useStats := countryID == "" && categoryID == "" && q == "" && c.Query("apellido") == ""
+
+	if useStats {
+		// Fast path: use precomputed entity_stats table (no JOIN, all data pre-computed)
+		orderBy := "count DESC"
+		switch sortBy {
+		case "count":
+			orderBy = "count DESC"
+		case "name":
+			orderBy = "canonical_name ASC"
+		case "recent":
+			orderBy = "last_date DESC NULLS LAST"
+		}
+
+		countQuery := "SELECT COUNT(*) FROM entity_stats WHERE entity_type = $1"
+		var total int
+		db.GetPool().QueryRow(c.Request.Context(), countQuery, entityType).Scan(&total)
+
+		query := fmt.Sprintf(`
+			SELECT canonical_name as valor, entity_type as tipo, 
+			       apellido, count,
+			       wiki_summary, wiki_url, image_path, last_date
+			FROM entity_stats
+			WHERE entity_type = $1
+			ORDER BY %s
+			LIMIT $2 OFFSET $3
+		`, orderBy)
+		args := []interface{}{entityType, perPage, offset}
+
+		rows, err := db.GetPool().Query(c.Request.Context(), query, args...)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to get entities", Message: err.Error()})
+			return
+		}
+		defer rows.Close()
+
+		var entities []models.Entity
+		for rows.Next() {
+			var e models.Entity
+			var lastDate sql.NullTime
+			if err := rows.Scan(&e.Valor, &e.Tipo, &e.Apellido, &e.Count, &e.WikiSummary, &e.WikiURL, &e.ImagePath, &lastDate); err != nil {
+				log.Printf("GetEntities: scan error: %v", err)
+				continue
+			}
+			if lastDate.Valid {
+				e.LastDate = &lastDate.Time
+			}
+			entities = append(entities, e)
+		}
+
+		if entities == nil {
+			entities = []models.Entity{}
+		}
+
+		c.JSON(http.StatusOK, models.EntityListResponse{
+			Entities:   entities,
+			Total:      total,
+			Page:       page,
+			PerPage:    perPage,
+			TotalPages: (total + perPage - 1) / perPage,
+		})
+		return
+	}
+
+	// Slow path: original query with filters
+	var where string
+	var args []interface{}
+	if entityType != "" {
+		where = "t.tipo = $1"
+		args = []interface{}{entityType}
+	} else {
+		where = "1=1"
+		args = []interface{}{}
+	}
 
 	if countryID != "" {
 		where += fmt.Sprintf(" AND n.pais_id = $%d", len(args)+1)
@@ -701,40 +889,10 @@ func GetEntities(c *gin.Context) {
 		orderBy = "t.last_mentioned_at DESC NULLS LAST"
 	}
 
-	// 1. Get the total count of distinct canonical entities matching the filter.
-	// Agrupación case-insensitive: "Donald Trump" y "Donald trump" son la
-	// misma entidad a efectos de Populares (el NER genera ambas variantes).
-	countQuery := fmt.Sprintf(`
-		SELECT COUNT(DISTINCT LOWER(COALESCE(ea.canonical_name, t.valor)))
-		FROM tags_noticia tn
-		JOIN tags t ON tn.tag_id = t.id
-		JOIN traducciones tr ON tn.traduccion_id = tr.id
-		JOIN noticias n ON tr.noticia_id = n.id
-		LEFT JOIN entity_aliases ea ON LOWER(ea.alias) = LOWER(t.valor) AND ea.tipo = t.tipo
-		WHERE %s AND NOT EXISTS (
-		SELECT 1 FROM entity_blocklist b WHERE b.tipo = t.tipo AND b.valor_lower = LOWER(t.valor)
-	)
-	`, where)
-
+	// Skip slow COUNT DISTINCT for entities. Frontend shows "Page X" without "of Y".
 	var total int
-	err := db.GetPool().QueryRow(c.Request.Context(), countQuery, args...).Scan(&total)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to get entities count", Message: err.Error()})
-		return
-	}
 
-	if total == 0 {
-		c.JSON(http.StatusOK, models.EntityListResponse{
-			Entities:   []models.Entity{},
-			Total:      0,
-			Page:       page,
-			PerPage:    perPage,
-			TotalPages: 0,
-		})
-		return
-	}
-
-	// 2. Fetch the paginated entities. Forma visible = variante exacta más
+	// Fetch the paginated entities. Forma visible = variante exacta más
 	// frecuente (mode): evita que un variant TODO-MAYÚSCULAS gane por orden
 	// ASCII a MIN(). MAX() en wiki_* ignora NULLs (gana el tag con wiki).
 	args = append(args, perPage, offset)
@@ -764,14 +922,10 @@ func GetEntities(c *gin.Context) {
 	var entities []models.Entity
 	for rows.Next() {
 		var e models.Entity
-		var apellido *string
 		var lastDate sql.NullTime
-		if err := rows.Scan(&e.Valor, &e.Tipo, &apellido, &e.Count, &e.WikiSummary, &e.WikiURL, &e.ImagePath, &lastDate); err != nil {
+		if err := rows.Scan(&e.Valor, &e.Tipo, &e.Apellido, &e.Count, &e.WikiSummary, &e.WikiURL, &e.ImagePath, &lastDate); err != nil {
 			log.Printf("GetEntities: scan error: %v", err)
 			continue
-		}
-		if apellido != nil {
-			e.Apellido = *apellido
 		}
 		if lastDate.Valid {
 			e.LastDate = &lastDate.Time
@@ -828,12 +982,15 @@ func GetLastNames(c *gin.Context) {
 
 func GetEntityMentions(c *gin.Context) {
 	valuesRaw := c.DefaultQuery("values", "")
-	days := 30
-	if v := c.Query("days"); v != "" {
-		if d, err := strconv.Atoi(v); err == nil && d >= 1 && d <= 365 {
-			days = d
+	hours := 720 // 30 days default
+	if v := c.Query("hours"); v != "" {
+		if h, err := strconv.Atoi(v); err == nil && h >= 1 && h <= 2160 { // max 90 days
+			hours = h
 		}
 	}
+
+	// Determine if we use hourly or daily granularity
+	useHourly := hours <= 48
 
 	var values []string
 	for _, v := range strings.Split(valuesRaw, ",") {
@@ -846,12 +1003,13 @@ func GetEntityMentions(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "values is required (comma separated)"})
 		return
 	}
-	if len(values) > 20 {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Too many values (max 20)"})
+	// Limit to 3 entities for performance - too many causes slow queries
+	if len(values) > 3 {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Too many values (max 3 for performance)"})
 		return
 	}
 
-	start := time.Now().AddDate(0, 0, -(days - 1)).Truncate(24 * time.Hour)
+	start := time.Now().Add(-time.Duration(hours) * time.Hour).Truncate(time.Hour)
 	ctx := c.Request.Context()
 
 	// OPTIMIZED: Single query to get all tag IDs for all values using UNNEST
@@ -868,12 +1026,19 @@ func GetEntityMentions(c *gin.Context) {
 	}
 
 	// Query all tag IDs for all values at once
+	// Optimized: split into two queries - one for direct matches, one for alias matches - then union
 	rows, err := db.GetPool().Query(ctx, `
-		SELECT DISTINCT t.id, t.tipo, LOWER(t.valor) as valor_lower
-		FROM tags t
-		LEFT JOIN entity_aliases ea ON ea.tipo = t.tipo AND LOWER(ea.alias) = LOWER(t.valor)
-		WHERE LOWER(t.valor) = ANY($1)
-		   OR LOWER(COALESCE(ea.canonical_name, t.valor)) = ANY($1)
+		WITH matching_tags AS (
+			SELECT DISTINCT t.id, t.tipo, LOWER(t.valor) as valor_lower
+			FROM tags t
+			WHERE LOWER(t.valor) = ANY($1)
+			UNION
+			SELECT DISTINCT t.id, t.tipo, LOWER(t.valor) as valor_lower
+			FROM tags t
+			JOIN entity_aliases ea ON ea.tipo = t.tipo AND LOWER(ea.alias) = LOWER(t.valor)
+			WHERE LOWER(ea.canonical_name) = ANY($1)
+		)
+		SELECT DISTINCT id, tipo, valor_lower FROM matching_tags
 	`, lowerValues)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to get tag IDs", Message: err.Error()})
@@ -912,9 +1077,17 @@ func GetEntityMentions(c *gin.Context) {
 		// No tags found for any of the values
 		series := make([]models.MentionSeries, 0, len(values))
 		for _, valor := range values {
-			data := make([]models.MentionPoint, days)
-			for i := 0; i < days; i++ {
-				data[i] = models.MentionPoint{Fecha: start.AddDate(0, 0, i).Format("2006-01-02"), Count: 0}
+			var data []models.MentionPoint
+			if useHourly {
+				data = make([]models.MentionPoint, hours)
+				for i := 0; i < hours; i++ {
+					data[i] = models.MentionPoint{Fecha: start.Add(time.Duration(i) * time.Hour).Format("2006-01-02 15:00"), Count: 0}
+				}
+			} else {
+				data = make([]models.MentionPoint, hours/24)
+				for i := 0; i < hours/24; i++ {
+					data[i] = models.MentionPoint{Fecha: start.AddDate(0, 0, i).Format("2006-01-02"), Count: 0}
+				}
 			}
 			series = append(series, models.MentionSeries{
 				Valor: valor,
@@ -923,20 +1096,33 @@ func GetEntityMentions(c *gin.Context) {
 				Tipo:  "desconocido",
 			})
 		}
-		c.JSON(http.StatusOK, models.MentionsResponse{Days: days, Series: series})
+		c.JSON(http.StatusOK, models.MentionsResponse{Days: hours, Series: series})
 		return
 	}
 
 	// OPTIMIZED: Single query to get all mention counts for all tag IDs
-	drows, err := db.GetPool().Query(ctx, `
-		SELECT tn.tag_id, n.fecha::date::text AS dia, COUNT(DISTINCT n.id) AS cnt
-		FROM tags_noticia tn
-		JOIN traducciones tr ON tn.traduccion_id = tr.id
-		JOIN noticias n ON tr.noticia_id = n.id
-		WHERE tn.tag_id = ANY($1) AND n.fecha >= CURRENT_DATE - ($2::int - 1)
-		GROUP BY tn.tag_id, n.fecha::date
-		ORDER BY tn.tag_id, n.fecha::date
-	`, allTagIDs, days)
+	var drows pgx.Rows
+	if useHourly {
+		drows, err = db.GetPool().Query(ctx, `
+			SELECT tn.tag_id, date_trunc('hour', n.fecha)::text AS hora, COUNT(DISTINCT tn.noticia_id) AS cnt
+			FROM tags_noticia tn
+			JOIN traducciones tr ON tn.traduccion_id = tr.id
+			JOIN noticias n ON tr.noticia_id = n.id
+			WHERE tn.tag_id = ANY($1) AND n.fecha >= $2::timestamptz
+			GROUP BY tn.tag_id, date_trunc('hour', n.fecha)
+			ORDER BY tn.tag_id, date_trunc('hour', n.fecha)
+		`, allTagIDs, start)
+	} else {
+		drows, err = db.GetPool().Query(ctx, `
+			SELECT tn.tag_id, n.fecha::date::text AS dia, COUNT(DISTINCT tn.noticia_id) AS cnt
+			FROM tags_noticia tn
+			JOIN traducciones tr ON tn.traduccion_id = tr.id
+			JOIN noticias n ON tr.noticia_id = n.id
+			WHERE tn.tag_id = ANY($1) AND n.fecha >= CURRENT_DATE - ($2::int - 1)
+			GROUP BY tn.tag_id, n.fecha::date
+			ORDER BY tn.tag_id, n.fecha::date
+		`, allTagIDs, hours/24)
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to get mention counts", Message: err.Error()})
 		return
@@ -966,20 +1152,29 @@ func GetEntityMentions(c *gin.Context) {
 		tags := valorToTags[lv]
 
 		// Aggregate counts across all tags for this value
-		dayCount := make(map[string]int)
+		periodCount := make(map[string]int)
 		totalCount := 0
 		for _, ti := range tags {
-			for dia, cnt := range tagDayCount[ti.ID] {
-				dayCount[dia] += cnt
+			for period, cnt := range tagDayCount[ti.ID] {
+				periodCount[period] += cnt
 				totalCount += cnt
 			}
 		}
 
-		// Build complete day-by-day data
-		data := make([]models.MentionPoint, 0, days)
-		for i := 0; i < days; i++ {
-			fecha := start.AddDate(0, 0, i).Format("2006-01-02")
-			data = append(data, models.MentionPoint{Fecha: fecha, Count: dayCount[fecha]})
+		// Build complete data points
+		var data []models.MentionPoint
+		if useHourly {
+			data = make([]models.MentionPoint, 0, hours)
+			for i := 0; i < hours; i++ {
+				fecha := start.Add(time.Duration(i) * time.Hour).Format("2006-01-02 15:00")
+				data = append(data, models.MentionPoint{Fecha: fecha, Count: periodCount[fecha]})
+			}
+		} else {
+			data = make([]models.MentionPoint, 0, hours/24)
+			for i := 0; i < hours/24; i++ {
+				fecha := start.AddDate(0, 0, i).Format("2006-01-02")
+				data = append(data, models.MentionPoint{Fecha: fecha, Count: periodCount[fecha]})
+			}
 		}
 
 		tipo := valorToTipo[lv]
@@ -994,5 +1189,68 @@ func GetEntityMentions(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, models.MentionsResponse{Days: days, Series: series})
+	c.JSON(http.StatusOK, models.MentionsResponse{Days: hours, Series: series})
+}
+
+// RefreshEntityStatsStartup refreshes entity_stats on server startup (non-blocking)
+func RefreshEntityStatsStartup() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	start := time.Now()
+	_, err := db.GetPool().Exec(ctx, "SELECT refresh_entity_stats()")
+	if err != nil {
+		return fmt.Errorf("refresh_entity_stats failed: %w", err)
+	}
+
+	var count int
+	db.GetPool().QueryRow(ctx, "SELECT COUNT(*) FROM entity_stats").Scan(&count)
+	log.Printf("EntityStats: refreshed %d entities in %v", count, time.Since(start))
+	return nil
+}
+
+// RefreshEntityStats refreshes the entity_stats table (HTTP handler)
+func RefreshEntityStats(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	// Check if refresh is already running
+	var isRefreshing bool
+	err := db.GetPool().QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM pg_stat_activity 
+			WHERE query LIKE '%refresh_entity_stats%' AND state = 'active'
+		)
+	`).Scan(&isRefreshing)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to check refresh status", Message: err.Error()})
+		return
+	}
+
+	if isRefreshing {
+		c.JSON(http.StatusConflict, models.ErrorResponse{Error: "Entity stats refresh already in progress"})
+		return
+	}
+
+	// Get count before refresh
+	var countBefore int
+	db.GetPool().QueryRow(ctx, "SELECT COUNT(*) FROM entity_stats").Scan(&countBefore)
+
+	// Execute refresh
+	start := time.Now()
+	_, err = db.GetPool().Exec(ctx, "SELECT refresh_entity_stats()")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to refresh entity stats", Message: err.Error()})
+		return
+	}
+
+	// Get count after refresh
+	var countAfter int
+	db.GetPool().QueryRow(ctx, "SELECT COUNT(*) FROM entity_stats").Scan(&countAfter)
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":         "success",
+		"count_before":   countBefore,
+		"count_after":    countAfter,
+		"duration_ms":    time.Since(start).Milliseconds(),
+	})
 }

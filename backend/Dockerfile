@@ -16,6 +16,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -buildvcs=false -o /topics ./cmd/topics
 RUN CGO_ENABLED=0 GOOS=linux go build -buildvcs=false -o /related ./cmd/related
 RUN CGO_ENABLED=0 GOOS=linux go build -buildvcs=false -o /sanitize ./cmd/sanitize
 RUN CGO_ENABLED=0 GOOS=linux go build -buildvcs=false -o /entityscan ./cmd/entityscan
+RUN CGO_ENABLED=0 GOOS=linux go build -buildvcs=false -o /event_clustering ./cmd/event_clustering
 
 FROM alpine:3.23
 
@@ -31,6 +32,7 @@ COPY --from=builder /topics /topics
 COPY --from=builder /related /related
 COPY --from=builder /sanitize /sanitize
 COPY --from=builder /entityscan /entityscan
+COPY --from=builder /event_clustering /event_clustering
 
 # Symlinks for convenience
 RUN ln -s /server /usr/local/bin/server && \
@@ -40,7 +42,8 @@ RUN ln -s /server /usr/local/bin/server && \
     ln -s /topics /usr/local/bin/topics && \
     ln -s /related /usr/local/bin/related && \
     ln -s /sanitize /usr/local/bin/sanitize && \
-    ln -s /entityscan /usr/local/bin/entityscan
+    ln -s /entityscan /usr/local/bin/entityscan && \
+    ln -s /event_clustering /usr/local/bin/event_clustering
 
 ENV PATH="/usr/local/bin:${PATH}"
 

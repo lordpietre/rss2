@@ -29,9 +29,11 @@ DB_CONFIG = {
     'password': os.getenv('DB_PASS', 'rss')
 }
 
-TARGET_LANGS = os.getenv('TARGET_LANGS', 'es').split(',')
+# Configurable via env, default: 'es,en'
+TARGET_LANGS = os.getenv('TARGET_LANGS', 'es,en').split(',')
 BATCH_SIZE = int(os.getenv('SCHEDULER_BATCH', '2000'))
 SLEEP_INTERVAL = int(os.getenv('SCHEDULER_SLEEP', '30'))
+USE_DB_LANGS = os.getenv('USE_DB_LANGS', 'true').lower() == 'true'
 
 # Códigos ISO 639-1 válidos para langdetect + comunes
 # https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes
@@ -63,18 +65,36 @@ def is_valid_lang(lang):
     return True
 
 
+def get_active_langs(conn):
+    """Fetch active languages from idiomas_disponibles table."""
+    if not USE_DB_LANGS:
+        return [l.strip() for l in TARGET_LANGS if l.strip()]
+    
+    with conn.cursor() as cur:
+        cur.execute("SELECT codigo FROM idiomas_disponibles WHERE activo = TRUE")
+        rows = cur.fetchall()
+        if not rows:
+            logger.warning("No active languages found in idiomas_disponibles, falling back to env TARGET_LANGS")
+            return [l.strip() for l in TARGET_LANGS if l.strip()]
+        return [row[0].strip() for row in rows]
+
+
 def create_translation_jobs(conn):
     """Create translation jobs for news without translations."""
     created = 0
 
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
-        for lang in TARGET_LANGS:
+        # Get all active languages (from DB or env)
+        active_langs = get_active_langs(conn)
+        
+        for lang in active_langs:
             lang = lang.strip()
             if not lang:
                 continue
 
             # Crear jobs si hay resumen O contenido (el translator maneja ambos)
             # Filtramos idiomas inválidos que langdetect pudo asignar
+            # También registramos en traducciones_target para rastrear qué idiomas se han solicitado
             cur.execute("""
                 INSERT INTO traducciones (noticia_id, lang_from, lang_to, status, created_at)
                 SELECT n.id, n.lang, %s, 'pending', NOW()
@@ -100,6 +120,17 @@ def create_translation_jobs(conn):
             if rows:
                 created += len(rows)
                 logger.info(f"Created {len(rows)} translation jobs for {lang}")
+                
+                # Track requested translations in traducciones_target
+                for row in rows:
+                    try:
+                        cur.execute("""
+                            INSERT INTO traducciones_target (noticia_id, lang_to, created_at)
+                            VALUES (%s, %s, NOW())
+                            ON CONFLICT (noticia_id, lang_to) DO NOTHING
+                        """, (row['noticia_id'], lang))
+                    except Exception as e:
+                        logger.warning(f"Failed to track translation target {row['noticia_id']}/{lang}: {e}")
 
         conn.commit()
 

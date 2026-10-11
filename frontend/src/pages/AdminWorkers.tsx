@@ -46,7 +46,6 @@ export function AdminWorkers() {
     setLoading(true)
     try {
       const res = await api.get('/admin/workers/status')
-      console.log('Status response:', res.data)
       setStatus(res.data)
       setConfigType(res.data.type)
       setConfigWorkers(res.data.workers)
@@ -63,18 +62,9 @@ export function AdminWorkers() {
   const fetchRemoteWorkers = async () => {
     try {
       const res = await api.get('/admin/workers/remote')
-      console.log('Remote workers response:', res.data)
       setRemoteWorkers(res.data)
     } catch (err: any) {
       console.error('Error fetching remote workers:', err)
-      // If 401, user is not authenticated - try refreshing
-      if (err.response?.status === 401) {
-        const userData = localStorage.getItem('user')
-        if (userData) {
-          const user = JSON.parse(userData)
-          console.log('Current user from localStorage:', user)
-        }
-      }
     }
   }
 
@@ -92,7 +82,7 @@ export function AdminWorkers() {
       })
       await fetchStatus()
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Error al iniciar workers')
+      alert(err.response?.data?.error || 'Error starting workers')
     } finally {
       setActionLoading(null)
     }
@@ -104,7 +94,7 @@ export function AdminWorkers() {
       await api.post('/admin/workers/stop')
       await fetchStatus()
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Error al detener workers')
+      alert(err.response?.data?.error || 'Error stopping workers')
     } finally {
       setActionLoading(null)
     }
@@ -119,7 +109,7 @@ export function AdminWorkers() {
       })
       await fetchStatus()
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Error al guardar configuración')
+      alert(err.response?.data?.error || 'Error saving configuration')
     } finally {
       setActionLoading(null)
     }
@@ -137,19 +127,19 @@ export function AdminWorkers() {
       setNewWorkerName('')
       fetchRemoteWorkers()
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Error al crear worker')
+      alert(err.response?.data?.error || 'Error creating worker')
     } finally {
       setActionLoading(null)
     }
   }
 
   const handleDeleteRemoteWorker = async (id: number) => {
-    if (!confirm('¿Eliminar este worker remoto?')) return
+    if (!confirm('Delete this remote worker?')) return
     try {
       await api.delete(`/admin/workers/remote/${id}`)
       fetchRemoteWorkers()
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Error al eliminar worker')
+      alert(err.response?.data?.error || 'Error deleting worker')
     }
   }
 
@@ -158,86 +148,90 @@ export function AdminWorkers() {
       await api.post(`/admin/workers/remote/${id}/toggle`)
       fetchRemoteWorkers()
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Error al cambiar estado')
+      alert(err.response?.data?.error || 'Error changing status')
     }
   }
 
   const handleRegenerateKey = async (id: number) => {
-    if (!confirm('¿Regenerar API key? La anterior deixará de funcionar.')) return
+    if (!confirm('Regenerate API key? The previous one will stop working.')) return
     try {
       const res = await api.post(`/admin/workers/remote/${id}/regenerate-key`)
       setNewWorkerKey(res.data.api_key)
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Error al regenerar key')
+      alert(err.response?.data?.error || 'Error regenerating key')
     }
   }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary-50" />
       </div>
     )
   }
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Server className="h-6 w-6" />
-          Workers de Traducción
-        </h1>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-50 flex items-center gap-3">
+            <Server className="h-6 w-6 text-primary-50" />
+            System Status
+          </h1>
+          <p className="text-sm text-gray-400 mt-1">Translation workers and remote worker management</p>
+        </div>
         <button
           onClick={fetchStatus}
           className="btn-secondary flex items-center gap-2"
         >
           <RefreshCw className="h-4 w-4" />
-          Actualizar
+          Refresh
         </button>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+        {/* Configuration */}
+        <div className="panel">
+          <h2 className="text-lg font-semibold text-gray-50 mb-4 flex items-center gap-2">
             <Settings className="h-5 w-5" />
-            Configuración
+            Configuration
           </h2>
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-2">Tipo de procesamiento</label>
+              <label className="block text-xs font-mono uppercase text-gray-400 mb-2">Processing Type</label>
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
                   onClick={() => setConfigType('cpu')}
                   className={`p-3 rounded-lg border-2 transition-all flex flex-col items-center ${
                     configType === 'cpu'
-                      ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-green-300'
+                      ? 'border-primary-50 bg-primary-900/30'
+                      : 'border-gray-700 hover:border-primary-500/50'
                   }`}
                 >
-                  <Cpu className="h-6 w-6 text-green-600 mb-1" />
-                  <span className="font-medium">CPU</span>
+                  <Cpu className="h-6 w-6 text-primary-50 mb-1" />
+                  <span className="font-medium text-gray-50">CPU</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setConfigType('gpu')}
                   className={`p-3 rounded-lg border-2 transition-all flex flex-col items-center ${
                     configType === 'gpu'
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-blue-300'
+                      ? 'border-blue-400 bg-blue-900/30'
+                      : 'border-gray-700 hover:border-blue-400/50'
                   }`}
                 >
-                  <svg className="h-6 w-6 text-blue-600 mb-1" viewBox="0 0 24 24" fill="currentColor">
+                  <svg className="h-6 w-6 text-blue-400 mb-1" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
                   </svg>
-                  <span className="font-medium">GPU</span>
+                  <span className="font-medium text-gray-50">GPU</span>
                 </button>
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2">Número de workers</label>
+              <label className="block text-xs font-mono uppercase text-gray-400 mb-2">Number of Workers</label>
               <div className="flex flex-wrap gap-2">
                 {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
                   <button
@@ -246,8 +240,8 @@ export function AdminWorkers() {
                     onClick={() => setConfigWorkers(num)}
                     className={`w-10 h-10 rounded-lg font-medium transition-all ${
                       configWorkers === num
-                        ? 'bg-primary-600 text-white'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                        ? 'bg-primary-50 text-gray-900'
+                        : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
                     }`}
                   >
                     {num}
@@ -266,72 +260,72 @@ export function AdminWorkers() {
               ) : (
                 <Settings className="h-4 w-4" />
               )}
-              Guardar Configuración
+              Save Configuration
             </button>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+        {/* Current Status */}
+        <div className="panel">
+          <h2 className="text-lg font-semibold text-gray-50 mb-4 flex items-center gap-2">
             <Server className="h-5 w-5" />
-            Estado Actual
+            Current Status
           </h2>
 
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <span className="font-medium">Estado</span>
+            <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
+              <span className="font-medium text-gray-300">Status</span>
               <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                 status?.status === 'running'
-                  ? 'bg-green-100 text-green-800'
-                  : 'bg-gray-100 text-gray-800'
+                  ? 'bg-primary-900/30 text-primary-50 border border-primary-500/30'
+                  : 'bg-gray-700 text-gray-300'
               }`}>
-                {status?.status === 'running' ? 'Activo' : 'Detenido'}
+                {status?.status === 'running' ? 'Active' : 'Stopped'}
               </span>
             </div>
 
-            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <span className="font-medium">Tipo</span>
+            <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
+              <span className="font-medium text-gray-300">Type</span>
               <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                 status?.type === 'gpu'
-                  ? 'bg-blue-100 text-blue-800'
-                  : 'bg-green-100 text-green-800'
+                  ? 'bg-blue-900/30 text-blue-400 border border-blue-500/30'
+                  : 'bg-primary-900/30 text-primary-50 border border-primary-500/30'
               }`}>
                 {status?.type === 'gpu' ? 'GPU' : 'CPU'}
               </span>
             </div>
 
-            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <span className="font-medium">Workers configurados</span>
-              <span className="text-lg font-bold">{status?.workers}</span>
+            <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
+              <span className="font-medium text-gray-300">Workers Configured</span>
+              <span className="text-lg font-bold text-gray-50">{status?.workers}</span>
             </div>
 
-            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <span className="font-medium">Workers activos</span>
-              <span className="text-lg font-bold">{tStats?.active_workers ?? status?.running ?? 0}</span>
+            <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
+              <span className="font-medium text-gray-300">Active Workers</span>
+              <span className="text-lg font-bold text-primary-50">{tStats?.active_workers ?? status?.running ?? 0}</span>
             </div>
 
-            <div className="rounded-lg border border-primary-200 dark:border-primary-800 p-4">
-              <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-primary-600" />
-                Rendimiento de Traducción
+            <div className="rounded-lg border border-primary-500/20 p-4">
+              <h3 className="text-sm font-semibold text-gray-50 mb-3 flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-primary-50" />
+                Translation Performance
               </h3>
               <div className="grid grid-cols-3 gap-3 text-center">
-                <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                  <div className="text-xl font-bold text-primary-600">{tStats?.rate_per_second ?? 0}</div>
-                  <div className="text-xs text-gray-500">noticias/seg</div>
+                <div className="p-3 bg-gray-800 rounded-lg">
+                  <div className="text-xl font-bold text-primary-50">{tStats?.rate_per_second ?? 0}</div>
+                  <div className="text-xs text-gray-500">news/sec</div>
                 </div>
-                <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                  <div className="text-xl font-bold text-primary-600">{tStats?.rate_per_minute ?? 0}</div>
-                  <div className="text-xs text-gray-500">noticias/min</div>
+                <div className="p-3 bg-gray-800 rounded-lg">
+                  <div className="text-xl font-bold text-primary-50">{tStats?.rate_per_minute ?? 0}</div>
+                  <div className="text-xs text-gray-500">news/min</div>
                 </div>
-                <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                  <div className="text-xl font-bold text-primary-600">{tStats?.translations_last_1min ?? 0}</div>
-                  <div className="text-xs text-gray-500">últ. 1 min</div>
+                <div className="p-3 bg-gray-800 rounded-lg">
+                  <div className="text-xl font-bold text-primary-50">{tStats?.translations_last_1min ?? 0}</div>
+                  <div className="text-xs text-gray-500">last 1 min</div>
                 </div>
               </div>
               <div className="text-xs text-gray-500 mt-2">
-                {tStats?.translations_last_5min ?? 0} traducidas en los últimos 5 min ·{' '}
-                {tStats?.remote_workers_online ?? 0} remotos online
+                {tStats?.translations_last_5min ?? 0} translated in last 5 min · {tStats?.remote_workers_online ?? 0} remote online
               </div>
             </div>
 
@@ -340,14 +334,14 @@ export function AdminWorkers() {
                 <button
                   onClick={handleStop}
                   disabled={actionLoading === 'stop'}
-                  className="btn-danger flex-1 flex items-center justify-center gap-2"
+                  className="btn-secondary flex-1 flex items-center justify-center gap-2 border-rss-red/50 text-rss-red hover:bg-rss-red/10"
                 >
                   {actionLoading === 'stop' ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <Square className="h-4 w-4" />
                   )}
-                  Detener
+                  Stop
                 </button>
               ) : (
                 <button
@@ -360,7 +354,7 @@ export function AdminWorkers() {
                   ) : (
                     <Play className="h-4 w-4" />
                   )}
-                  Iniciar
+                  Start
                 </button>
               )}
             </div>
@@ -368,36 +362,37 @@ export function AdminWorkers() {
         </div>
       </div>
 
-      <div className="mt-6 bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
+      {/* Remote Workers */}
+      <div className="panel">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-50 flex items-center gap-2">
             <Wifi className="h-5 w-5" />
-            Workers Remotos
+            Remote Workers
           </h2>
           <button
             onClick={() => setShowAddForm(true)}
             className="btn-primary flex items-center gap-2"
           >
             <Plus className="h-4 w-4" />
-            Añadir Worker
+            Add Worker
           </button>
         </div>
 
         {showAddForm && (
-          <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-            <h3 className="font-medium mb-3">Nuevo Worker Remoto</h3>
+          <div className="mb-6 p-4 bg-gray-800 rounded-lg">
+            <h3 className="font-medium text-gray-50 mb-3">New Remote Worker</h3>
             <div className="flex gap-3 mb-3">
               <input
                 type="text"
-                placeholder="Nombre del worker"
+                placeholder="Worker name"
                 value={newWorkerName}
                 onChange={(e) => setNewWorkerName(e.target.value)}
-                className="flex-1 px-3 py-2 border rounded-lg dark:bg-gray-600 dark:border-gray-600"
+                className="input flex-1"
               />
               <select
                 value={newWorkerCapabilities}
                 onChange={(e) => setNewWorkerCapabilities(e.target.value)}
-                className="px-3 py-2 border rounded-lg dark:bg-gray-600 dark:border-gray-600"
+                className="input w-32"
               >
                 <option value="cpu">CPU</option>
                 <option value="gpu">GPU</option>
@@ -409,72 +404,70 @@ export function AdminWorkers() {
                 disabled={actionLoading === 'add'}
                 className="btn-primary"
               >
-                {actionLoading === 'add' ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Crear'}
+                {actionLoading === 'add' ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create'}
               </button>
               <button
                 onClick={() => { setShowAddForm(false); setNewWorkerKey(null) }}
                 className="btn-secondary"
               >
-                Cancelar
+                Cancel
               </button>
             </div>
           </div>
         )}
 
         {newWorkerKey && (
-          <div className="mb-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+          <div className="mb-4 p-4 bg-primary-900/20 border border-primary-500/30 rounded-lg">
             <div className="flex items-center gap-2 mb-2">
-              <Key className="h-4 w-4 text-green-600" />
-              <span className="font-medium text-green-800 dark:text-green-200">API Key creada</span>
+              <Key className="h-4 w-4 text-primary-50" />
+              <span className="font-medium text-primary-50">API Key Created</span>
             </div>
-            <code className="block p-2 bg-white dark:bg-gray-800 rounded text-sm break-all font-mono">
+            <code className="block p-2 bg-gray-900 rounded text-sm break-all font-mono text-gray-300">
               {newWorkerKey}
             </code>
-            <p className="text-sm text-green-700 dark:text-green-300 mt-2">
-              Copia esta clave. No se mostrará de nuevo.
+            <p className="text-sm text-gray-400 mt-2">
+              Copy this key. It will not be shown again.
             </p>
             <button
               onClick={() => setNewWorkerKey(null)}
-              className="mt-2 text-sm text-green-700 dark:text-green-300 underline"
+              className="mt-2 text-sm text-primary-300 underline"
             >
-              Ocultar
+              Hide
             </button>
           </div>
         )}
 
         {remoteWorkers.length === 0 ? (
-          <p className="text-gray-500 text-center py-4">No hay workers remotos configurados</p>
+          <p className="text-gray-500 text-center py-8">No remote workers configured</p>
         ) : (
           <div className="space-y-3">
             {remoteWorkers.map((worker) => (
-              <div key={worker.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <div key={worker.id} className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
                 <div className="flex items-center gap-3">
-                  <div className={`w-3 h-3 rounded-full ${
-                    worker.status === 'online' ? 'bg-green-500' : 'bg-gray-400'
-                  }`} />
+                  <div className={`w-3 h-3 rounded-full ${worker.status === 'online' ? 'bg-primary-50 animate-pulse' : 'bg-gray-600'}`} />
                   <div>
-                    <span className="font-medium">{worker.name}</span>
-                    <span className="ml-2 text-sm text-gray-500">{worker.capabilities}</span>
+                    <span className="font-medium text-gray-50">{worker.name}</span>
+                    <span className="ml-2 text-sm text-gray-500 font-mono">{worker.capabilities}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => handleToggleRemoteWorker(worker.id)}
-                    className="px-2 py-1 text-xs rounded border hover:bg-gray-100 dark:hover:bg-gray-600"
+                    className="px-3 py-1 text-xs rounded border border-gray-700 hover:bg-gray-700"
                   >
-                    {worker.status === 'disabled' ? 'Activar' : 'Desactivar'}
+                    {worker.status === 'disabled' ? 'Enable' : 'Disable'}
                   </button>
                   <button
                     onClick={() => handleRegenerateKey(worker.id)}
-                    className="p-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-                    title="Regenerar API Key"
+                    className="p-2 text-gray-400 hover:text-gray-200"
+                    title="Regenerate API Key"
                   >
                     <Key className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => handleDeleteRemoteWorker(worker.id)}
-                    className="p-2 text-red-500 hover:text-red-700"
-                    title="Eliminar"
+                    className="p-2 text-gray-400 hover:text-rss-red"
+                    title="Delete"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>

@@ -72,7 +72,7 @@ def store_cache(pairs, ttl: int = CACHE_TTL):
         pipe = r.pipeline(transaction=False)
         for k, v in pairs:
             if v:
-                pipe.setex(k, ttl, v)
+                pipe.set(k, v, ex=ttl)
         pipe.execute()
     except Exception as e:
         LOG.warning(f"Redis cache store error: {e}")
