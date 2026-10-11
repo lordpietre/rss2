@@ -170,7 +170,8 @@ func SemanticSearch(ctx context.Context, query, lang string, page, perPage int) 
 		FROM traduccion_embeddings te
 		JOIN traducciones t ON te.traduccion_id = t.id
 		WHERE te.embedding_vector IS NOT NULL
-		  AND te.embedding_vector != '0'::vector(384)
+		  AND te.embedding_vector::text != '[]'
+		  AND te.embedding_vector::text != '0'
 		  AND t.lang_to = $1
 		  AND t.status = 'done'
 	`
@@ -204,7 +205,8 @@ func SemanticSearch(ctx context.Context, query, lang string, page, perPage int) 
 		JOIN traducciones t ON te.traduccion_id = t.id
 		JOIN noticias n ON t.noticia_id = n.id
 		WHERE te.embedding_vector IS NOT NULL
-		  AND te.embedding_vector != '0'::vector(384)
+		  AND te.embedding_vector::text != '[]'
+		  AND te.embedding_vector::text != '0'
 		  AND t.lang_to = $1
 		  AND t.status = 'done'
 		ORDER BY te.embedding_vector <=> '%s'::vector
