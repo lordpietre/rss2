@@ -150,9 +150,9 @@ func SearchNews(c *gin.Context) {
 	whereClause := "WHERE 1=1"
 
 	if query != "" {
-		// Full-text sobre search_vector_es (índice GIN, 100% poblado):
-		// ~50 ms frente a ~4 s del ILIKE con seq scan. plainto_tsquery
-		// aplica stemming español ("elecciones" ⊃ "elección").
+		// Full-text search with improved multi-word handling
+		// Use plainto_tsquery for AND semantics (all terms must match)
+		// This ensures relevance but may miss some results for complex queries
 		whereClause += " AND n.search_vector_es @@ plainto_tsquery('spanish', $" + strconv.Itoa(argNum) + ")"
 		args = append(args, query)
 		argNum++
@@ -186,6 +186,10 @@ func SearchNews(c *gin.Context) {
 		` + whereClause + `
 		ORDER BY n.fecha DESC
 		LIMIT $` + strconv.Itoa(argNum) + ` OFFSET $` + strconv.Itoa(argNum+1)
+
+	// Note: ts_rank could be added for relevance ordering:
+	// ORDER BY ts_rank(n.search_vector_es, plainto_tsquery('spanish', $2)) DESC, n.fecha DESC
+	// This requires adding the query term twice or using a subquery
 
 	args = append(args, perPage, offset)
 
