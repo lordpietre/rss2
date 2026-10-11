@@ -14,18 +14,24 @@
 
 ### Go (backend + rss-ingestor-go)
 ```bash
-make deps        # go mod download + tidy (both modules)
+make all         # deps + build (full local build)
+make deps        # go mod download + tidy (backend/ only; rss-ingestor-go/ is untouched)
 make build       # build all Go binaries to bin/
+make clean       # remove bin/ + go clean
 make test        # go test ./... in both modules
 make parity      # diff backend/internal/textclean rss-ingestor-go/textclean (must stay identical)
 ```
 
-### Go workers (run locally with DB env)
+### Go workers (run locally with DB env — binaries in bin/, no Docker)
 ```bash
 make run-scraper     DB_HOST=localhost DB_PORT=5432 DB_NAME=rss DB_USER=rss DB_PASS=rss
 make run-discovery   DB_HOST=localhost DB_PORT=5432 DB_NAME=rss DB_USER=rss DB_PASS=rss
 make run-topics      DB_HOST=localhost DB_PORT=5432 DB_NAME=rss DB_USER=rss DB_PASS=rss
 make run-related     DB_HOST=localhost DB_PORT=5432 DB_NAME=rss DB_USER=rss DB_PASS=rss RELATED_SLEEP=10
+# wiki: no make target; run manually:
+#   DB_HOST=localhost DB_PORT=5432 DB_NAME=rss DB_USER=rss DB_PASS=rss \
+#   REDIS_HOST=localhost REDIS_PORT=6379 REDIS_PASSWORD=<pass> WIKI_SLEEP=5 WIKI_BATCH=40 \
+#   bin/wiki-worker
 ```
 
 ### Sanitize + entity operations (affects production data)
@@ -33,13 +39,15 @@ make run-related     DB_HOST=localhost DB_PORT=5432 DB_NAME=rss DB_USER=rss DB_P
 make sanitize-dry-run         # preview text cleaning
 make sanitize                # apply + requeue for translation
 make sanitize-restore        # undo from noticias.*_raw
-make sanitize-local          # run locally (requires direct DB access)
+make sanitize-local          # run locally (requires Go + direct DB access)
 
 make entities-scan           # dry-run NER false-positive scan
 make entities-scan-apply     # seed entity_blocklist from scan
+make entities-scan-local     # run locally (Go + direct DB)
 
 make alerts-prune            # dry-run legacy alert pruning
 make alerts-prune-apply     # apply alert pruning
+make alerts-prune-local      # run locally (Go + direct DB)
 ```
 
 ### Frontend
@@ -56,9 +64,15 @@ docker compose up -d --build backend   # first: build shared image
 docker compose up -d --no-build        # then: rest of services
 ```
 
+### Docker builds (two-step, avoids AlreadyExists conflicts)
+```bash
+docker compose build backend frontend ingestor translator
+docker compose build translation-scheduler langdetect ner embeddings
+```
+
 ## Critical Quirks
 
-- **textclean duplication**: `backend/internal/textclean/` and `rss-ingestor-go/textclean/` must be identical. Use `make parity` to verify after changes. They build in separate Docker contexts and would diverge without this check.
+- **textclean duplication**: `backend/internal/textclean/` and `rss-ingestor-go/textclean/` must be identical. Use `make parity` to verify after changes. They build in separate Docker contexts and would diverge without this check. **Always run `make parity` before committing textclean changes** — there is no CI/pre-commit hook enforcing this.
 
 - **Go workers reuse backend image**: Workers (scraper, discovery, topics, wiki, related) are built into the `backend` Dockerfile as separate binaries (`/scraper`, `/discovery`, etc.) and then invoked with different entrypoints in `docker-compose.yml`. Never `docker compose build` two services against the same image tag in one command (conflicts with `AlreadyExists`).
 
