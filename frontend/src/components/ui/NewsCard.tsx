@@ -77,10 +77,10 @@ export function NewsCard({
 
         {/* Content - elongated vertical layout */}
         <div className="flex-1 min-w-0 flex flex-col">
-          {/* Meta row - small text */}
-          <div className="flex items-center gap-2 text-xs text-gray-500 mb-1 flex-wrap">
+          {/* Meta row */}
+          <div className="flex items-center gap-2 text-sm text-gray-400 mb-1.5 flex-wrap">
             {news.fuente_nombre && (
-              <span className="truncate max-w-[120px]">{news.fuente_nombre}</span>
+              <span className="truncate max-w-[150px] font-medium">{news.fuente_nombre}</span>
             )}
             {news.fecha && (
               <span className="shrink-0">
@@ -88,20 +88,20 @@ export function NewsCard({
               </span>
             )}
             {countryName && (
-              <span className="flex items-center gap-0.5 shrink-0 text-emerald-600 dark:text-emerald-400">
-                <MapPin className="h-3 w-3" />
+              <span className="flex items-center gap-0.5 shrink-0 text-emerald-500 dark:text-emerald-400">
+                <MapPin className="h-3.5 w-3.5" />
                 {countryName}
               </span>
             )}
           </div>
 
-          {/* Title - smaller, more lines */}
-          <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-1 line-clamp-2 leading-snug">
+          {/* Title - larger for better readability */}
+          <h3 className="text-lg font-semibold text-gray-50 mb-1.5 line-clamp-2 leading-snug">
             {news.title_translated || news.titulo}
           </h3>
 
-          {/* Summary - always 3 lines for consistency */}
-          <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-3 leading-relaxed flex-1">
+          {/* Summary - larger text */}
+          <p className="text-base text-gray-300 line-clamp-3 leading-relaxed flex-1">
             {news.summary_translated || news.resumen}
           </p>
 
@@ -139,28 +139,28 @@ export function NewsCard({
       {/* Hover tooltip with full content */}
       {showHover && (
         <div 
-          className="absolute z-50 left-0 top-full mt-2 w-[500px] bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-5"
+          className="absolute z-50 left-0 top-full mt-2 w-[500px] bg-rss-bg-panel/90 backdrop-blur-sm rounded-lg shadow-xl border border-rss-border p-5"
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >
-          <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-3">
+          <h3 className="font-bold text-xl text-gray-50 mb-3">
             {news.title_translated || news.titulo}
           </h3>
-          <p className="text-sm text-gray-700 dark:text-gray-300 mb-4 max-h-40 overflow-y-auto leading-relaxed">
+          <p className="text-base text-gray-300 mb-4 max-h-40 overflow-y-auto leading-relaxed">
             {news.summary_translated || news.resumen}
           </p>
           {news.content_translated || news.contenido ? (
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 max-h-32 overflow-y-auto leading-relaxed">
+            <p className="text-base text-gray-400 mb-4 max-h-32 overflow-y-auto leading-relaxed">
               {news.content_translated || news.contenido}
             </p>
           ) : null}
-          <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+          <div className="flex items-center gap-4 text-base text-gray-400">
             {news.fuente_nombre && <span className="font-medium">{news.fuente_nombre}</span>}
             {news.fecha && (
               <span>{formatDistanceToNow(new Date(news.fecha), { addSuffix: true, locale: es })}</span>
             )}
             {countryName && (
-              <span className="flex items-center gap-1 text-emerald-600">
+              <span className="flex items-center gap-1 text-emerald-500">
                 <MapPin className="h-4 w-4" />
                 {countryName}
               </span>

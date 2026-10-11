@@ -440,7 +440,7 @@ export function Populares() {
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       {entity.image_path && (
-                        <img src={entity.image_path} alt={entity.valor} className="w-16 h-16 object-cover rounded-xl shrink-0 bg-gray-800 border border-gray-700" onError={(e) => e.currentTarget.style.display = 'none'} />
+                        <img src={entity.image_path} alt={entity.valor} className="w-20 h-20 object-cover rounded-xl shrink-0 bg-gray-800 border border-gray-700" onError={(e) => e.currentTarget.style.display = 'none'} />
                       )}
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
@@ -506,7 +506,7 @@ export function Populares() {
           <div className="bg-gray-900 rounded-xl shadow-2xl w-full max-w-md border border-gray-700" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-4 px-6 py-4 border-b border-gray-700">
               {configModal.entity.image_path && (
-                <img src={configModal.entity.image_path} alt={configModal.entity.valor} className="w-20 h-20 object-cover rounded-xl border-2 border-gray-600" />
+                <img src={configModal.entity.image_path} alt={configModal.entity.valor} className="w-24 h-24 object-cover rounded-xl border-2 border-gray-600" />
               )}
               <div>
                 <h2 className="text-xl font-bold text-gray-50">{configModal.entity.valor}</h2>
