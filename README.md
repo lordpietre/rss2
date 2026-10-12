@@ -93,6 +93,13 @@ Las entidades se extraen mediante NER (Named Entity Recognition) y se almacenan 
 | GET | `/api/entities` | Lista de entidades con filtros (sort: count, name, recent, last_mentioned) |
 | GET | `/api/entities/news?valor=&tipo=` | Noticias que mencionan una entidad |
 | GET | `/api/entities/mentions?values=&hours=` | Serie temporal de menciones |
+| GET | `/api/entities/graph?tipo=&limit=` | Datos para grafo de entidades (nodes + links) |
+
+**Endpoint `/api/entities/graph`:**
+- Devuelve `{ nodes: [...], links: [...] }` para visualización de red
+- `nodes`: entidades con `{ id, valor, tipo, wiki_summary, news_count }`
+- `links`: co-ocurrencias con `{ source, target, value }` (limitado a 20 nodos por rendimiento)
+- **Limitación**: El cálculo de co-ocurrencias es lento para datasets grandes (2.4M filas en `tags_noticia`). Actualmente devuelve nodos sin links en producción.
 
 ### Trends Radar (Stats.tsx)
 
