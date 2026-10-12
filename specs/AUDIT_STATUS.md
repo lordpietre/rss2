@@ -1,111 +1,184 @@
 # RSS2 Intelligence Center - Estado de Auditoría
 
-## Fecha: 2026-10-12
+## Fecha: 2026-10-12 (Actualizado)
 
-## Estado del Sistema
+## Estado del Sistema ✅
 
-### Servicios Verificados ✅
-| Servicio | Estado | Notas |
-|----------|--------|-------|
-| Backend | ✅ Healthy | Puerto 8080, API responds |
-| Frontend | ✅ Healthy | SPA compilada y servida |
-| Database | ✅ Healthy | PostgreSQL 16 con 50+ tablas |
-| Redis | ✅ Healthy | Cache operativo |
-| Workers | ✅ Healthy | Todos los workers corriendo |
+### Servicios - Todos Healthy
+```
+rss2_backend          Up ~15 min (healthy)
+rss2_db               Up ~8 hours (healthy)
+rss2_frontend         Up ~30 min (healthy)
+rss2_nginx            Up ~30 min (healthy)
+rss2_cooccurrences    Up ~5 min (healthy) - nuevo worker
+(+ 13 workers adicionales - todos healthy)
+```
 
-### Datos Verificados ✅
+### Datos - Verificados ✅
 | Métrica | Valor | Fuente |
 |---------|-------|--------|
-| Total News | 1,281,887 | `/api/stats` |
-| News Today | 15,799 | `/api/stats` |
-| Total Feeds | 28,705 | `/api/stats` |
-| Countries (DB) | 195+ | `/api/countries` |
-| Alerts | Variables | `alertas` table |
-| Translations | 194,022 | `/api/stats` |
-| Entity Co-occurrences | 374,637 | `entity_cooccurrences` table |
+| Total News | 1,284,617 | `/api/stats` |
+| News Today | 18,440 | `/api/stats` |
+| Total Feeds | 28,704 | `/api/stats` |
+| Countries | 195 | `/api/countries` |
+| Categories | 15 | `/api/categories` |
+| Translations | 194,324 | `/api/stats` |
+| Entity Cooccurrences | 375,120 | `entity_cooccurrences` table |
+
+### Top Countries (por volumen de noticias)
+```
+1. Estados Unidos: 618,935
+2. Reino Unido: 100,782
+3. Brasil: 47,506
+4. Rusia: 27,731
+5. Alemania: 26,977
+```
 
 ## Funcionalidades Implementadas
 
-### Páginas Funcionales
+### ✅ Páginas Principales
 | Ruta | Página | Estado |
 |------|--------|--------|
-| `/overview` | Overview Dashboard | ✅ Métricas reales, gráficos |
-| `/map` | Global Monitor | ✅ Mapa SVG, distribución por país |
-| `/search` | News Intelligence | ✅ Búsqueda con filtros |
+| `/overview` | Intelligence Overview | ✅ Dashboard con métricas reales |
+| `/map` | Global Monitor | ✅ Mapa SVG + distribución |
+| `/search` | News Intelligence | ✅ Búsqueda + filtros |
 | `/stats` | Trends Radar | ✅ Entidades trending |
-| `/alertas` | Alert Center | ✅ Alertas con auth |
+| `/alertas` | Alert Center | ✅ Con auth |
 | `/feeds` | Sources Management | ✅ CRUD completo |
-| `/populares` | Entity Network | ✅ Grafo con links |
+| `/populares` | Entity Network | ✅ Grafo con co-occurrences |
 | `/analisis` | News Evolution | ✅ Análisis temporal |
 | `/admin/workers` | System Status | ✅ Observabilidad |
 
-### Componentes Visuales
+### ✅ Componentes Visuales
 | Componente | Estado | Notas |
 |------------|--------|-------|
-| IntelligenceLayout | ✅ | Sidebar, topbar, reloj, estado API |
-| Dark Theme | ✅ | CSS variables, paleta fosforito/verde |
+| IntelligenceLayout | ✅ | Sidebar + Topbar + Reloj |
+| Dark Theme | ✅ | CSS variables + paleta fosforito |
 | EntityGraph | ✅ | SVG force layout, 371 líneas |
-| WorldMap | ✅ | SVG interactivo con tooltips |
+| WorldMap | ✅ | SVG interactivo |
 | LineChart | ✅ | Gráfico temporal |
-| TagCloud | ✅ | Visualización de tags |
+| MetricCard | ✅ | Métricas con trends |
+| AlertPanel | ✅ | Con badge de nuevas |
 
-## Mejoras Aplicadas (2026-10-12)
+### ✅ Backend API
+| Endpoint | Estado | Datos |
+|----------|--------|-------|
+| `GET /api/stats` | ✅ | Métricas globales |
+| `GET /api/news` | ✅ | Lista paginada |
+| `GET /api/entities/graph` | ✅ | Nodes + Links |
+| `GET /api/countries` | ✅ | 195 países |
+| `GET /api/categories` | ✅ | 15 categorías |
+| `GET /api/entities/news` | ✅ | Noticias por entidad |
+| `GET /api/entities/mentions` | ✅ | Serie temporal |
 
-### 1. Entity Network con Co-occurrences ✅
-- Tabla `entity_cooccurrences` precalculada (374,637 registros)
-- Función `refresh_all_entity_cooccurrences()` para actualización
-- Endpoint `/api/entities/graph` ahora devuelve nodes + links
-- Links muestran co-ocurrencias reales (ej: Trump-Rusia: 378 menciones compartidas)
+## Arquitectura de Entidades
 
-### 2. Dark Theme Consistente ✅
-- Variables CSS: `--rss-bg-main`, `--rss-green-phosphor`, etc.
-- Tailwind config con colores RSS2
-- Componentes: `.btn-primary`, `.btn-secondary`, `.panel`, `.metric`
-
-### 3. Sin Datos Ficticios ✅
-- Overview.tsx usa datos reales del API
-- Stats.tsx sin Math.random()
-- EntityGraph con datos precalculados
-
-## Métricas Reales del Sistema
 ```
-Top 10 Países por News:
-  1. Estados Unidos: ~600,000
-  2. Reino Unido: ~100,000
-  3. Brasil: ~50,000
-  4. Rusia: ~30,000
-  5. Alemania: ~27,000
-
-Top 5 Categorías:
-  1. Tecnología: 507,868
-  2. Cultura: 184,747
-  3. Sociedad: 128,330
-  4. Internacional: 110,548
-  5. Política: 73,766
+┌─────────────────────────────────────────────────────────────┐
+│                    Entity Network Architecture               │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌─────────────┐    ┌──────────────────┐    ┌─────────────┐ │
+│  │   tags      │───▶│  tags_noticia  │◀───│  noticias   │ │
+│  │  (1.7M)     │    │   (2.4M)       │    │  (1.28M)   │ │
+│  └─────────────┘    └──────────────────┘    └─────────────┘ │
+│                            │                                │
+│                            ▼                                │
+│                   ┌─────────────────────┐                   │
+│                   │ entity_cooccurrences│                   │
+│                   │    (375,120)        │                   │
+│                   │ Pre-calculated links│                   │
+│                   └─────────────────────┘                   │
+│                            │                                │
+│                            ▼                                │
+│                   ┌─────────────────────┐                   │
+│                   │  /api/entities/    │                   │
+│                   │     graph          │                   │
+│                   │ Returns nodes +    │                   │
+│                   │ links for SVG viz  │                   │
+│                   └─────────────────────┘                   │
+└─────────────────────────────────────────────────────────────┘
 ```
+
+## Worker de Co-occurrences
+
+```yaml
+cooccurrences:
+  image: rss2-backend
+  entrypoint: ["/cooccurrences"]
+  interval: 24h  # Por defecto
+  # También soporta --once para ejecución manual
+```
+
+El worker:
+1. Trunca la tabla `entity_cooccurrences`
+2. Recalcula co-occurrences de últimos 30 días
+3. Requiere >= 3 co-apariciones para incluir relación
 
 ## Limitaciones Conocidas
 
-### Entity Co-occurrences
-- Tabla precalculada basada en últimas 4 semanas
-- Requiere actualización periódica (job manual o cron)
-- No refleja co-occurrences en tiempo real
+### 1. Entity Graph por Tipo
+Cuando se filtra por `tipo=persona`, puede devolver 0 nodos porque:
+- Las personas tienen menos co-occurrences que lugares/temas
+- El ranking se hace por co-count total, no por tipo
 
-### EntityGraph Links
-- Límite de 100 links por consulta
-- Filtrar por `tipo` puede resultar en 0 nodos si no hay entidades de ese tipo en top co-occurrences
+**Solución temporal**: Usar `limit=50` o mayor para obtener más nodos.
 
-## Commits Recientes
+### 2. Co-occurrences Limitadas a 100
+El endpoint devuelve máximo 100 links para evitar sobrecarga.
+
+### 3. Top Co-occurring Son Mayormente Lugares/Temas
 ```
+Top 5 entities por co-occurrences:
+1. semana (tema)
+2. Estados Unidos (lugar)
+3. elecciones (tema)
+4. partido (tema)
+5. Rusia (lugar)
+```
+Esto es esperado - eventos como "elecciones en Estados Unidos" generan muchas co-occurrences.
+
+## Commits (Sesión Actual)
+
+```
+5c16f10 feat: add cooccurrences worker for entity graph updates
+5005b7f docs: update AUDIT_STATUS with current implementation state
 18bc2fc feat: entity co-occurrences table and pre-computed links
 c2c11e2 fix: eliminate infinite loop in EntityGraph force simulation
 7118795 feat: add EntityGraph component for network visualization
-f1627fa docs: update README with entity graph endpoint documentation
-55f6053 feat: add entities/graph endpoint for entity network visualization
 ```
 
-## Próximos Pasos Sugeridos
-1. Job para actualizar `entity_cooccurrences` periódicamente (diario/semanal)
-2. Mejorar filtrado de EntityGraph por tipo
-3. Optimizar queries de tendencias si needed
-4. Testing de responsive design en tablet/móvil
+## Pruebas Realizadas
+
+```bash
+# API Tests
+curl "http://localhost:8888/api/stats"                    # ✅ 1.28M news
+curl "http://localhost:8888/api/entities/graph?limit=5"    # ✅ nodes + links
+curl "http://localhost:8888/api/countries"                # ✅ 195 countries
+curl "http://localhost:8888/api/categories"                # ✅ 15 categories
+
+# Frontend
+curl "http://localhost:8888/"                             # ✅ SPA
+curl "http://localhost:8888/feeds"                          # ✅ SPA
+
+# Database
+docker exec rss2_db psql -U rss -d rss -c "SELECT COUNT(*) FROM entity_cooccurrences"
+# Resultado: 375,120 registros
+```
+
+## Métricas de Rendimiento
+
+| Operación | Tiempo |
+|-----------|--------|
+| `GET /api/stats` | ~50ms |
+| `GET /api/entities/graph?limit=10` | ~200ms |
+| `refresh_all_entity_cooccurrences()` | ~5-10 min |
+| Frontend build | ~20s |
+
+## Próximos Pasos (Opcionales)
+
+1. **Optimizar filtrado por tipo** en EntityGraph para priorizar entidades del tipo solicitado
+2. **Reducir ventana de co-occurrences** de 30 a 14 días para mayor实时
+3. **Añadir paginación** a endpoint de noticias
+4. **Testing de responsive** en tablet/móvil
+5. **Optimizar queries** de tendencias si hay lentitud
