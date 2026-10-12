@@ -60,6 +60,25 @@ type EntityListResponse struct {
 	TotalPages int      `json:"total_pages"`
 }
 
+type EntityGraphNode struct {
+	ID          int64   `json:"id"`
+	Valor       string  `json:"valor"`
+	Tipo        string  `json:"tipo"`
+	WikiSummary *string `json:"wiki_summary,omitempty"`
+	NewsCount   int     `json:"news_count"`
+}
+
+type EntityGraphLink struct {
+	Source int64 `json:"source"`
+	Target int64 `json:"target"`
+	Value  int   `json:"value"`
+}
+
+type EntityGraphResponse struct {
+	Nodes []EntityGraphNode `json:"nodes"`
+	Links []EntityGraphLink `json:"links"`
+}
+
 type MentionPoint struct {
 	Fecha string `json:"fecha"`
 	Count int    `json:"count"`

@@ -347,6 +347,7 @@ func Main() {
 		api.GET("/entities", handlers.GetEntities)
 		api.GET("/entities/news", handlers.GetEntityNews)
 		api.GET("/entities/mentions", handlers.GetEntityMentions)
+		api.GET("/entities/graph", handlers.GetEntityGraph)
 		api.GET("/last-names", handlers.GetLastNames)
 
 		// Languages available for translation

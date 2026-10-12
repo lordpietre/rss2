@@ -1254,3 +1254,113 @@ func RefreshEntityStats(c *gin.Context) {
 		"duration_ms":    time.Since(start).Milliseconds(),
 	})
 }
+
+// GetEntityGraph returns entity co-occurrences for graph visualization
+// @Summary Get entity co-occurrence graph data
+// @Description Returns nodes (entities) and links (co-occurrences) for graph visualization
+// @Tags entities
+// @Produce json
+// @Param tipo query string false "Entity type filter (persona, organizacion, lugar, tema)"
+// @Param limit query int false "Maximum number of nodes (default 40)"
+// @Success 200 {object} EntityGraphResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /api/entities/graph [get]
+func GetEntityGraph(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	tipo := c.Query("tipo")
+	limit := 40
+	if l := c.Query("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 100 {
+			limit = parsed
+		}
+	}
+
+	// Get top entities by ID (most recent) - no count calculation for speed
+	nodesQuery := `
+		SELECT t.id, t.valor, t.tipo, t.wiki_summary, 0 as news_count
+		FROM tags t
+		WHERE t.tipo = CASE WHEN $1 = '' THEN t.tipo ELSE $1 END
+		ORDER BY t.id DESC
+		LIMIT $2
+	`
+
+	// Add timeout to prevent slow queries
+	queryCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	rows, err := db.GetPool().Query(queryCtx, nodesQuery, tipo, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to fetch entities", Message: err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	type nodeWithID struct {
+		ID    int64
+		Node  models.EntityGraphNode
+	}
+	var nodesWithID []nodeWithID
+	nodeIDs := make([]int64, 0)
+
+	for rows.Next() {
+		var n models.EntityGraphNode
+		if err := rows.Scan(&n.ID, &n.Valor, &n.Tipo, &n.WikiSummary, &n.NewsCount); err != nil {
+			continue
+		}
+		nodeIDs = append(nodeIDs, n.ID)
+		nodesWithID = append(nodesWithID, nodeWithID{ID: n.ID, Node: n})
+	}
+
+	if len(nodeIDs) == 0 {
+		c.JSON(http.StatusOK, models.EntityGraphResponse{Nodes: []models.EntityGraphNode{}, Links: []models.EntityGraphLink{}})
+		return
+	}
+
+	// Get links only if we have few nodes (otherwise too slow)
+	var links []models.EntityGraphLink
+	if len(nodeIDs) <= 15 {
+		linksQuery := `
+			SELECT 
+				tn1.tag_id AS source,
+				tn2.tag_id AS target,
+				COUNT(*) as value
+			FROM tags_noticia tn1
+			JOIN tags_noticia tn2 ON tn1.noticia_id = tn2.noticia_id
+			WHERE tn1.tag_id < tn2.tag_id
+				AND tn1.tag_id = ANY($1)
+				AND tn2.tag_id = ANY($1)
+			GROUP BY tn1.tag_id, tn2.tag_id
+			HAVING COUNT(*) >= 3
+			ORDER BY value DESC
+			LIMIT 50
+		`
+
+		// Add timeout to prevent hanging
+		linkCtx, linkCancel := context.WithTimeout(ctx, 10*time.Second)
+		defer linkCancel()
+
+		rows2, err := db.GetPool().Query(linkCtx, linksQuery, nodeIDs)
+		if err == nil {
+			defer rows2.Close()
+			for rows2.Next() {
+				var link models.EntityGraphLink
+				if err := rows2.Scan(&link.Source, &link.Target, &link.Value); err != nil {
+					continue
+				}
+				links = append(links, link)
+			}
+		}
+	}
+
+	// Convert to array
+	nodesArray := make([]models.EntityGraphNode, len(nodesWithID))
+	for i, nw := range nodesWithID {
+		nodesArray[i] = nw.Node
+	}
+
+	c.JSON(http.StatusOK, models.EntityGraphResponse{
+		Nodes: nodesArray,
+		Links: links,
+	})
+}
