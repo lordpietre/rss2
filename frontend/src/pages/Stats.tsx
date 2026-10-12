@@ -81,7 +81,7 @@ export function Stats() {
     return entitiesData.entities.slice(0, 15).map((e, idx) => ({
       valor: e.valor,
       tipo: e.tipo,
-      count: e.cnt, // API returns cnt, not count
+      count: e.count,
       rank: idx + 1,
       change: Math.round((Math.random() - 0.3) * 20), // Simulated trend for demo
     }))

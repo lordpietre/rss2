@@ -133,7 +133,7 @@ export interface MentionsResponse {
 export interface EntitySuggestion {
   valor: string
   tipo: string
-  cnt: number
+  count: number
   last_date?: string
 }
 

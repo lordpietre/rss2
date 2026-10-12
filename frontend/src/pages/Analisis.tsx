@@ -129,7 +129,7 @@ export function Analisis() {
                       className="w-full text-left px-4 py-2 text-sm hover:bg-gray-800 flex items-center justify-between gap-2"
                     >
                       <span className="text-gray-200">{r.valor}</span>
-                      <span className="text-xs text-gray-500 font-mono">{r.cnt} news</span>
+                      <span className="text-xs text-gray-500 font-mono">{r.count} news</span>
                     </button>
                   </li>
                 ))}
