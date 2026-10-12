@@ -1276,40 +1276,47 @@ func GetEntityGraph(c *gin.Context) {
 		}
 	}
 
-	// Get top entities by ID (most recent) - no count calculation for speed
-	nodesQuery := `
-		SELECT t.id, t.valor, t.tipo, t.wiki_summary, 0 as news_count
-		FROM tags t
-		WHERE t.tipo = CASE WHEN $1 = '' THEN t.tipo ELSE $1 END
-		ORDER BY t.id DESC
-		LIMIT $2
+	// Get top entities by co-occurrence count from pre-computed table
+	// First get the top tag IDs that have co-occurrences
+	topTagsQuery := `
+		SELECT DISTINCT tag_id, total_count
+		FROM (
+			SELECT tag1_id as tag_id, SUM(co_count) as total_count
+			FROM entity_cooccurrences
+			GROUP BY tag1_id
+			UNION ALL
+			SELECT tag2_id as tag_id, SUM(co_count) as total_count
+			FROM entity_cooccurrences
+			GROUP BY tag2_id
+		) combined
+		ORDER BY total_count DESC
+		LIMIT $1
 	`
 
-	// Add timeout to prevent slow queries
 	queryCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	rows, err := db.GetPool().Query(queryCtx, nodesQuery, tipo, limit)
+	rows, err := db.GetPool().Query(queryCtx, topTagsQuery, limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to fetch entities", Message: err.Error()})
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to fetch top entities", Message: err.Error()})
 		return
 	}
 	defer rows.Close()
 
-	type nodeWithID struct {
-		ID    int64
-		Node  models.EntityGraphNode
+	// Collect tag IDs with their counts
+	type tagCount struct {
+		id    int64
+		count int
 	}
-	var nodesWithID []nodeWithID
-	nodeIDs := make([]int64, 0)
-
+	var tagCounts []tagCount
+	var nodeIDs []int64
 	for rows.Next() {
-		var n models.EntityGraphNode
-		if err := rows.Scan(&n.ID, &n.Valor, &n.Tipo, &n.WikiSummary, &n.NewsCount); err != nil {
+		var tc tagCount
+		if err := rows.Scan(&tc.id, &tc.count); err != nil {
 			continue
 		}
-		nodeIDs = append(nodeIDs, n.ID)
-		nodesWithID = append(nodesWithID, nodeWithID{ID: n.ID, Node: n})
+		tagCounts = append(tagCounts, tc)
+		nodeIDs = append(nodeIDs, tc.id)
 	}
 
 	if len(nodeIDs) == 0 {
@@ -1317,46 +1324,100 @@ func GetEntityGraph(c *gin.Context) {
 		return
 	}
 
-	// Get links only if we have few nodes (otherwise too slow)
-	var links []models.EntityGraphLink
-	if len(nodeIDs) <= 15 {
-		linksQuery := `
-			SELECT 
-				tn1.tag_id AS source,
-				tn2.tag_id AS target,
-				COUNT(*) as value
-			FROM tags_noticia tn1
-			JOIN tags_noticia tn2 ON tn1.noticia_id = tn2.noticia_id
-			WHERE tn1.tag_id < tn2.tag_id
-				AND tn1.tag_id = ANY($1)
-				AND tn2.tag_id = ANY($1)
-			GROUP BY tn1.tag_id, tn2.tag_id
-			HAVING COUNT(*) >= 3
-			ORDER BY value DESC
-			LIMIT 50
+	// Get entity details for these tags
+	type nodeWithID struct {
+		ID    int64
+		Node  models.EntityGraphNode
+	}
+	var nodesWithID []nodeWithID
+	nodeIDSet := make(map[int64]bool)
+
+	// Build a map of tag counts
+	tagCountMap := make(map[int64]int)
+	for _, tc := range tagCounts {
+		tagCountMap[tc.id] = tc.count
+	}
+
+	// Get tags with type filter
+	if tipo != "" {
+		nodesQuery := `
+			SELECT t.id, t.valor, t.tipo, COALESCE(t.wiki_summary, '')
+			FROM tags t
+			WHERE t.id = ANY($1) AND t.tipo = $2
 		`
+		rows, err := db.GetPool().Query(queryCtx, nodesQuery, nodeIDs, tipo)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to fetch entity details", Message: err.Error()})
+			return
+		}
+		defer rows.Close()
 
-		// Add timeout to prevent hanging
-		linkCtx, linkCancel := context.WithTimeout(ctx, 10*time.Second)
-		defer linkCancel()
-
-		rows2, err := db.GetPool().Query(linkCtx, linksQuery, nodeIDs)
-		if err == nil {
-			defer rows2.Close()
-			for rows2.Next() {
-				var link models.EntityGraphLink
-				if err := rows2.Scan(&link.Source, &link.Target, &link.Value); err != nil {
-					continue
-				}
-				links = append(links, link)
+		for rows.Next() {
+			var n models.EntityGraphNode
+			if err := rows.Scan(&n.ID, &n.Valor, &n.Tipo, &n.WikiSummary); err != nil {
+				continue
 			}
+			n.NewsCount = tagCountMap[n.ID]
+			nodeIDSet[n.ID] = true
+			nodesWithID = append(nodesWithID, nodeWithID{ID: n.ID, Node: n})
+		}
+	} else {
+		// Get all tags without type filter
+		nodesQuery := `
+			SELECT t.id, t.valor, t.tipo, COALESCE(t.wiki_summary, '')
+			FROM tags t
+			WHERE t.id = ANY($1)
+		`
+		rows, err := db.GetPool().Query(queryCtx, nodesQuery, nodeIDs)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to fetch entity details", Message: err.Error()})
+			return
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var n models.EntityGraphNode
+			if err := rows.Scan(&n.ID, &n.Valor, &n.Tipo, &n.WikiSummary); err != nil {
+				continue
+			}
+			n.NewsCount = tagCountMap[n.ID]
+			nodeIDSet[n.ID] = true
+			nodesWithID = append(nodesWithID, nodeWithID{ID: n.ID, Node: n})
 		}
 	}
 
-	// Convert to array
-	nodesArray := make([]models.EntityGraphNode, len(nodesWithID))
-	for i, nw := range nodesWithID {
-		nodesArray[i] = nw.Node
+	// Get links from pre-computed table
+	linksQuery := `
+		SELECT tag1_id AS source, tag2_id AS target, co_count as value
+		FROM entity_cooccurrences
+		WHERE tag1_id = ANY($1) AND tag2_id = ANY($1)
+		ORDER BY co_count DESC
+		LIMIT 100
+	`
+
+	linkCtx, linkCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer linkCancel()
+
+	linkRows, err := db.GetPool().Query(linkCtx, linksQuery, nodeIDs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to fetch links", Message: err.Error()})
+		return
+	}
+	defer linkRows.Close()
+
+	var links []models.EntityGraphLink
+	for linkRows.Next() {
+		var link models.EntityGraphLink
+		if err := linkRows.Scan(&link.Source, &link.Target, &link.Value); err != nil {
+			continue
+		}
+		links = append(links, link)
+	}
+
+	// Convert to array maintaining order
+	nodesArray := make([]models.EntityGraphNode, 0, len(nodesWithID))
+	for _, nw := range nodesWithID {
+		nodesArray = append(nodesArray, nw.Node)
 	}
 
 	c.JSON(http.StatusOK, models.EntityGraphResponse{
