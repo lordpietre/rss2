@@ -100,7 +100,7 @@ const COUNTRY_NAME_TO_CODE: Record<string, string> = {
   'austria': 'AT',
   'grecia': 'GR', 'greece': 'GR',
   'rumania': 'RO', 'romania': 'RO',
-  'hungary': 'HU', 'hgría': 'HU',
+  'hungary': 'HU', 'hungría': 'HU', 'hungria': 'HU',
   'czech': 'CZ', 'checa': 'CZ',
   'irlanda': 'IE', 'ireland': 'IE',
 }
@@ -109,7 +109,9 @@ export function WorldMap({ countries, selectedCountry, onCountryClick, maxCount 
   // Create a lookup by country name
   const countryByCode = useMemo(() => {
     const map = new Map<string, CountryData>()
+    if (!countries || !Array.isArray(countries)) return map
     countries.forEach(c => {
+      if (!c?.pais_nombre) return
       const code = COUNTRY_NAME_TO_CODE[c.pais_nombre.toLowerCase()]
       if (code) {
         map.set(code, c)
@@ -118,9 +120,13 @@ export function WorldMap({ countries, selectedCountry, onCountryClick, maxCount 
     return map
   }, [countries])
 
-  const effectiveMax = maxCount || Math.max(...countries.map(c => c.count), 1)
+  const effectiveMax = useMemo(() => {
+    if (!countries || !Array.isArray(countries) || countries.length === 0) return 1
+    return maxCount || Math.max(...countries.map(c => c?.count || 0), 1)
+  }, [countries, maxCount])
 
   const getIntensity = (count: number): string => {
+    if (!count || !effectiveMax) return '#1a2e1f'
     const ratio = count / effectiveMax
     if (ratio > 0.75) return '#72FF8A'
     if (ratio > 0.5) return '#36C96B'

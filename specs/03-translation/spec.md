@@ -15,13 +15,21 @@
    Precondición documentada: sin `lang` no hay jobs.
 
 3. `translator` (`translator/Dockerfile.cpu`, CTranslate2 NLLB-200 int8 CPU):
-   `ctranslator_worker.py` reclama por polling SQL (`SKIP LOCKED`,
-   `locked_at` >10 min reintenta), traduce, `status='done'`, `locked_at=NULL`,
-   inserta en `translation_stats`, caché Redis best-effort (`tr:{lang_from}:{lang_to}:{md5}`,
-   TTL 30 d). Escalado 2026-09-15: `translator` + `translator-2`
+   `translator/workers/ctranslator_worker.py` reclama por polling SQL
+   (`SKIP LOCKED`, `locked_at` >10 min reintenta), traduce título, resumen y
+   contenido completo (`contenido_trad`), `status='done'`, `locked_at=NULL`,
+   inserta en `translation_stats`, caché Redis best-effort
+   (`tr:{lang_from}:{lang_to}:{md5}`, TTL 30 d). Traduce a `es` únicamente.
+   Escalado 2026-09-15: `translator` + `translator-2`
    (misma imagen, `CT2_INTRA_THREADS=2`, reparto por `SKIP LOCKED`).
    OJO: 3 réplicas saturan los 22G y entran en swap (5.7G) dejando los
    workers colgados (CPU ~2%, MEM al límite); 2 es el techo de este host.
+
+   **Límites de memoria**:
+   - `MAX_SRC_TOKENS=2048` (tokens fuente)
+   - `MAX_NEW_TOKENS=2048` (tokens traducción)
+   - `MAX_SEQ_PER_CALL=32` (~2GB peak, safe)
+   - `MAX_BODY_CHARS=80000` (contenido completo)
 
 ## Cache Keys
 
@@ -39,7 +47,7 @@ DB_* reales en los tres servicios; `TARGET_LANGS=es`, `SCHEDULER_BATCH/SLEEP`,
 
 - [x] `noticias.lang` se rellena (27k+).
 - [x] `traducciones pending` se crean en lotes y `done` crece.
-- [x] `titulo_trad/resumen_trad` con español real (verificado ja/tr→es).
+- [x] `titulo_trad/resumen_trad/contenido_trad` con español real (verificado ja/tr→es).
 - [x] `/api/news?translated_only=true` devuelve traducidas (tras fix
       `n.contenido`/args del spec 05).
 - [ ] Drenar backlog (~27k) — tarda horas en CPU; alternativa GPU documentada.
@@ -79,6 +87,10 @@ DB_* reales en los tres servicios; `TARGET_LANGS=es`, `SCHEDULER_BATCH/SLEEP`,
       `restarts=0` y ningún OOM posterior. Ojo: `docker inspect
       .State.OOMKilled` se resetea a `false` al reiniciar, la evidencia
       autoritativa es `dmesg -T | grep "Memory cgroup out of memory"`.
+- [x] **Limpieza archivo residual** (2026-10-12): Eliminado
+      `workers/ctranslator_worker.py` (679 líneas, MAX_SEQ_PER_CALL=64)
+      que no se usaba; solo `translator/workers/ctranslator_worker.py`
+      (745 líneas) es el worker activo.
 - [ ] Decidir GPU (`--profile gpu` en máquina NVIDIA) o más réplicas CPU si
       el backlog no drena.
 - [ ] Añadir `TRANSLATOR_*`/`SCHEDULER_*` a `.env.example` si se estabilizan.

@@ -12,6 +12,8 @@ import { useApiFavorites, useApiLists, useApiSavedSearches } from '../hooks/useA
 export function Search() {
   const [searchParams, setSearchParams] = useSearchParams()
   const q = searchParams.get('q') || ''
+  const entity = searchParams.get('entity') || ''
+  const tipo = searchParams.get('tipo') || ''
   const lang = searchParams.get('lang') || ''
   const categoria = searchParams.get('categoria_id') || ''
   const pais = searchParams.get('pais_id') || ''
@@ -24,7 +26,7 @@ export function Search() {
   const { lists, createList, addToList } = useApiLists()
   const { createSearch } = useApiSavedSearches()
 
-  const hasFilters = !!(q || lang || categoria || pais)
+  const hasFilters = !!(q || lang || categoria || pais || entity)
 
   useEffect(() => {
     if (!localStorage.getItem('token')) return
@@ -43,17 +45,33 @@ export function Search() {
     queryFn: apiService.getCountries,
   })
 
-  const { data, isLoading } = useQuery({
+  // Entity search query (when clicking on entity from Trends)
+  const { data: entityData, isLoading: entityLoading } = useQuery({
+    queryKey: ['entity-news', entity, tipo, page],
+    queryFn: () => apiService.getEntityNews({
+      valor: entity,
+      tipo: tipo || undefined,
+      page,
+      per_page: 30,
+    }),
+    enabled: !!entity,
+  })
+
+  // Keyword search query
+  const { data: searchData, isLoading: searchLoading } = useQuery({
     queryKey: ['search', q, lang, categoria, pais, page],
-    queryFn: () => apiService.search({ 
-      q, 
+    queryFn: () => apiService.search({
+      q,
       lang: lang || undefined,
       categoria_id: categoria || undefined,
       pais_id: pais || undefined,
       page,
     }),
-    enabled: !!q || !!lang || !!categoria || !!pais,
+    enabled: !!q && !entity,
   })
+
+  const data = entity ? entityData : searchData
+  const isLoading = entity ? entityLoading : searchLoading
 
   const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()

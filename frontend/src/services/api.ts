@@ -263,6 +263,11 @@ export const apiService = {
     return data
   },
 
+  getEntityNews: async (params: { valor: string; tipo?: string; page?: number; per_page?: number; days?: number }): Promise<NewsListResponse> => {
+    const { data } = await api.get('/entities/news', { params })
+    return data
+  },
+
   searchEntities: async (params: { tipo: string; q?: string; page?: number; per_page?: number; sort_by?: string }): Promise<{ entities: EntitySuggestion[]; total: number }> => {
     const { data } = await api.get('/entities', { params })
     return data

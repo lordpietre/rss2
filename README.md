@@ -25,6 +25,36 @@ feeds ──ingestor──▶ noticias ──langdetect──▶ lang
   noticias(resumen<200) ──scraper──▶ enriquecimiento · fuentes_url ──discovery──▶ feeds
 ```
 
+## Arquitectura
+
+### Backend (Go)
+- API REST en `backend/cmd/server/main.go` (puerto interno :8080)
+- Workers Go compilados como binarios separados en el mismo Dockerfile:
+  - `/scraper` — enriquecimiento de resúmenes
+  - `/discovery` — descubrimiento de nuevos feeds
+  - `/topics` — categorización de noticias
+  - `/wiki` — obtención de resúmenes e imágenes de Wikipedia
+  - `/related` — cálculo de noticias relacionadas
+- Handlers en `backend/internal/handlers/`
+
+### Frontend (React)
+- SPA en `frontend/` con Vite + TypeScript + Tailwind
+- Páginas principales:
+  - `Home.tsx` — portada con carrusel, tendencias, sidebar de sugerencias
+  - `Search.tsx` — búsqueda de noticias con filtros
+  - `Populares.tsx` — red de entidades populares
+  - `Stats.tsx` — Trends Radar con entidades trending
+  - `GlobalMonitor.tsx` — Cobertura global con mapa mundial
+  - `Analisis.tsx` — Evolución temporal de entidades
+  - `Alertas.tsx` — Alertas de picos de actividad
+
+### Workers Python
+- `workers/ner/` — spaCy NER (entidades nombradas)
+- `workers/langdetect/` — detección de idioma
+- `workers/translation-scheduler/` — scheduler de traducciones
+- `workers/embeddings/` — sentence-transformers para embeddings
+- `translator/` — CTranslate2 con NLLB-200-distilled-600M
+
 ## Servicios (`docker-compose.yml`)
 
 | Servicio | Qué hace |
@@ -45,6 +75,73 @@ Los workers Go (`topics`, `wiki`, `related`, `scraper`,
 (los binarios ya se compilan en `backend/Dockerfile`).
 
 Perfiles opcionales: `gpu` (translator NVIDIA), `monitoring` (prometheus/grafana).
+
+## Entidades y Trends
+
+### Entidades (Populares)
+
+Las entidades se extraen mediante NER (Named Entity Recognition) y se almacenan en las tablas `tags` y `tags_noticia`.
+
+**Parámetros de entidad:**
+- `valor` — nombre de la entidad (ej: "Donald Trump", "Barcelona")
+- `tipo` — tipo de entidad: `persona`, `organizacion`, `ubicacion`, `tema`
+
+**Endpoints de entidades:**
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/api/entities` | Lista de entidades con filtros (sort: count, name, recent, last_mentioned) |
+| GET | `/api/entities/news?valor=&tipo=` | Noticias que mencionan una entidad |
+| GET | `/api/entities/mentions?values=&hours=` | Serie temporal de menciones |
+
+### Trends Radar (Stats.tsx)
+
+La página de Stats muestra las entidades más mencionadas en las últimas 24-72 horas.
+
+**Navegación desde Trends:**
+- Al hacer clic en una entidad (ej: "Donald Trump"), navega a `/search?entity=Donald+Trump&tipo=persona`
+- La página Search detecta el parámetro `entity` y consulta `/api/entities/news` en lugar del search normal
+- El parámetro `tipo` filtra por tipo de entidad
+
+**Timeout de entity news:**
+Las consultas de entidades muy populares (ej: "Donald Trump" con miles de menciones) pueden tardar más de 20 segundos. El frontend tiene un timeout de **60 segundos** para estas operaciones.
+
+## Cobertura Global (GlobalMonitor.tsx)
+
+La sección Global Coverage muestra un mapa mundial con la actividad de noticias por país.
+
+### Cómo funciona
+
+1. `GET /api/stats` devuelve `top_countries` con `{ pais_id, pais_nombre, count }`
+2. El componente `WorldMap` hace lookup de `pais_nombre` → código ISO usando `COUNTRY_NAME_TO_CODE`
+3. Los países se colorean según intensidad: `#72FF8A` (alto), `#36C96B` (medio), `#244C32` (bajo), `#1a2e1f` (ninguno)
+
+### Nombres de países
+
+La tabla `paises` en la base de datos contiene los nombres en español. El lookup soporta:
+- Nombres en español: "Estados Unidos", "Reino Unido", "España"
+- Nombres en inglés: "United States", "United Kingdom", "Spain"
+- Variaciones comunes: "USA", "UK", "méxico", "mexico"
+
+Países soportados: ~40 países principales con paths SVG definidos en `WorldMap.tsx`.
+
+## Alertas de Actividad
+
+Las alertas detectan picos de menciones de entidades usando `ratio` (hits/baseline).
+
+### Endpoint
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/api/alerts` | Lista de alertas (status: nueva, leida, dismiss) |
+| POST | `/api/alerts/:id/read` | Marcar como leída |
+| POST | `/api/alerts/:id/dismiss` | Descartar alerta |
+| POST | `/api/alerts/read-all` | Marcar todas como leídas |
+
+### Navegación
+
+- Desde Overview: Alerta → `/analisis?entity=...` (Evolución de entidad)
+- Desde Stats: Trends → `/search?entity=...` (Noticias de entidad)
 
 ## Traducción automática
 
@@ -121,7 +218,6 @@ Sistema de favoritos y listas persistentes en Postgres (multidispositivo).
 | POST | `/api/saved-searches/:id/use` | Marcar búsqueda como usada (actualiza last_used y use_count) |
 | PUT | `/api/saved-searches/:id` | Renombrar búsqueda |
 | DELETE | `/api/saved-searches/:id` | Eliminar búsqueda |
-| GET | `/api/entities?sort_by=` | Entidades (sort: count, name, recent, last_mentioned) |
 
 ### Frontend
 
@@ -170,6 +266,33 @@ Para limpiar chrome residual de noticias ya ingestadas:
 
 ```bash
 docker exec rss2_backend sanitize -apply -requeue
+```
+
+## Comandos de desarrollo
+
+### Go (backend + rss-ingestor-go)
+```bash
+make all         # deps + build (full local build)
+make deps        # go mod download + tidy (backend/ only)
+make build       # build all Go binaries to bin/
+make clean       # remove bin/ + go clean
+make test        # go test ./... en ambos módulos
+make parity      # diff textclean entre backend/ y rss-ingestor-go/
+```
+
+### Go workers (run locally with DB env)
+```bash
+make run-scraper     DB_HOST=localhost DB_PORT=5432 DB_NAME=rss DB_USER=rss DB_PASS=rss
+make run-discovery   DB_HOST=localhost DB_PORT=5432 DB_NAME=rss DB_USER=rss DB_PASS=rss
+make run-topics      DB_HOST=localhost DB_PORT=5432 DB_NAME=rss DB_USER=rss DB_PASS=rss
+make run-related     DB_HOST=localhost DB_PORT=5432 DB_NAME=rss DB_USER=rss DB_PASS=rss RELATED_SLEEP=10
+```
+
+### Frontend
+```bash
+cd frontend
+npm test          # vitest
+npm run build     # tsc && vite build
 ```
 
 ## Documentación de diseño

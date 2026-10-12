@@ -92,10 +92,7 @@ export function Overview() {
   const hourlyData = stats?.translation_stats_24h?.map((val) => ({
     fecha: val.hour,
     count: val.total
-  })) || Array.from({ length: 24 }, (_, i) => ({
-    fecha: `${String(i).padStart(2, '0')}:00`,
-    count: Math.floor(Math.random() * 100) + 20
-  }))
+  })) || []
 
   return (
     <div className="space-y-6">

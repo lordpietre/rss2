@@ -156,7 +156,7 @@ export function Populares() {
         setNewsError('Request timed out. This entity may have too much data.')
         setNewsLoading(false)
       }
-    }, 20000)
+    }, 60000)
     
     try {
       const params = new URLSearchParams()
@@ -200,7 +200,7 @@ export function Populares() {
         setNewsError('Request timed out. This entity may have too much data.')
         setNewsLoading(false)
       }
-    }, 20000)
+    }, 60000)
     
     try {
       const params = new URLSearchParams()

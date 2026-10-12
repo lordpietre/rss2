@@ -83,7 +83,7 @@ export function Stats() {
       tipo: e.tipo,
       count: e.count,
       rank: idx + 1,
-      change: Math.round((Math.random() - 0.3) * 20), // Simulated trend for demo
+      change: 0, // No trend change data available
     }))
   }, [entitiesData])
 
@@ -130,7 +130,7 @@ export function Stats() {
           <div className="text-3xl font-bold text-gray-50 font-mono">
             {stats?.news_today?.toLocaleString() || '—'}
           </div>
-          <TrendBadge value={12} />
+          <TrendBadge value={0} />
         </div>
 
         <div className="panel">
@@ -141,7 +141,7 @@ export function Stats() {
           <div className="text-3xl font-bold text-gray-50 font-mono">
             {stats?.news_this_week?.toLocaleString() || '—'}
           </div>
-          <TrendBadge value={8} />
+          <TrendBadge value={0} />
         </div>
 
         <div className="panel">
