@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { api } from '../services/api'
 import { WikiTooltip } from '../components/ui/WikiTooltip'
 import { SaveSearchModal } from '../components/SaveSearchModal'
+import { EntityGraph } from '../components/ui/EntityGraph'
 import { useApiSavedSearches } from '../hooks/useApiFavorites'
 import { Bookmark, Network, ChevronDown, ChevronUp } from 'lucide-react'
 
@@ -79,6 +80,7 @@ export function Populares() {
   const [newTipo, setNewTipo] = useState('')
   const [aliasInput, setAliasInput] = useState('')
   const [canonicalInput, setCanonicalInput] = useState('')
+  const [viewMode, setViewMode] = useState<'list' | 'network'>('list')
   const [activeTab, setActiveTab] = useState<'tipo' | 'alias'>('tipo')
 
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -318,6 +320,38 @@ export function Populares() {
         </div>
       </div>
 
+      {/* View Tabs */}
+      <div className="flex gap-2 border-b border-gray-700 pb-2">
+        <button
+          onClick={() => setViewMode('list')}
+          className={`px-4 py-2 text-sm font-medium rounded-t transition-colors ${
+            viewMode === 'list' 
+              ? 'bg-rss-green-dim/20 text-rss-green-phosphor border-b-2 border-rss-green-phosphor' 
+              : 'text-gray-400 hover:text-gray-200'
+          }`}
+        >
+          📋 List View
+        </button>
+        <button
+          onClick={() => setViewMode('network')}
+          className={`px-4 py-2 text-sm font-medium rounded-t transition-colors ${
+            viewMode === 'network' 
+              ? 'bg-rss-green-dim/20 text-rss-green-phosphor border-b-2 border-rss-green-phosphor' 
+              : 'text-gray-400 hover:text-gray-200'
+          }`}
+        >
+          🔗 Network Graph
+        </button>
+      </div>
+
+      {/* Network Graph View */}
+      {viewMode === 'network' && (
+        <EntityGraph />
+      )}
+
+      {/* List View */}
+      {viewMode === 'list' && (
+      <>
       {/* Header Actions */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div className="flex gap-2">
@@ -564,6 +598,9 @@ export function Populares() {
             </div>
           </div>
         </div>
+      )}
+
+      </>
       )}
 
       {/* News Modal */}
