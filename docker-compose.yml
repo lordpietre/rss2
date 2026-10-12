@@ -364,6 +364,32 @@ services:
           cpus: '1'
           memory: 512M
 
+  # Cooccurrences: actualiza tabla de co-ocurrencias de entidades
+  # Se ejecuta una vez al día para mantener el grafo de entidades actualizado
+  cooccurrences:
+    image: rss2-backend
+    container_name: rss2_cooccurrences
+    entrypoint: ["/cooccurrences"]
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q cooccurrences /proc/1/cmdline"]
+      interval: 1h
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-rss}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-rss}?sslmode=disable
+    networks:
+      - backend
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
   # Topics: clasifica noticias (news_topics) y puebla noticias.pais_id
   # Reutiliza la imagen backend (sin build: evita el conflicto AlreadyExists
   # de construir dos servicios contra el mismo tag en un solo comando).
