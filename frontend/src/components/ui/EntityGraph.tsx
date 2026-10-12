@@ -51,6 +51,69 @@ export function EntityGraph() {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const svgRef = useRef<SVGSVGElement>(null)
 
+  // Compute simple force layout for nodes
+  const computeLayout = (nodes: GraphNode[], links: GraphLink[]): GraphNode[] => {
+    if (nodes.length === 0) return nodes
+    
+    // Copy nodes with initial random positions
+    const positioned = nodes.map((n) => ({
+      ...n,
+      x: n.x ?? Math.random() * 600 + 50,
+      y: n.y ?? Math.random() * 400 + 50
+    }))
+    
+    const iterations = 100
+    for (let i = 0; i < iterations; i++) {
+      // Repulsion between all nodes
+      for (let a = 0; a < positioned.length; a++) {
+        for (let b = a + 1; b < positioned.length; b++) {
+          const dx = (positioned[b].x || 0) - (positioned[a].x || 0)
+          const dy = (positioned[b].y || 0) - (positioned[a].y || 0)
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1
+          const force = 2000 / (dist * dist)
+          const fx = (dx / dist) * force
+          const fy = (dy / dist) * force
+          positioned[a].x = (positioned[a].x || 0) - fx
+          positioned[a].y = (positioned[a].y || 0) - fy
+          positioned[b].x = (positioned[b].x || 0) + fx
+          positioned[b].y = (positioned[b].y || 0) + fy
+        }
+      }
+
+      // Attraction along links
+      for (const link of links) {
+        const source = positioned.find(n => n.id === link.source)
+        const target = positioned.find(n => n.id === link.target)
+        if (source && target) {
+          const dx = (target.x || 0) - (source.x || 0)
+          const dy = (target.y || 0) - (source.y || 0)
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1
+          const force = (dist - 100) * 0.01
+          const fx = (dx / dist) * force
+          const fy = (dy / dist) * force
+          source.x = (source.x || 0) + fx
+          source.y = (source.y || 0) + fy
+          target.x = (target.x || 0) - fx
+          target.y = (target.y || 0) - fy
+        }
+      }
+
+      // Center gravity
+      for (const node of positioned) {
+        node.x = ((node.x || 0) + (350 - (node.x || 0)) * 0.01)
+        node.y = ((node.y || 0) + (250 - (node.y || 0)) * 0.01)
+      }
+
+      // Boundary constraints
+      for (const node of positioned) {
+        node.x = Math.max(50, Math.min(650, node.x || 350))
+        node.y = Math.max(50, Math.min(450, node.y || 250))
+      }
+    }
+    
+    return positioned
+  }
+
   // Fetch graph data
   const fetchGraph = useCallback(async () => {
     setLoading(true)
@@ -59,13 +122,10 @@ export function EntityGraph() {
       const res = await api.get(`/entities/graph`, {
         params: { tipo, limit: 30 }
       })
-      // Initialize random positions for nodes
-      const nodesWithPositions = res.data.nodes.map((n: GraphNode) => ({
-        ...n,
-        x: Math.random() * 600 + 50,
-        y: Math.random() * 400 + 50
-      }))
-      setGraphData({ nodes: nodesWithPositions, links: res.data.links || [] })
+      const links = Array.isArray(res.data.links) ? res.data.links : []
+      // Initialize positions and compute layout
+      const nodesWithPositions = computeLayout(res.data.nodes, links)
+      setGraphData({ nodes: nodesWithPositions, links })
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load entity graph')
     } finally {
@@ -76,65 +136,7 @@ export function EntityGraph() {
   useEffect(() => {
     fetchGraph()
   }, [fetchGraph])
-
-  // Simple force simulation (basic spring layout)
-  useEffect(() => {
-    if (graphData.nodes.length === 0) return
-
-    const nodes = [...graphData.nodes]
-    const links = graphData.links || []
-    const iterations = 100
-
-    for (let i = 0; i < iterations; i++) {
-      // Repulsion between all nodes
-      for (let a = 0; a < nodes.length; a++) {
-        for (let b = a + 1; b < nodes.length; b++) {
-          const dx = (nodes[b].x || 0) - (nodes[a].x || 0)
-          const dy = (nodes[b].y || 0) - (nodes[a].y || 0)
-          const dist = Math.sqrt(dx * dx + dy * dy) || 1
-          const force = 2000 / (dist * dist)
-          const fx = (dx / dist) * force
-          const fy = (dy / dist) * force
-          nodes[a].x! -= fx
-          nodes[a].y! -= fy
-          nodes[b].x! += fx
-          nodes[b].y! += fy
-        }
-      }
-
-      // Attraction along links
-      for (const link of links) {
-        const source = nodes.find(n => n.id === link.source)
-        const target = nodes.find(n => n.id === link.target)
-        if (source && target) {
-          const dx = (target.x || 0) - (source.x || 0)
-          const dy = (target.y || 0) - (source.y || 0)
-          const dist = Math.sqrt(dx * dx + dy * dy) || 1
-          const force = (dist - 100) * 0.01
-          const fx = (dx / dist) * force
-          const fy = (dy / dist) * force
-          source.x! += fx
-          source.y! += fy
-          target.x! -= fx
-          target.y! -= fy
-        }
-      }
-
-      // Center gravity
-      for (const node of nodes) {
-        node.x! += (350 - (node.x || 0)) * 0.01
-        node.y! += (250 - (node.y || 0)) * 0.01
-      }
-
-      // Boundary constraints
-      for (const node of nodes) {
-        node.x = Math.max(50, Math.min(650, node.x || 350))
-        node.y = Math.max(50, Math.min(450, node.y || 250))
-      }
-    }
-
-    setGraphData(prev => ({ ...prev, nodes }))
-  }, [graphData.nodes.length, graphData.links.length])
+ // Only re-run when tipo changes
 
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault()
