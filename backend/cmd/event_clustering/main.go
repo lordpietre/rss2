@@ -48,18 +48,18 @@ func loadConfig() {
 }
 
 func getEnvInt(key string, defaultValue int) int {
-	if value := os.Getenv(key); value != "" {
-		if intVal, err := strconv.Atoi(value); err == nil {
-			return intVal
+	if v := os.Getenv(key); v != "" {
+		if i, err := strconv.Atoi(v); err == nil {
+			return i
 		}
 	}
 	return defaultValue
 }
 
 func getEnvFloat(key string, defaultValue float64) float64 {
-	if value := os.Getenv(key); value != "" {
-		if floatVal, err := strconv.ParseFloat(value, 64); err == nil {
-			return floatVal
+	if v := os.Getenv(key); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			return f
 		}
 	}
 	return defaultValue
@@ -191,18 +191,26 @@ func fetchPendingNews(ctx context.Context, limit int) ([]newsWithEmbedding, erro
 	defer rows.Close()
 
 	var newsList []newsWithEmbedding
+	var skippedInvalid, skippedDim int
 	for rows.Next() {
 		var n newsWithEmbedding
 		var embeddingStr sql.NullString
 		if err := rows.Scan(&n.ID, &n.TraduccionID, &n.Titulo, &n.Fecha, &embeddingStr); err != nil {
 			continue
 		}
-		if embeddingStr.Valid {
-			n.Embedding = parseEmbedding(embeddingStr.String)
+		if !embeddingStr.Valid {
+			skippedInvalid++
+			continue
 		}
-		if len(n.Embedding) == embDim {
-			newsList = append(newsList, n)
+		n.Embedding = parseEmbedding(embeddingStr.String)
+		if len(n.Embedding) != embDim {
+			skippedDim++
+			continue
 		}
+		newsList = append(newsList, n)
+	}
+	if skippedInvalid > 0 || skippedDim > 0 {
+		logger.Warn().Int("skipped_invalid", skippedInvalid).Int("skipped_dim", skippedDim).Msg("Some news skipped due to invalid embeddings")
 	}
 	return newsList, nil
 }
@@ -295,15 +303,16 @@ func embeddingToVector(emb []float64) string {
 	if len(emb) == 0 {
 		return "[]"
 	}
-	vec := make([]string, len(emb))
+	var sb strings.Builder
+	sb.WriteByte('[')
 	for i, v := range emb {
-		vec[i] = fmt.Sprintf("%g", v)
+		if i > 0 {
+			sb.WriteByte(',')
+		}
+		sb.WriteString(fmt.Sprintf("%g", v))
 	}
-	result := vec[0]
-	for i := 1; i < len(vec); i++ {
-		result += "," + vec[i]
-	}
-	return "[" + result + "]"
+	sb.WriteByte(']')
+	return sb.String()
 }
 
 // ============================================================================
@@ -327,6 +336,10 @@ func calculateEntityHash(entities []string) string {
 func getClusterHash(entities []string, fecha time.Time) string {
 	entityHash := calculateEntityHash(entities)
 	dateHash := fecha.Format("2006-01-02")
+	// Use first 16 chars of hash, pad if needed
+	if len(entityHash) < 16 {
+		entityHash = entityHash + strings.Repeat("0", 16-len(entityHash))
+	}
 	return fmt.Sprintf("%s_%s", entityHash[:16], dateHash)
 }
 

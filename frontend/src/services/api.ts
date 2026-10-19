@@ -331,4 +331,63 @@ export const apiService = {
     const { data } = await api.post('/admin/restore', formData)
     return data
   },
+
+  // Subscription methods
+  getSubscriptionStatus: async (): Promise<{
+    plan: string
+    status: string
+    ends_at?: string
+    limits: {
+      feeds: number
+      translations_per_day: number
+      search_enabled: boolean
+      alerts_limit: number
+    }
+    needs_upgrade: boolean
+  }> => {
+    const { data } = await api.get('/app/subscription/status')
+    return data
+  },
+
+  validateSubscription: async (receiptToken: string, productId: string, period: string): Promise<{
+    success: boolean
+    plan: string
+    status: string
+    ends_at?: string
+  }> => {
+    const { data } = await api.post('/app/subscription/validate', {
+      receipt_token: receiptToken,
+      product_id: productId,
+      period,
+    })
+    return data
+  },
+
+  cancelSubscription: async (): Promise<{ success: boolean; status: string }> => {
+    const { data } = await api.post('/app/subscription/cancel')
+    return data
+  },
+
+  getUsage: async (): Promise<{
+    plan: string
+    limits: {
+      feeds: number
+      translations_per_day: number
+      search_enabled: boolean
+      alerts_limit: number
+    }
+    usage: {
+      feeds_used: number
+      translations_today: number
+      alerts_used: number
+    }
+  }> => {
+    const { data } = await api.get('/app/usage')
+    return data
+  },
+
+  checkLimit: async (action: string): Promise<{ allowed: boolean; action: string; reason?: string }> => {
+    const { data } = await api.get('/app/limits/check', { params: { action } })
+    return data
+  },
 }

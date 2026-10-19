@@ -297,7 +297,9 @@ func cacheResult(ctx context.Context, cacheKey string, summary *WikiSummary) {
 	}
 }
 
-func processTag(ctx context.Context, tag Tag) {
+// processTag processes a single tag and returns whether the processing was successful.
+// Returns nil for success, or an error for transient failures that should be retried.
+func processTag(ctx context.Context, tag Tag) error {
 	logger.Info().Int64("tag_id", tag.ID).Str("valor", tag.Valor).Msg("Procesando tag")
 
 	summary, err := fetchWikipediaInfo(ctx, tag.Valor)
@@ -312,19 +314,19 @@ func processTag(ctx context.Context, tag Tag) {
 		
 		if isTransient {
 			logger.Warn().Err(err).Str("valor", tag.Valor).Msg("Error transitorio al consultar Wikipedia, se reintentará")
-		} else {
-			// Marcar como revisado ante errores permanentes para no reintentar
-			_, _ = pool.Exec(ctx, "UPDATE tags SET wiki_checked = TRUE WHERE id = $1", tag.ID)
-			logger.Error().Err(err).Str("valor", tag.Valor).Msg("Error permanente al consultar Wikipedia (marcado como revisado)")
+			return err // Devolver error para que el caller pueda hacer backoff
 		}
-		return
+		// Marcar como revisado ante errores permanentes para no reintentar
+		_, _ = pool.Exec(ctx, "UPDATE tags SET wiki_checked = TRUE WHERE id = $1", tag.ID)
+		logger.Error().Err(err).Str("valor", tag.Valor).Msg("Error permanente al consultar Wikipedia (marcado como revisado)")
+		return nil // Error permanente, no requiere retry
 	}
 
 	if summary == nil || summary.Extract == "" {
 		// Not found or disambiguation
 		_, _ = pool.Exec(ctx, "UPDATE tags SET wiki_checked = TRUE WHERE id = $1", tag.ID)
 		logger.Warn().Str("valor", tag.Valor).Msg("No se encontraron resultados válidos en Wikipedia")
-		return
+		return nil // No error, solo no encontrado
 	}
 
 	var localImagePath *string
@@ -360,9 +362,10 @@ func processTag(ctx context.Context, tag Tag) {
 
 	if err != nil {
 		logger.Error().Err(err).Int64("tag_id", tag.ID).Msg("Error al actualizar la base de datos")
-	} else {
-		logger.Info().Str("valor", tag.Valor).Bool("imagen", localImagePath != nil).Msg("Actualizado con éxito")
+		return err // Error de DB, transient
 	}
+	logger.Info().Str("valor", tag.Valor).Bool("imagen", localImagePath != nil).Msg("Actualizado con éxito")
+	return nil
 }
 
 func Main() {
@@ -482,29 +485,35 @@ func Main() {
 		 consecutiveErrors := 0
 
 			for _, tag := range tags {
-				processTag(ctx, tag)
-				select {
-				case <-ctx.Done():
-					return
-				case <-time.After(time.Duration(currentDelay) * time.Second):
-				}
+				err := processTag(ctx, tag)
 				
-				// Backoff exponencial: si hay errores recientes, incrementar delay
+				// Backoff exponencial: si hay errores transitorios, incrementar delay
 				// Resetear gradualmente cuando hay éxito
-				if consecutiveErrors > 0 {
-					consecutiveErrors--
+				if err != nil {
+					consecutiveErrors++
 					if currentDelay < maxDelay {
 						currentDelay = currentDelay * 2
 						if currentDelay > maxDelay {
 							currentDelay = maxDelay
 						}
 					}
-				} else if currentDelay > baseDelay {
-					// Reducir gradualmente hacia el base
-					currentDelay = currentDelay / 2
-					if currentDelay < baseDelay {
-						currentDelay = baseDelay
+					logger.Warn().Int("consecutiveErrors", consecutiveErrors).Int("currentDelay", currentDelay).Msg("Incrementando delay por error")
+				} else {
+					if consecutiveErrors > 0 {
+						consecutiveErrors--
 					}
+					if currentDelay > baseDelay {
+						currentDelay = currentDelay / 2
+						if currentDelay < baseDelay {
+							currentDelay = baseDelay
+						}
+					}
+				}
+				
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(time.Duration(currentDelay) * time.Second):
 				}
 			}
 		}

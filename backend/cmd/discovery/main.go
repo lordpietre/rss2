@@ -98,16 +98,44 @@ func loadConfig() {
 	circuitBreaker = NewDomainCircuitBreaker(domainCooldownMinutes)
 }
 
+// ensureSchema creates necessary tables/columns if they don't exist
+func ensureSchema(ctx context.Context) error {
+	// Create system_state table for reactivation tracking
+	_, err := dbPool.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS system_state (
+			id INTEGER PRIMARY KEY,
+			last_reactivation_check TIMESTAMP
+		)
+	`)
+	if err != nil {
+		logger.Error().Err(err).Msg("Failed to create system_state table")
+		return err
+	}
+	
+	// Ensure fuentes_url has necessary columns for reactivation
+	alterQueries := []string{
+		`ALTER TABLE fuentes_url ADD COLUMN IF NOT EXISTS failures_count INTEGER DEFAULT 0`,
+		`ALTER TABLE fuentes_url ADD COLUMN IF NOT EXISTS is_healthy BOOLEAN DEFAULT true`,
+		`ALTER TABLE fuentes_url ADD COLUMN IF NOT EXISTS last_success TIMESTAMP`,
+	}
+	for _, q := range alterQueries {
+		if _, err := dbPool.Exec(ctx, q); err != nil {
+			logger.Warn().Err(err).Msg("Failed to alter fuentes_url")
+			// Don't fail on this, columns might already exist
+		}
+	}
+	
+	return nil
+}
+
 func getEnvInt(key string, defaultValue int) int {
-	if value := os.Getenv(key); value != "" {
-		if intVal, err := strconv.Atoi(value); err == nil {
-			return intVal
+	if v := os.Getenv(key); v != "" {
+		if i, err := strconv.Atoi(v); err == nil {
+			return i
 		}
 	}
 	return defaultValue
 }
-
-
 
 // getHealthyURLs returns only healthy feeds for processing
 func getHealthyURLs(ctx context.Context) ([]URLSource, error) {
@@ -748,6 +776,11 @@ func Main() {
 	defer workers.Close()
 
 	logger.Info().Msg("Connected to PostgreSQL")
+
+	// Ensure schema exists (tables for reactivation tracking)
+	if err := ensureSchema(context.Background()); err != nil {
+		logger.Error().Err(err).Msg("Failed to ensure schema, continuing anyway")
+	}
 
 	// Start health check HTTP server
 	go func() {

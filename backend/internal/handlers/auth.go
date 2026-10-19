@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -49,11 +50,16 @@ func Login(c *gin.Context) {
 	}
 
 	var user models.User
+	var limitsJSON []byte
+	var subscriptionEnd *string
 	err := db.GetPool().QueryRow(c.Request.Context(), `
-		SELECT id, email, username, password_hash, is_admin, created_at, updated_at
+		SELECT id, email, username, password_hash, is_admin, role, plan, subscription_status, subscription_end,
+			   COALESCE(limits_json, '{"feeds": 5, "translations_per_day": 0, "search_enabled": false, "alerts_limit": 0}'::jsonb) as limits_json,
+			   created_at, updated_at
 		FROM users WHERE email = $1`, req.Email).Scan(
-		&user.ID, &user.Email, &user.Username, &user.PasswordHash, &user.IsAdmin,
-		&user.CreatedAt, &user.UpdatedAt,
+		&user.ID, &user.Email, &user.Username, &user.PasswordHash, &user.IsAdmin, &user.Role,
+		&user.Plan, &user.SubscriptionStatus, &subscriptionEnd,
+		&limitsJSON, &user.CreatedAt, &user.UpdatedAt,
 	)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "Invalid credentials"})
@@ -64,6 +70,9 @@ func Login(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "Invalid credentials"})
 		return
 	}
+
+	// Parse limits JSON
+	json.Unmarshal(limitsJSON, &user.Limits)
 
 	tokenString, err := auth.GenerateToken(user.ID, user.Email, user.Username, user.IsAdmin)
 	if err != nil {
@@ -105,12 +114,15 @@ func Register(c *gin.Context) {
 	db.GetPool().QueryRow(c.Request.Context(), "SELECT COUNT(*) FROM users").Scan(&userCount)
 	isFirstUser := userCount == 0
 
+	// Default limits for new users
+	defaultLimits := `{"feeds": 5, "translations_per_day": 0, "search_enabled": false, "alerts_limit": 0}`
+
 	var userID int64
 	err = db.GetPool().QueryRow(c.Request.Context(), `
-		INSERT INTO users (email, username, password_hash, is_admin, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, NOW(), NOW())
+		INSERT INTO users (email, username, password_hash, is_admin, plan, subscription_status, limits_json, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, 'free', 'none', $5::jsonb, NOW(), NOW())
 		RETURNING id`,
-		req.Email, req.Username, string(hashedPassword), isFirstUser,
+		req.Email, req.Username, string(hashedPassword), isFirstUser, defaultLimits,
 	).Scan(&userID)
 
 	if err != nil {
@@ -123,14 +135,23 @@ func Register(c *gin.Context) {
 	}
 
 	var user models.User
+	var limitsJSON []byte
 	err = db.GetPool().QueryRow(c.Request.Context(), `
-		SELECT id, email, username, is_admin, created_at, updated_at
-		FROM users WHERE id = $1`, userID).Scan(
-		&user.ID, &user.Email, &user.Username, &user.IsAdmin,
+		SELECT id, email, username, is_admin, role, plan, subscription_status,
+			   COALESCE(limits_json, $1::jsonb) as limits_json, created_at, updated_at
+		FROM users WHERE id = $2`, defaultLimits, userID).Scan(
+		&user.ID, &user.Email, &user.Username, &user.IsAdmin, &user.Role,
+		&user.Plan, &user.SubscriptionStatus, &limitsJSON,
 		&user.CreatedAt, &user.UpdatedAt,
 	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to fetch user"})
+		return
+	}
+
+	// Parse limits JSON
+	if err := json.Unmarshal(limitsJSON, &user.Limits); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to parse user limits"})
 		return
 	}
 
@@ -167,16 +188,23 @@ func GetCurrentUser(c *gin.Context) {
 	claims := userVal.(*auth.Claims)
 
 	var user models.User
+	var limitsJSON []byte
 	err := db.GetPool().QueryRow(c.Request.Context(), `
-		SELECT id, email, username, is_admin, created_at, updated_at
+		SELECT id, email, username, is_admin, role, plan, subscription_status, subscription_end,
+			   COALESCE(limits_json, '{"feeds": 5, "translations_per_day": 0, "search_enabled": false, "alerts_limit": 0}'::jsonb) as limits_json,
+			   created_at, updated_at
 		FROM users WHERE id = $1`, claims.UserID).Scan(
-		&user.ID, &user.Email, &user.Username, &user.IsAdmin,
-		&user.CreatedAt, &user.UpdatedAt,
+		&user.ID, &user.Email, &user.Username, &user.IsAdmin, &user.Role,
+		&user.Plan, &user.SubscriptionStatus, &user.SubscriptionEnd,
+		&limitsJSON, &user.CreatedAt, &user.UpdatedAt,
 	)
 	if err != nil {
 		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: "User not found"})
 		return
 	}
+
+	// Parse limits JSON
+	json.Unmarshal(limitsJSON, &user.Limits)
 
 	c.JSON(http.StatusOK, user)
 }

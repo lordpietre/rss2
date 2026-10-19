@@ -357,11 +357,12 @@ func GetStats(c *gin.Context) {
 	}
 
 	// Top idiomas de noticias originales
+	// Optimizado: usa índice idx_noticias_lang directamente sin TRIM
 	rows, err = db.GetPool().Query(ctx, `
-		SELECT TRIM(n.lang)::TEXT as lang, COUNT(*) as count, COUNT(DISTINCT DATE(n.fecha)) as dias
+		SELECT n.lang as lang, COUNT(*) as count, COUNT(DISTINCT DATE(n.fecha)) as dias
 		FROM noticias n
-		WHERE n.lang IS NOT NULL AND TRIM(n.lang) != ''
-		GROUP BY TRIM(n.lang)
+		WHERE n.lang IS NOT NULL AND n.lang != '' AND n.lang != 'und'
+		GROUP BY n.lang
 		ORDER BY count DESC
 		LIMIT 15
 	`)

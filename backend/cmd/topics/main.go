@@ -46,9 +46,9 @@ func loadConfig() {
 }
 
 func getEnvInt(key string, defaultValue int) int {
-	if value := os.Getenv(key); value != "" {
-		if intVal, err := strconv.Atoi(value); err == nil {
-			return intVal
+	if v := os.Getenv(key); v != "" {
+		if i, err := strconv.Atoi(v); err == nil {
+			return i
 		}
 	}
 	return defaultValue
@@ -209,7 +209,7 @@ func findTopics(text string, topics []Topic) []struct {
 
 func findBestCountry(text string, countries []Country) *int64 {
 	text = strings.ToLower(text)
-	bestID := new(int64)
+	var bestID int64
 	bestCount := 0
 
 	for _, c := range countries {
@@ -221,12 +221,12 @@ func findBestCountry(text string, countries []Country) *int64 {
 		}
 		if count > bestCount {
 			bestCount = count
-			*bestID = c.ID
+			bestID = c.ID
 		}
 	}
 
 	if bestCount > 0 {
-		return bestID
+		return &bestID
 	}
 	return nil
 }

@@ -144,14 +144,27 @@ type Translation struct {
 }
 
 type User struct {
-	ID           int64     `json:"id"`
-	Email        string    `json:"email"`
-	Username     string    `json:"username"`
-	PasswordHash string    `json:"-"`
-	IsAdmin      bool      `json:"is_admin"`
-	Role         string    `json:"role"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID                  int64     `json:"id"`
+	Email               string    `json:"email"`
+	Username            string    `json:"username"`
+	PasswordHash        string    `json:"-"`
+	IsAdmin             bool      `json:"is_admin"`
+	Role                string    `json:"role"`
+	Plan                string    `json:"plan"`
+	SubscriptionStatus  string    `json:"subscription_status"`
+	SubscriptionEnd     *time.Time `json:"subscription_end,omitempty"`
+	GooglePlayToken     string    `json:"-"`
+	GooglePlayProductID string    `json:"google_play_product_id,omitempty"`
+	Limits              UserLimits `json:"limits"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
+}
+
+type UserLimits struct {
+	Feeds            int  `json:"feeds"`
+	TranslationsPerDay int  `json:"translations_per_day"`
+	SearchEnabled    bool `json:"search_enabled"`
+	AlertsLimit      int  `json:"alerts_limit"`
 }
 
 type SearchHistory struct {

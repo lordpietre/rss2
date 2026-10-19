@@ -36,18 +36,18 @@ func loadConfig() {
 }
 
 func getEnvInt(key string, defaultValue int) int {
-	if value := os.Getenv(key); value != "" {
-		if intVal, err := strconv.Atoi(value); err == nil {
-			return intVal
+	if v := os.Getenv(key); v != "" {
+		if i, err := strconv.Atoi(v); err == nil {
+			return i
 		}
 	}
 	return defaultValue
 }
 
 func getEnvFloat(key string, defaultValue float64) float64 {
-	if value := os.Getenv(key); value != "" {
-		if floatVal, err := strconv.ParseFloat(value, 64); err == nil {
-			return floatVal
+	if v := os.Getenv(key); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			return f
 		}
 	}
 	return defaultValue

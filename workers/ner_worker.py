@@ -494,19 +494,27 @@ def main():
 
                         for valor, tipo in tags:
                             try:
-                                # Usar commit parcial por noticia para evitar abortar todo el batch
+                                # First try to insert, on conflict do nothing to avoid race conditions
+                                # where two workers try to insert the same tag simultaneously
                                 cur.execute(
                                     """
                                     INSERT INTO tags (valor, tipo)
                                     VALUES (%s, %s)
-                                    ON CONFLICT (valor, tipo)
-                                    DO UPDATE SET valor = EXCLUDED.valor
-                                    RETURNING id;
+                                    ON CONFLICT (valor, tipo) DO NOTHING;
+                                    """,
+                                    (valor, tipo),
+                                )
+
+                                # Now get the tag id (either newly inserted or existing)
+                                cur.execute(
+                                    """
+                                    SELECT id FROM tags WHERE valor = %s AND tipo = %s;
                                     """,
                                     (valor, tipo),
                                 )
                                 tag_id = cur.fetchone()[0]
 
+                                # Link tag to news item
                                 cur.execute(
                                     """
                                     INSERT INTO tags_noticia (traduccion_id, noticia_id, tag_id)

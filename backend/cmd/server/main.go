@@ -54,6 +54,72 @@ func initDB() {
 		log.Info().Msg("Column role ready")
 	}
 
+	// Añadir columnas de suscripción si no existen
+	_, err = db.GetPool().Exec(ctx, `
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS plan VARCHAR(20) DEFAULT 'free'
+	`)
+	if err != nil {
+		log.Warn().Err(err).Msg("Could not add plan column")
+	} else {
+		log.Info().Msg("Column plan ready")
+	}
+
+	_, err = db.GetPool().Exec(ctx, `
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status VARCHAR(20) DEFAULT 'none'
+	`)
+	if err != nil {
+		log.Warn().Err(err).Msg("Could not add subscription_status column")
+	} else {
+		log.Info().Msg("Column subscription_status ready")
+	}
+
+	_, err = db.GetPool().Exec(ctx, `
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_end TIMESTAMP
+	`)
+	if err != nil {
+		log.Warn().Err(err).Msg("Could not add subscription_end column")
+	} else {
+		log.Info().Msg("Column subscription_end ready")
+	}
+
+	_, err = db.GetPool().Exec(ctx, `
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS google_play_token TEXT
+	`)
+	if err != nil {
+		log.Warn().Err(err).Msg("Could not add google_play_token column")
+	} else {
+		log.Info().Msg("Column google_play_token ready")
+	}
+
+	_, err = db.GetPool().Exec(ctx, `
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS google_play_product_id TEXT
+	`)
+	if err != nil {
+		log.Warn().Err(err).Msg("Could not add google_play_product_id column")
+	} else {
+		log.Info().Msg("Column google_play_product_id ready")
+	}
+
+	// Añadir límites por defecto para usuarios existentes en free
+	_, err = db.GetPool().Exec(ctx, `
+		UPDATE users SET limits_json = '{"feeds": 5, "translations_per_day": 0, "search_enabled": false, "alerts_limit": 0}'::jsonb
+		WHERE limits_json IS NULL AND (plan = 'free' OR plan IS NULL)
+	`)
+	if err != nil {
+		log.Warn().Err(err).Msg("Could not set default limits for free users")
+	}
+
+	// Índices para suscripciones
+	_, err = db.GetPool().Exec(ctx, `CREATE INDEX IF NOT EXISTS idx_users_plan ON users(plan)`)
+	if err != nil {
+		log.Warn().Err(err).Msg("Could not create idx_users_plan index")
+	}
+
+	_, err = db.GetPool().Exec(ctx, `CREATE INDEX IF NOT EXISTS idx_users_subscription_status ON users(subscription_status)`)
+	if err != nil {
+		log.Warn().Err(err).Msg("Could not create idx_users_subscription_status index")
+	}
+
 	// Crear tabla de configuración si no existe
 	_, err = db.GetPool().Exec(ctx, `
 		CREATE TABLE IF NOT EXISTS config (
@@ -438,6 +504,17 @@ func Main() {
 		auth.Use(middleware.AuthRequired())
 		{
 			auth.GET("/me", handlers.GetCurrentUser)
+		}
+
+		// App/Subscription routes (authenticated)
+		app := api.Group("/app")
+		app.Use(middleware.AuthRequired())
+		{
+			app.POST("/subscription/validate", handlers.ValidateSubscriptionReceipt)
+			app.POST("/subscription/cancel", handlers.CancelSubscription)
+			app.GET("/subscription/status", handlers.GetSubscriptionStatus)
+			app.GET("/usage", handlers.GetUsage)
+			app.GET("/limits/check", handlers.CheckPlanLimits)
 		}
 	}
 

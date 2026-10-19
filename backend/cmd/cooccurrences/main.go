@@ -5,6 +5,8 @@ import (
 	"flag"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -14,12 +16,10 @@ import (
 var db *sqlx.DB
 
 func main() {
-	// Parse flags
 	interval := flag.Duration("interval", 24*time.Hour, "Interval between refreshes")
 	once := flag.Bool("once", false, "Run once and exit")
 	flag.Parse()
 
-	// Connect to database
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
 		dbURL = "postgres://rss:rss@localhost:5432/rss?sslmode=disable"
@@ -32,32 +32,33 @@ func main() {
 	}
 	defer db.Close()
 
-	log.Printf("Cooccurrences worker started")
-	log.Printf("Interval: %v", *interval)
+	log.Printf("Cooccurrences worker started, interval=%v", *interval)
 
 	if *once {
-		log.Println("Running once mode...")
 		if err := refreshCooccurrences(); err != nil {
 			log.Fatalf("Refresh failed: %v", err)
 		}
 		return
 	}
 
-	// Run initial refresh
 	if err := refreshCooccurrences(); err != nil {
-		log.Printf("Initial refresh failed: %v", err)
+		log.Printf("Initial refresh failed: %v, will retry on schedule", err)
 	}
 
-	// Main loop
 	ticker := time.NewTicker(*interval)
 	defer ticker.Stop()
 
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
 	for {
 		select {
+		case <-sigChan:
+			log.Println("Shutting down...")
+			return
 		case <-ticker.C:
-			log.Println("Running scheduled refresh...")
 			if err := refreshCooccurrences(); err != nil {
-				log.Printf("Scheduled refresh failed: %v", err)
+				log.Printf("Refresh failed: %v", err)
 			}
 		}
 	}
@@ -69,13 +70,10 @@ func refreshCooccurrences() error {
 
 	log.Println("Starting cooccurrences refresh...")
 
-	// Clear existing data
-	_, err := db.ExecContext(ctx, "TRUNCATE entity_cooccurrences")
-	if err != nil {
+	if _, err := db.ExecContext(ctx, "TRUNCATE entity_cooccurrences"); err != nil {
 		return err
 	}
 
-	// Insert all co-occurrences from recent news (last 30 days)
 	query := `
 		INSERT INTO entity_cooccurrences (tag1_id, tag2_id, co_count)
 		SELECT 
@@ -97,12 +95,10 @@ func refreshCooccurrences() error {
 
 	rowsAffected, _ := result.RowsAffected()
 
-	// Update timestamp
-	_, err = db.ExecContext(ctx, "UPDATE entity_cooccurrences SET last_updated = NOW()")
-	if err != nil {
+	if _, err := db.ExecContext(ctx, "UPDATE entity_cooccurrences SET last_updated = NOW()"); err != nil {
 		log.Printf("Warning: failed to update timestamps: %v", err)
 	}
 
-	log.Printf("Cooccurrences refresh completed: %d records inserted", rowsAffected)
+	log.Printf("Cooccurrences refresh completed: %d records", rowsAffected)
 	return nil
 }

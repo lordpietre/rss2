@@ -309,7 +309,8 @@ func runUnblock(ctx context.Context, pool *pgxpool.Pool, s *stats) error {
 	if err != nil {
 		return err
 	}
-	s.bloqueados = int(tag.RowsAffected())
+	affected := tag.RowsAffected()
+	s.bloqueados = int(affected)
 	return nil
 }
 

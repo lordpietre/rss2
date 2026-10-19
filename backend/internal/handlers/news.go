@@ -1194,7 +1194,7 @@ func GetEntityMentions(c *gin.Context) {
 
 // RefreshEntityStatsStartup refreshes entity_stats on server startup (non-blocking)
 func RefreshEntityStatsStartup() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 
 	start := time.Now()

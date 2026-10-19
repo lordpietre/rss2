@@ -48,9 +48,24 @@ var (
 )
 
 var (
-	htmlLeftRe = regexp.MustCompile(`</?[a-zA-Z][^<>]{0,200}>`)
-	codeRe     = regexp.MustCompile(`function\(|jQuery\(|document\.querySelector`)
+	htmlLeftRe *regexp.Regexp
+	codeRe     *regexp.Regexp
 )
+
+func init() {
+	// Usar Compile en lugar de MustCompile para detectar errores en init
+	var err error
+	htmlLeftRe, err = regexp.Compile(`</?[a-zA-Z][^<>]{0,200}>`)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "regexp.MustCompile htmlLeftRe: %v\n", err)
+		os.Exit(1)
+	}
+	codeRe, err = regexp.Compile(`function\(|jQuery\(|document\.querySelector`)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "regexp.MustCompile codeRe: %v\n", err)
+		os.Exit(1)
+	}
+}
 
 type fuenteStat struct {
 	n     int
