@@ -14,8 +14,8 @@ var Client *redis.Client
 // Cache TTL constants
 const (
 	TTLShort   = 5 * time.Minute    // 5 min for frequently changing data
-	TTLMedium  = 30 * time.Minute   // 30 min for semi-static data
-	TTLLong    = 2 * time.Hour      // 2 hours for stable data
+	TTLMedium  = 1 * time.Hour     // 1 hour for semi-static data (increased from 30 min)
+	TTLLong    = 4 * time.Hour     // 4 hours for stable data (increased from 2 hours)
 	TTLNoExpire = 0                // No expiration (manual invalidation)
 )
 
