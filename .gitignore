@@ -122,3 +122,9 @@ docker-compose.override.yml
 
 # PM - documentos/activos locales
 PM/
+
+# ==================================================================================
+# Go binaries (compiled, generated at build time)
+# ==================================================================================
+backend/bin/
+bin/
