@@ -48,8 +48,7 @@ cp .env.example .env
 # - SECRET_KEY (clave secreta para JWT)
 
 # 3. Iniciar la aplicación
-docker compose up -d --build backend   # Primero: construir backend
-docker compose up -d --no-build       # Luego: iniciar el resto
+docker compose up -d --build          # Build + levanta todos los servicios
 
 # 4. Esperar a que esté listo (~5 minutos) y acceder a:
 ```
