@@ -1,0 +1,23 @@
+# Imagen de pruebas del subsistema TTS.
+#
+# Extiende la imagen del servicio (que ya trae soundfile, librosa, flask,
+# redis y psycopg2-binary) unicamente con pytest. La imagen de runtime no
+# lleva pytest a proposito: no es una dependencia del servicio.
+#
+# Por que un contenedor y no el host: las pruebas importan soundfile (para
+# leer los WAV que generan) y el host tiene Python 3.14, para el que las
+# versiones fijadas de numpy/librosa no tienen ruedas. En el host fallaba
+# con "ModuleNotFoundError: No module named 'soundfile'" antes de ejecutar
+# nada.
+#
+# Las pruebas de integracion se saltan si TEST_DATABASE_URL no esta
+# definida (ver workers/tests/conftest.py).
+
+FROM rss2-tts:latest
+
+RUN pip install --no-cache-dir pytest
+
+WORKDIR /app
+
+ENTRYPOINT []
+CMD ["python", "-m", "pytest", "workers/tests", "-v"]

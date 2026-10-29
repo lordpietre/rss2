@@ -5,11 +5,20 @@
 # POSTGRES_PASSWORD, REDIS_PASSWORD, DB_PASS, SECRET_KEY, GRAFANA_PASSWORD
 # ==================================================================================
 
+# Rotación de logs: sin esto un worker en bucle de error puede llenar el disco
+# (el log del Postgres llegó a 23 GB por inserts repetidos con UTF-8 inválido).
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "3"
+
 services:
   # ------------------------------------------------------------------------------
   # BASE DE DATOS Y CACHE
   # ------------------------------------------------------------------------------
   db:
+    logging: *default-logging
     image: pgvector/pgvector:pg16
     container_name: rss2_db
     environment:
@@ -48,6 +57,7 @@ services:
       retries: 30
 
   redis:
+    logging: *default-logging
     image: redis:7-alpine
     container_name: rss2_redis
     command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD}
@@ -67,6 +77,7 @@ services:
   # ------------------------------------------------------------------------------
   # Traductor NLLB-200 (CTranslate2) - CPU
   translator:
+    logging: *default-logging
     build:
       context: ./translator
       dockerfile: Dockerfile.cpu
@@ -85,7 +96,7 @@ services:
       CT2_INTRA_THREADS: 2
       # Tope de memoria: 128 secuencias por llamada medía 4383 MB de pico
       # y superaba el límite de 4G → OOM del cgroup (39 kills). 32 → 1901 MB.
-      MAX_SEQ_PER_CALL: ${MAX_SEQ_PER_CALL:-32}
+      MAX_SEQ_PER_CALL: ${MAX_SEQ_PER_CALL:-8}
       TRANSLATOR_ID: "0"
       TRANSLATOR_TOTAL: "2"
       PORT: 8000
@@ -106,13 +117,16 @@ services:
       resources:
         limits:
           cpus: '2'
-          # Pico medido con MAX_SEQ_PER_CALL=32: ~2.0 GiB (4G provocaba OOM
-          # al llegar a 4383 MB con el valor anterior de 128).
+          # Pico medido con MAX_SEQ_PER_CALL=8: ~1.8 GiB (el KV cache de
+          # CTranslate2 escala con seqs x (MAX_SRC+MAX_NEW)_TOKENS). Con 16 el
+          # pico llegaba a ~2.6 GiB y con 32 a ~3.1 GiB: ambos cruzan el
+          # límite de 3G y el OOM killer del cgroup mataba el proceso.
           memory: 3G
 
   # Réplicas 2-3 del translator (paso 1 velocidad): reutilizan la imagen
   # ya construida; se reparten el trabajo por SKIP LOCKED en SQL.
   translator-2:
+    logging: *default-logging
     image: rss2-translator
     container_name: rss2_translator_2
     healthcheck:
@@ -127,7 +141,7 @@ services:
       CT2_DEVICE: cpu
       CT2_COMPUTE_TYPE: int8
       CT2_INTRA_THREADS: 2
-      MAX_SEQ_PER_CALL: ${MAX_SEQ_PER_CALL:-32}
+      MAX_SEQ_PER_CALL: ${MAX_SEQ_PER_CALL:-8}
       TRANSLATOR_ID: "1"
       TRANSLATOR_TOTAL: "2"
       PORT: 8000
@@ -151,12 +165,15 @@ services:
       resources:
         limits:
           cpus: '2'
-          # Pico medido con MAX_SEQ_PER_CALL=32: ~2.0 GiB (4G provocaba OOM
-          # al llegar a 4383 MB con el valor anterior de 128).
+          # Pico medido con MAX_SEQ_PER_CALL=8: ~1.8 GiB (el KV cache de
+          # CTranslate2 escala con seqs x (MAX_SRC+MAX_NEW)_TOKENS). Con 16 el
+          # pico llegaba a ~2.6 GiB y con 32 a ~3.1 GiB: ambos cruzan el
+          # límite de 3G y el OOM killer del cgroup mataba el proceso.
           memory: 3G
 
   # Traductor GPU (opcional, solo con --profile gpu y NVIDIA + nvidia-container-toolkit)
   translator-gpu:
+    logging: *default-logging
     profiles: ["gpu"]
     build:
       context: ./translator
@@ -167,7 +184,7 @@ services:
       CT2_DEVICE: cuda
       CT2_COMPUTE_TYPE: float16
       CT2_INTRA_THREADS: 4
-      MAX_SEQ_PER_CALL: ${MAX_SEQ_PER_CALL:-32}
+      MAX_SEQ_PER_CALL: ${MAX_SEQ_PER_CALL:-8}
       PORT: 8000
       TARGET_LANGS: ${TARGET_LANGS:-es}
       TRANSLATOR_BATCH: ${TRANSLATOR_BATCH:-32}
@@ -195,6 +212,7 @@ services:
   # ------------------------------------------------------------------------------
   # Ingestor RSS (Go): feeds -> noticias
   ingestor:
+    logging: *default-logging
     build:
       context: ./rss-ingestor-go
     container_name: rss2_ingestor
@@ -213,6 +231,9 @@ services:
       DB_PASS: ${POSTGRES_PASSWORD}
       RSS_MAX_WORKERS: 20
       RSS_POKE_INTERVAL_MIN: 60
+      # Idioma destino de la traduccion. Lo usa el ingestor para marcar las
+      # noticias de los canales "ya traducidos" con el idioma destino.
+      TARGET_LANGS: ${TARGET_LANGS:-es}
     networks:
       - backend
     depends_on:
@@ -227,6 +248,7 @@ services:
 
   # Scheduler: noticias -> traducciones pendientes (las consume el translator)
   translation-scheduler:
+    logging: *default-logging
     build:
       context: .
       dockerfile: Dockerfile.scheduler
@@ -248,6 +270,16 @@ services:
       TARGET_LANGS: ${TARGET_LANGS:-es}
       SCHEDULER_BATCH: 2000
       SCHEDULER_SLEEP: 30
+      # Ruta rápida: noticias insertadas en los últimos N minutos (índice
+      # idx_noticias_created_at → milisegundos). Ruta de catch-up: cada
+      # CATCHUP_INTERVAL_MIN minutos mira las noticias actualizadas en las
+      # últimas CATCHUP_LOOKBACK_HOURS horas (cubre las que acaba de
+      # etiquetar langdetect). Sin esto el anti-join recorría todo el
+      # catálogo y el ciclo tardaba ~12 min.
+      SCHEDULER_LOOKBACK_MINUTES: ${SCHEDULER_LOOKBACK_MINUTES:-60}
+      SCHEDULER_CATCHUP_INTERVAL_MIN: ${SCHEDULER_CATCHUP_INTERVAL_MIN:-360}
+      SCHEDULER_CATCHUP_LOOKBACK_HOURS: ${SCHEDULER_CATCHUP_LOOKBACK_HOURS:-168}
+      SCHEDULER_CATCHUP_BATCH: ${SCHEDULER_CATCHUP_BATCH:-20000}
     networks:
       - backend
     depends_on:
@@ -262,6 +294,7 @@ services:
 
   # Langdetect: noticias.lang (lo necesita el scheduler para encolar traducciones)
   langdetect:
+    logging: *default-logging
     build:
       context: .
       dockerfile: Dockerfile.scheduler
@@ -295,6 +328,7 @@ services:
 
   # NER (spaCy models es_core_news_lg + en_core_web_lg sobre traducciones done): tags -> Populares/Evolución/Alertas
   ner:
+    logging: *default-logging
     build:
       context: .
       dockerfile: Dockerfile.ner
@@ -329,6 +363,7 @@ services:
   # Reutiliza la imagen backend (el binario /wiki-worker ya se compila en
   # backend/Dockerfile): evita el build con contexto raíz, que es muy pesado.
   wiki:
+    logging: *default-logging
     image: rss2-backend
     container_name: rss2_wiki
     entrypoint: ["/wiki-worker"]
@@ -367,6 +402,7 @@ services:
   # Cooccurrences: actualiza tabla de co-ocurrencias de entidades
   # Se ejecuta una vez al día para mantener el grafo de entidades actualizado
   cooccurrences:
+    logging: *default-logging
     image: rss2-backend
     container_name: rss2_cooccurrences
     entrypoint: ["/cooccurrences"]
@@ -394,6 +430,7 @@ services:
   # Reutiliza la imagen backend (sin build: evita el conflicto AlreadyExists
   # de construir dos servicios contra el mismo tag en un solo comando).
   topics:
+    logging: *default-logging
     image: rss2-backend
     container_name: rss2_topics
     entrypoint: ["/topics"]
@@ -431,6 +468,7 @@ services:
   # related (coseno SQL). Modelo pre-descargado en ./hf_cache.
   # También sirve API HTTP en :6000 para búsqueda semántica bajo demanda.
   embeddings:
+    logging: *default-logging
     build:
       context: .
       dockerfile: Dockerfile.embeddings
@@ -469,9 +507,87 @@ services:
       retries: 3
       start_period: 300s
 
+  # TTS: sintesis de voz y clonacion de timbre para narrar noticias.
+  #
+  # - No publica puertos: solo es alcanzable desde la red interna y el
+  #   backend Go es quien expone la API editorial.
+  # - Los pesos del modelo NO se descargan al arrancar: se preparan con
+  #   scripts/prepare_tts_models.sh y se montan en ./models/openvoice.
+  # - El audio se guarda en ./data/tts_audio (volumen persistente), nunca en
+  #   Postgres.
+  tts:
+    logging: *default-logging
+    build:
+      context: .
+      dockerfile: Dockerfile.tts
+    container_name: rss2_tts
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-rss}
+      DB_USER: ${POSTGRES_USER:-rss}
+      DB_PASS: ${POSTGRES_PASSWORD}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      TTS_API_KEY: ${TTS_API_KEY:-}
+      TTS_ENGINES: ${TTS_ENGINES:-chatterbox,melotts,openvoice}
+      TTS_ENGINE: ${TTS_ENGINE:-chatterbox}
+      TTS_MELO_LANGUAGE: ${TTS_MELO_LANGUAGE:-ES}
+      TTS_MELO_SPEAKER_ID: ${TTS_MELO_SPEAKER_ID:-0}
+      TTS_CHATTERBOX_MODEL_DIR: /app/models/chatterbox
+      TTS_CHATTERBOX_T3_MODEL: ${TTS_CHATTERBOX_T3_MODEL:-v3}
+      TTS_CHATTERBOX_LANGUAGE: ${TTS_CHATTERBOX_LANGUAGE:-es}
+      TTS_CHATTERBOX_EXAGGERATION: ${TTS_CHATTERBOX_EXAGGERATION:-0.5}
+      TTS_CHATTERBOX_CFG_WEIGHT: ${TTS_CHATTERBOX_CFG_WEIGHT:-0.5}
+      TTS_CHATTERBOX_TEMPERATURE: ${TTS_CHATTERBOX_TEMPERATURE:-0.8}
+      TTS_CHATTERBOX_REPETITION_PENALTY: ${TTS_CHATTERBOX_REPETITION_PENALTY:-1.2}
+      TTS_DEVICE: ${TTS_DEVICE:-cpu}
+      # Sin red para HuggingFace en runtime: los pesos y el cache (Cangjie,
+      # pkuseg) se preparan con scripts/prepare_tts_models.sh y en la build.
+      # Si falta algo, el motor falla en /health en vez de descargar callado.
+      HF_HUB_OFFLINE: "1"
+      TTS_TORCH_THREADS: ${TTS_TORCH_THREADS:-2}
+      TTS_PORT: 7000
+      TTS_AUDIO_DIR: /app/data/tts_audio
+      TTS_VOICES_DIR: /app/data/tts_voices
+      TTS_TMP_DIR: /app/data/tts_tmp
+      TTS_OPENVOICE_MODEL_DIR: /app/models/openvoice
+      TTS_MAX_SCRIPT_CHARS: ${TTS_MAX_SCRIPT_CHARS:-8000}
+      TTS_MAX_ATTEMPTS: ${TTS_MAX_ATTEMPTS:-2}
+      TTS_SLEEP_IDLE: ${TTS_SLEEP_IDLE:-5}
+      TTS_ALLOW_VOICE_UPLOAD: ${TTS_ALLOW_VOICE_UPLOAD:-0}
+    volumes:
+      - ./models/openvoice:/app/models/openvoice:ro
+      - ./models/chatterbox:/app/models/chatterbox:ro
+      - ./data/tts_audio:/app/data/tts_audio
+      - ./data/tts_voices:/app/data/tts_voices
+      - ./data/tts_tmp:/app/data/tts_tmp
+      - ./hf_cache:/cache
+    networks:
+      - backend
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '3'
+          # Medido en esta maquina: Chatterbox cargado pica ~5,0 GiB (pesos
+          # 3,2 GB + torch + page cache). Un guion largo anade el KV cache
+          # (~2 GB mas), de ahi el margen hasta 8G.
+          memory: 8G
+    healthcheck:
+      # Verifica que el proceso python esté corriendo
+      test: ["CMD-SHELL", "grep -q tts_worker /proc/1/cmdline"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 600s
+
   # Related: noticias relacionadas por coseno (CPU) sobre embeddings locales.
   # EMB_MODEL debe coincidir con el del servicio embeddings.
   related:
+    logging: *default-logging
     image: rss2-backend
     container_name: rss2_related
     entrypoint: ["/related"]
@@ -509,6 +625,7 @@ services:
   # Event Clustering: agrupar noticias del mismo evento usando embeddings.
   # Usa pgvector para similitud coseno y clustering incremental.
   event-clustering:
+    logging: *default-logging
     image: rss2-backend
     container_name: rss2_event_clustering
     entrypoint: ["/event_clustering"]
@@ -546,6 +663,7 @@ services:
   # Scraper: completa resumen<200 y explora fuentes_url activas.
   # Sin fuentes_url sembradas solo hace enriquecimiento (también útil).
   scraper:
+    logging: *default-logging
     image: rss2-backend
     container_name: rss2_scraper
     entrypoint: ["/scraper"]
@@ -582,6 +700,7 @@ services:
   # Discovery: fuentes_url → feeds (directos si hay categoria+pais,
   # si no a feeds_pending para revisión). Dedupe por ON CONFLICT(url).
   discovery:
+    logging: *default-logging
     image: rss2-backend
     container_name: rss2_discovery
     entrypoint: ["/discovery"]
@@ -618,6 +737,7 @@ services:
   # BACKEND UNIFICADO (Go) - Un solo binario, múltiples subcomandos
   # ------------------------------------------------------------------------------
   backend:
+    logging: *default-logging
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -629,8 +749,21 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       SECRET_KEY: ${SECRET_KEY}
       SERVER_PORT: "8080"
+      # Escaneo de alertas: cada cuanto se buscan picos de actividad de las
+      # entidades. Con el corpus creciendo ~1.500 noticias/min, 60 min dejaba
+      # el panel de alertas demasiado obsoleto.
+      ALERTS_SCAN_INTERVAL_MIN: ${ALERTS_SCAN_INTERVAL_MIN:-15}
+      # Subsistema de sintesis de voz (servicio interno, no publicado).
+      TTS_URL: http://tts:7000
+      TTS_API_KEY: ${TTS_API_KEY:-}
+      # Motor por defecto: el que usan los trabajos que no piden otro.
+      TTS_ENGINE: ${TTS_ENGINE:-chatterbox}
+      TTS_AUDIO_PATH: /app/data/tts_audio
+      TTS_MAX_SCRIPT_CHARS: ${TTS_MAX_SCRIPT_CHARS:-8000}
     volumes:
       - ./data/wiki_images:/app/data/wiki_images
+      # Los audios generados se leen de aqui; el servicio TTS es quien escribe.
+      - ./data/tts_audio:/app/data/tts_audio:ro
     networks:
       - backend
       - frontend
@@ -658,6 +791,7 @@ services:
   # FRONTEND (React + Vite)
   # ------------------------------------------------------------------------------
   frontend:
+    logging: *default-logging
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -680,6 +814,7 @@ services:
   # NGINX (Gateway - Puerto 8888)
   # ------------------------------------------------------------------------------
   nginx:
+    logging: *default-logging
     image: nginx:alpine
     container_name: rss2_nginx
     ports:
@@ -706,6 +841,7 @@ services:
   # MONITOREO (Opcional - activar con profile monitoring)
   # ------------------------------------------------------------------------------
   prometheus:
+    logging: *default-logging
     image: prom/prometheus:latest
     container_name: rss2_prometheus
     profiles: ["monitoring"]
@@ -720,6 +856,7 @@ services:
     restart: unless-stopped
 
   grafana:
+    logging: *default-logging
     image: grafana/grafana:latest
     container_name: rss2_grafana
     profiles: ["monitoring"]
@@ -737,6 +874,7 @@ services:
     restart: unless-stopped
 
   cadvisor:
+    logging: *default-logging
     image: gcr.io/cadvisor/cadvisor:latest
     container_name: rss2_cadvisor
     profiles: ["monitoring"]

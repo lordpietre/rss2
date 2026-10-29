@@ -1,0 +1,19 @@
+# Dependencias del servicio de TTS de RSS2 (para ejecutar las pruebas en local).
+#
+# Dentro del contenedor se instalan en Dockerfile.tts (que usa el indice de
+# torch CPU y MeloTTS/OpenVoice desde git). Este fichero es solo para el
+# entorno de desarrollo:
+#
+#   python -m venv .venv-tts && . .venv-tts/bin/activate
+#   pip install -r workers/requirements-tts.txt
+#
+# El motor de sintesis (MeloTTS, OpenVoice) NO hace falta para las pruebas
+# unitarias: se sustituye por un doble de prueba.
+
+numpy==1.26.4
+soundfile
+librosa
+flask
+redis
+psycopg2-binary
+pytest

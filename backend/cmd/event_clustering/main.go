@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"crypto/sha256"
-	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rss2/backend/internal/logger"
 	"github.com/rss2/backend/internal/workers"
@@ -26,7 +27,7 @@ var (
 	batchSize    = 500  // News to process per batch
 	minSimilitud = 0.85 // Cosine similarity threshold
 	timeWindowH  = 72   // Hours window for event clustering
-	entityTypes           = []string{"persona", "organizacion"}
+	entityTypes  = []string{"persona", "organizacion"}
 )
 
 // Configuración del modelo de embeddings (debe coincidir con el worker de embeddings)
@@ -124,18 +125,18 @@ func ensureSchema(ctx context.Context) error {
 // ============================================================================
 
 type newsWithEmbedding struct {
-	ID            string
-	TraduccionID  int64
-	Titulo        string
-	Fecha         time.Time
-	Embedding     []float64
-	Entities      []string // Entity values for this news
+	ID           string
+	TraduccionID int64
+	Titulo       string
+	Fecha        time.Time
+	Embedding    []float64
+	Entities     []string // Entity values for this news
 }
 
 type candidatePair struct {
-	News1, News2     *newsWithEmbedding
-	Similarity       float64
-	SharedEntities   int
+	News1, News2   *newsWithEmbedding
+	Similarity     float64
+	SharedEntities int
 }
 
 // ============================================================================
@@ -172,7 +173,7 @@ func getNewsEntities(ctx context.Context, noticiaID string) ([]string, error) {
 
 func fetchPendingNews(ctx context.Context, limit int) ([]newsWithEmbedding, error) {
 	rows, err := dbPool.Query(ctx, `
-		SELECT n.id, t.id, COALESCE(n.titulo, ''), n.fecha, e.embedding
+		SELECT n.id, t.id, COALESCE(n.titulo, ''), n.fecha, e.embedding::text
 		FROM noticias n
 		JOIN traducciones t ON t.noticia_id = n.id AND t.lang_to = 'es' AND t.status = 'done'
 		JOIN traduccion_embeddings e ON e.traduccion_id = t.id AND e.model = $1
@@ -194,15 +195,15 @@ func fetchPendingNews(ctx context.Context, limit int) ([]newsWithEmbedding, erro
 	var skippedInvalid, skippedDim int
 	for rows.Next() {
 		var n newsWithEmbedding
-		var embeddingStr sql.NullString
+		var embeddingStr *string
 		if err := rows.Scan(&n.ID, &n.TraduccionID, &n.Titulo, &n.Fecha, &embeddingStr); err != nil {
 			continue
 		}
-		if !embeddingStr.Valid {
+		if embeddingStr == nil {
 			skippedInvalid++
 			continue
 		}
-		n.Embedding = parseEmbedding(embeddingStr.String)
+		n.Embedding = parseEmbedding(*embeddingStr)
 		if len(n.Embedding) != embDim {
 			skippedDim++
 			continue
@@ -259,8 +260,8 @@ func cosineSimilarity(a, b []float64) float64 {
 
 // findSimilarNews finds news similar to the given news using pgvector
 func findSimilarNews(ctx context.Context, news *newsWithEmbedding, limit int) ([]struct {
-	ID        string
-	Score     float64
+	ID    string
+	Score float64
 }, error) {
 	vecStr := embeddingToVector(news.Embedding)
 
@@ -327,7 +328,7 @@ func calculateEntityHash(entities []string) string {
 	sorted := make([]string, len(entities))
 	copy(sorted, entities)
 	sort.Strings(sorted)
-	
+
 	combined := strings.Join(sorted, ",")
 	hash := sha256.Sum256([]byte(combined))
 	return hex.EncodeToString(hash[:])
@@ -335,7 +336,13 @@ func calculateEntityHash(entities []string) string {
 
 func getClusterHash(entities []string, fecha time.Time) string {
 	entityHash := calculateEntityHash(entities)
-	dateHash := fecha.Format("2006-01-02")
+	// Sin fecha valida no se puede agrupar por dia: se usa una fecha fija
+	// para que el hash no dependa del reloj (los valores cero produces
+	// fechas distintas cada vez y rompian cualquier agrupacion).
+	dateHash := "0000-00-00"
+	if !fecha.IsZero() && fecha.Year() > 1970 {
+		dateHash = fecha.Format("2006-01-02")
+	}
 	// Use first 16 chars of hash, pad if needed
 	if len(entityHash) < 16 {
 		entityHash = entityHash + strings.Repeat("0", 16-len(entityHash))
@@ -351,7 +358,10 @@ func findExistingCluster(ctx context.Context, clusterHash string) (int64, bool, 
 		ORDER BY created_at DESC 
 		LIMIT 1
 	`, clusterHash).Scan(&id)
-	if err == sql.ErrNoRows {
+	// El pool es de pgx: el error de "sin filas" es pgx.ErrNoRows, no
+	// sql.ErrNoRows. Con el sentinel equivocado, ninguna noticia llegaba a
+	// agruparse y el worker se descartaba todas.
+	if errors.Is(err, pgx.ErrNoRows) {
 		return 0, false, nil
 	}
 	if err != nil {
@@ -363,7 +373,7 @@ func findExistingCluster(ctx context.Context, clusterHash string) (int64, bool, 
 func createCluster(ctx context.Context, hash string, title string, fecha time.Time, embedding []float64) (int64, error) {
 	var id int64
 	vecStr := embeddingToVector(embedding)
-	
+
 	err := dbPool.QueryRow(ctx, `
 		INSERT INTO event_clusters (cluster_hash, titulo_template, primer_noticia_id, fecha_inicio, fecha_fin, embedding_vector, importancia)
 		VALUES ($1, $2, '', $3, $3, $4::vector, 'minor')
@@ -392,7 +402,7 @@ func updateClusterStats(ctx context.Context, clusterID int64) error {
 		ORDER BY nc.es_principal DESC, n.fecha ASC, nc.similitud DESC
 		LIMIT 1
 	`, clusterID).Scan(&principalID)
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return err
 	}
 
@@ -416,20 +426,25 @@ func updateClusterStats(ctx context.Context, clusterID int64) error {
 		return err
 	}
 
-	// Update importancia based on news count
+	// Update importancia based on news count.
+	//
+	// El WITH va antes del UPDATE: dentro de un CASE no es valido, y el
+	// error hacia que importancia y popularidad se quedaran siempre a sus
+	// valores por defecto.
 	_, err = dbPool.Exec(ctx, `
+		WITH cnt AS (
+			SELECT COUNT(*) AS c FROM noticia_clusters WHERE cluster_id = $1
+		)
 		UPDATE event_clusters ec
 		SET importancia = CASE
-			WITH cnt AS (SELECT COUNT(*) as c FROM noticia_clusters WHERE cluster_id = $1)
-			SELECT CASE 
-				WHEN c >= 10 THEN 'breaking'
-				WHEN c >= 5 THEN 'major'
-				WHEN c >= 2 THEN 'normal'
+				WHEN cnt.c >= 10 THEN 'breaking'
+				WHEN cnt.c >= 5 THEN 'major'
+				WHEN cnt.c >= 2 THEN 'normal'
 				ELSE 'minor'
-			END
-		END,
-		popularidad = (SELECT COUNT(*) FROM noticia_clusters WHERE cluster_id = $1)
-		WHERE id = $1
+			END,
+			popularidad = cnt.c
+		FROM cnt
+		WHERE ec.id = $1
 	`, clusterID)
 	return err
 }
@@ -479,10 +494,13 @@ func processBatch(ctx context.Context) (int, error) {
 
 		if !exists {
 			// Create new cluster
+			// El titulo se corta por bytes, lo que puede partir un caracter
+			// UTF-8: se sanea DESPUES de cortar.
 			title := news.Titulo
 			if len(title) > 100 {
 				title = title[:100] + "..."
 			}
+			title = strings.ToValidUTF8(title, "")
 			clusterID, err = createCluster(ctx, clusterHash, title, news.Fecha, news.Embedding)
 			if err != nil {
 				logger.Warn().Err(err).Str("noticia_id", news.ID).Msg("Failed to create cluster")
@@ -509,11 +527,11 @@ func processBatch(ctx context.Context) (int, error) {
 				err := dbPool.QueryRow(ctx, `
 					SELECT 1 FROM noticia_clusters WHERE noticia_id = $1
 				`, sim.ID).Scan(&exists)
-				if err == sql.ErrNoRows {
+				if errors.Is(err, pgx.ErrNoRows) {
 					// Get entities for similar news
 					simEntities, _ := getNewsEntities(ctx, sim.ID)
 					simHash := getClusterHash(simEntities, news.Fecha)
-					
+
 					// Check if same cluster or create new one
 					simClusterID, simExists, _ := findExistingCluster(ctx, simHash)
 					if !simExists {
@@ -524,7 +542,7 @@ func processBatch(ctx context.Context) (int, error) {
 							continue
 						}
 					}
-					
+
 					// Add to cluster
 					addToCluster(ctx, sim.ID, simClusterID, sim.Score, false)
 				}

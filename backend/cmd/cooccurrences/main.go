@@ -26,9 +26,25 @@ func main() {
 	}
 
 	var err error
-	db, err = sqlx.Connect("postgres", dbURL)
-	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+	// Al arrancar el host el DNS interno de Docker puede tardar unos
+	// segundos en responder. Sin reintentos el proceso muere y Docker lo
+	// reinicia con backoff (varios reinicios en cada arranque del host).
+	for attempt := 1; attempt <= 30; attempt++ {
+		db, err = sqlx.Connect("postgres", dbURL)
+		if err == nil {
+			break
+		}
+		// sqlx.Connect abre un pool aunque falle el ping: sin cerrarlo aqui
+		// cada intento deja un pool abierto (30 pools con sus conexiones).
+		if db != nil {
+			_ = db.Close()
+			db = nil
+		}
+		if attempt == 30 {
+			log.Fatalf("Failed to connect to database: %v", err)
+		}
+		log.Printf("Waiting for database (%d/30): %v", attempt, err)
+		time.Sleep(2 * time.Second)
 	}
 	defer db.Close()
 

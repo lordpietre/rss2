@@ -13,6 +13,7 @@ import { Account } from './pages/Account'
 import { Populares } from './pages/Populares'
 import { Analisis } from './pages/Analisis'
 import { Alertas } from './pages/Alertas'
+import { Noticiario } from './pages/Noticiario'
 import { AdminAliases } from './pages/AdminAliases'
 import { AdminUsers } from './pages/AdminUsers'
 import { AdminSettings } from './pages/AdminSettings'
@@ -76,6 +77,7 @@ function App() {
         <Route path="/populares" element={<Populares />} />
         <Route path="/analisis" element={<Analisis />} />
         <Route path="/alertas" element={<Alertas />} />
+        <Route path="/noticiario" element={<Noticiario />} />
         <Route path="/feeds" element={<Feeds />} />
         <Route path="/news/:id" element={<News />} />
         <Route path="/favorites" element={<Favorites />} />

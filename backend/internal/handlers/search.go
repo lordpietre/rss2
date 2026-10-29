@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -85,9 +86,45 @@ func SearchSuggestions(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"terms": terms})
 }
 
+// parseTimeFilter convierte un filtro temporal en un instante.
+//
+// Acepta una fecha ISO (2006-01-02 o RFC3339) o una ventana relativa
+// ("24h", "7d", "30m"). Devuelve el instante y true si se pudo interpretar.
+func parseTimeFilter(value string, now time.Time) (time.Time, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return time.Time{}, false
+	}
+
+	// Ventana relativa: 24h, 7d, 90m
+	if match := timeWindowRe.FindStringSubmatch(strings.ToLower(value)); match != nil {
+		amount, err := strconv.Atoi(match[1])
+		if err != nil || amount <= 0 {
+			return time.Time{}, false
+		}
+		switch match[2] {
+		case "h":
+			return now.Add(-time.Duration(amount) * time.Hour), true
+		case "d":
+			return now.AddDate(0, 0, -amount), true
+		case "m":
+			return now.Add(-time.Duration(amount) * time.Minute), true
+		}
+	}
+
+	for _, layout := range []string{time.RFC3339, "2006-01-02T15:04:05", "2006-01-02 15:04:05", "2006-01-02"} {
+		if parsed, err := time.Parse(layout, value); err == nil {
+			return parsed, true
+		}
+	}
+	return time.Time{}, false
+}
+
+var timeWindowRe = regexp.MustCompile(`^(\d+)([hdm])$`)
+
 // SearchNews searches news with various filters
 // @Summary Search news
-// @Description Search news with text query, language, category, country, and semantic search options
+// @Description Search news with text query, language, category, country, semantic search, date window, ordering and deduplication options
 // @Tags search
 // @Produce json
 // @Param q query string false "Search query"
@@ -97,6 +134,12 @@ func SearchSuggestions(c *gin.Context) {
 // @Param categoria_id query string false "Category ID filter"
 // @Param pais_id query string false "Country ID filter"
 // @Param semantic query string false "Use semantic search" default("false")
+// @Param desde query string false "Ventana temporal: fecha ISO o relativa (24h, 7d)"
+// @Param hasta query string false "Fecha final (ISO)"
+// @Param orden query string false "reciente (defecto) o relevancia"
+// @Param min_chars query int false "Longitud minima del texto (filtra lo que no se puede locutar)"
+// @Param dedup query string false "cluster: una noticia por historia (sin repetir el mismo tema)"
+// @Param topic_id query int false "Filtra por topico"
 // @Success 200 {object} map[string]interface{} "news, total, page, per_page, total_pages"
 // @Failure 400 {object} models.ErrorResponse
 // @Failure 500 {object} models.ErrorResponse
@@ -110,6 +153,10 @@ func SearchNews(c *gin.Context) {
 	categoriaID := c.Query("categoria_id")
 	paisID := c.Query("pais_id")
 	useSemantic := c.Query("semantic") == "true"
+	// Solo noticias ya traducidas. La seccion "Noticiario" monta un
+	// informativo en audio a partir del texto traducido, asi que filtrar por
+	// aqui evita traer noticias que luego no se pueden locutar.
+	translatedOnly := c.Query("translated_only") == "true"
 
 	if query == "" && categoriaID == "" && paisID == "" && lang == "" {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "At least one filter is required (q, categoria_id, pais_id, or lang)"})
@@ -123,8 +170,23 @@ func SearchNews(c *gin.Context) {
 
 	ctx := c.Request.Context()
 
+	// Los filtros de ventana temporal y longitud minima tambien se aplican a
+	// la busqueda semantica.
+	semanticFilters := services.SemanticFilters{}
+	if minChars, err := strconv.Atoi(c.Query("min_chars")); err == nil && minChars > 0 {
+		semanticFilters.MinChars = minChars
+	}
+	if desde := c.Query("desde"); desde != "" {
+		if parsed, ok := parseTimeFilter(desde, time.Now()); ok {
+			semanticFilters.Desde = &parsed
+		}
+	}
+	if c.Query("dedup") == "cluster" {
+		semanticFilters.Dedup = true
+	}
+
 	if useSemantic {
-		results, err := services.SemanticSearch(ctx, query, lang, page, perPage)
+		results, err := services.SemanticSearch(ctx, query, lang, page, perPage, semanticFilters)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Semantic search failed", Message: err.Error()})
 			return
@@ -133,8 +195,14 @@ func SearchNews(c *gin.Context) {
 		return
 	}
 
-	// Cache key for search results
-	cacheKey := cache.SearchKey(query, lang, page, perPage)
+	// Cache key: los filtros forman parte de la clave, o una busqueda con
+	// ventana temporal devolveria el resultado cacheado sin filtros.
+	cacheKey := cache.SearchKey(query, lang, page, perPage,
+		c.Query("desde"), c.Query("hasta"), c.Query("orden"),
+		c.Query("min_chars"), c.Query("dedup"), c.Query("topic_id"),
+		c.Query("categoria_id"), c.Query("pais_id"), c.Query("semantic"),
+		c.Query("translated_only"),
+	)
 
 	// Try to get from cache
 	if cached, err := cache.Get(ctx, cacheKey); err == nil && cached != "" {
@@ -174,9 +242,87 @@ func SearchNews(c *gin.Context) {
 		}
 	}
 
+	// --- Filtros pensados para montar un informativo ----------------------
+	now := time.Now()
+
+// Ventana temporal: desde/hasta.
+//
+// Se acota por arriba porque hay noticias con la fecha corrupta (el corpus
+// tiene unas 400 con fecha en el ano 3000): sin ese tope, "de mas reciente a
+// mas antiguo" las colocaria todas primero y "ultimas 24 h" las traeria
+// todas.
+if desde := c.Query("desde"); desde != "" {
+    if parsed, ok := parseTimeFilter(desde, now); ok {
+        whereClause += " AND n.fecha >= $" + strconv.Itoa(argNum)
+        args = append(args, parsed)
+        argNum++
+    }
+}
+if hasta := c.Query("hasta"); hasta != "" {
+    if parsed, ok := parseTimeFilter(hasta, now); ok {
+        whereClause += " AND n.fecha <= $" + strconv.Itoa(argNum)
+        args = append(args, parsed)
+        argNum++
+    }
+}
+whereClause += " AND (n.fecha IS NULL OR n.fecha <= NOW() + INTERVAL '1 day')"
+
+	// Longitud minima del texto: filtra las noticias que no dan para locutar.
+	// Se mide el texto que realmente se locutara (contenido o resumen, en su
+	// version traducida si existe).
+	if minChars, err := strconv.Atoi(c.Query("min_chars")); err == nil && minChars > 0 {
+		whereClause += " AND length(COALESCE(NULLIF(t.contenido_trad, ''), NULLIF(n.contenido, ''), NULLIF(t.resumen_trad, ''), NULLIF(n.resumen, ''), '')) >= $" + strconv.Itoa(argNum)
+		args = append(args, minChars)
+		argNum++
+	}
+
+	// Una sola noticia por historia: se queda con la principal de cada cluster.
+	if c.Query("dedup") == "cluster" {
+		whereClause += ` AND NOT EXISTS (
+			SELECT 1 FROM noticia_clusters nc2
+			JOIN noticia_clusters nc1 ON nc1.cluster_id = nc2.cluster_id
+			WHERE nc2.noticia_id = n.id AND nc1.es_principal AND nc1.noticia_id <> n.id
+		)`
+	}
+
+	// Filtro por topico (tematicas detectadas por el worker de topics).
+	if topicID, err := strconv.Atoi(c.Query("topic_id")); err == nil && topicID > 0 {
+		whereClause += " AND EXISTS (SELECT 1 FROM news_topics nt WHERE nt.noticia_id = n.id AND nt.topic_id = $" + strconv.Itoa(argNum) + ")"
+		args = append(args, topicID)
+		argNum++
+	}
+
+	// Solo noticias cuyo texto ya esta disponible en espanol:
+	//   - las ya traducidas (traduccion terminada), o
+	//   - las que nacieron en espanol (canales marcados como traducidos o
+	//     detectadas por langdetect): no tienen fila en traducciones porque el
+	//     scheduler no encola traducciones para ellas, pero su texto original
+	//     ya esta en el idioma destino y se puede locutar igual.
+	if translatedOnly {
+		whereClause += ` AND (
+			(t.status = 'done' AND t.titulo_trad IS NOT NULL AND t.titulo_trad != n.titulo)
+			OR n.lang = $1
+		)`
+	}
+
+	// Orden: por defecto el mas reciente; opcionalmente por relevancia.
+	//
+	// Las noticias con fecha corrupta (ano 3000) se van al final: sin este
+	// corte salian primero y el listado no parecia ordenado.
+	orderBy := "(n.fecha > NOW() + INTERVAL '1 day') ASC, n.fecha DESC NULLS LAST"
+	// Numero de argumentos que usa la clausula WHERE (la consulta de conteo
+	// los necesita, pero no el argumento extra de la relevancia).
+	filterArgCount := len(args)
+	if c.Query("orden") == "relevancia" && query != "" {
+		// ts_rank necesita el texto de la consulta: se añade otra vez.
+		orderBy = "ts_rank(n.search_vector_es, plainto_tsquery('spanish', $" + strconv.Itoa(argNum) + ")) DESC, (n.fecha > NOW() + INTERVAL '1 day') ASC, n.fecha DESC NULLS LAST"
+		args = append(args, query)
+		argNum++
+	}
+
 	sqlQuery := `
 		SELECT n.id, COALESCE(n.titulo, ''), COALESCE(n.resumen, ''), COALESCE(n.contenido, '') AS contenido, n.url, n.fecha, n.imagen_url,
-		       n.categoria_id, n.pais_id, n.fuente_nombre, n.lang,
+		       n.categoria_id, n.pais_id, n.fuente_nombre, n.lang, COALESCE(n.feed_id, 0),
 		       t.titulo_trad,
 		       t.resumen_trad,
 		       t.contenido_trad,
@@ -184,7 +330,7 @@ func SearchNews(c *gin.Context) {
 		FROM noticias n
 		LEFT JOIN traducciones t ON t.noticia_id = n.id AND t.lang_to = $1
 		` + whereClause + `
-		ORDER BY n.fecha DESC
+		ORDER BY ` + orderBy + `
 		LIMIT $` + strconv.Itoa(argNum) + ` OFFSET $` + strconv.Itoa(argNum+1)
 
 	// Note: ts_rank could be added for relevance ordering:
@@ -207,10 +353,11 @@ func SearchNews(c *gin.Context) {
 		var fecha *time.Time
 		var imagenURL, fuenteNombre, langRaw *string
 		var categoriaIDp, paisIDp *int64
+		var feedID int64
 
 		err := rows.Scan(
 			&id, &titulo, &resumen, &contenido, &url, &fecha, &imagenURL,
-			&categoriaIDp, &paisIDp, &fuenteNombre, &langRaw,
+			&categoriaIDp, &paisIDp, &fuenteNombre, &langRaw, &feedID,
 			&n.TitleTranslated, &n.SummaryTranslated, &n.ContentTranslated, &n.LangTranslated,
 		)
 		if err != nil {
@@ -221,6 +368,7 @@ func SearchNews(c *gin.Context) {
 		n.Resumen = resumen
 		n.Contenido = contenido
 		n.URL = url
+		n.FeedID = feedID
 		if fecha != nil {
 			f := fecha.Format(time.RFC3339)
 			n.Fecha = &f
@@ -245,7 +393,7 @@ func SearchNews(c *gin.Context) {
 	}
 
 	// Get total count
-	countArgs := args[:len(args)-2]
+	countArgs := args[:filterArgCount]
 
 	var total int
 	err = db.GetPool().QueryRow(ctx, `
@@ -269,7 +417,7 @@ func SearchNews(c *gin.Context) {
 	// Cache the response (pass the struct; cache.Set marshals once)
 	cache.Set(ctx, cacheKey, response, cache.TTLShort)
 
-c.JSON(http.StatusOK, response)
+	c.JSON(http.StatusOK, response)
 }
 
 // GetStats returns global statistics
@@ -528,7 +676,6 @@ func GetCountries(c *gin.Context) {
 	}
 
 	cache.Set(ctx, cacheKey, countries, cache.TTLLong)
-
 
 	c.JSON(http.StatusOK, countries)
 }

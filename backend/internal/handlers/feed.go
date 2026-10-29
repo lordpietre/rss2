@@ -37,11 +37,17 @@ func GetFeeds(c *gin.Context) {
 	activo := c.Query("activo")
 	categoriaID := c.Query("categoria_id")
 	paisID := c.Query("pais_id")
+	// Busqueda simple por nombre, descripcion o URL. Es la via practica para
+	// localizar un grupo de canales (p.ej. las Wikipedia de cambios
+	// recientes) y borrarlos de una vez.
+	query := strings.TrimSpace(c.Query("q"))
+	// Filtro por la lista de canales ya traducidos.
+	traducido := c.Query("traducido")
 
 	offset := (page - 1) * perPage
 
 	// Cache key based on filters
-	filterStr := fmt.Sprintf("activo_%s_cat_%s_pais_%s", activo, categoriaID, paisID)
+	filterStr := fmt.Sprintf("activo_%s_cat_%s_pais_%s_q_%s_trad_%s", activo, categoriaID, paisID, query, traducido)
 	cacheKey := cache.FeedListKey(filterStr, page, perPage)
 
 	ctx := c.Request.Context()
@@ -71,9 +77,22 @@ func GetFeeds(c *gin.Context) {
 		args = append(args, paisID)
 		argNum++
 	}
+	if query != "" {
+		pattern := "%" + query + "%"
+		// 'nombre'/'url' existen tambien en categorias y paises: hay que
+		// prefijar con el alias o la consulta es ambigua.
+		where += fmt.Sprintf(` AND (f.nombre ILIKE $%d OR f.url ILIKE $%d OR COALESCE(f.descripcion, '') ILIKE $%d)`, argNum, argNum, argNum)
+		args = append(args, pattern)
+		argNum++
+	}
+	if traducido != "" {
+		where += fmt.Sprintf(" AND f.traducido = $%d", argNum)
+		args = append(args, traducido == "true")
+		argNum++
+	}
 
 	var total int
-	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM feeds WHERE %s", where)
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM feeds f WHERE %s", where)
 	err := db.GetPool().QueryRow(ctx, countQuery, args...).Scan(&total)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to count feeds", Message: err.Error()})
@@ -83,6 +102,7 @@ func GetFeeds(c *gin.Context) {
 	sqlQuery := fmt.Sprintf(`
 		SELECT f.id, f.nombre, f.descripcion, f.url,
 		       f.categoria_id, f.pais_id, f.idioma, f.activo, f.fallos, f.last_error, f.last_fetch,
+		       f.traducido,
 		       c.nombre AS categoria, p.nombre AS pais,
 		       COALESCE(fs.noticias_count, 0) as noticias_count
 		FROM feeds f
@@ -116,6 +136,7 @@ func GetFeeds(c *gin.Context) {
 		err := rows.Scan(
 			&f.ID, &f.Nombre, &f.Descripcion, &f.URL,
 			&f.CategoriaID, &f.PaisID, &f.Idioma, &f.Activo, &f.Fallos, &f.LastError, &f.LastFetched,
+			&f.Traducido,
 			&f.Categoria, &f.Pais, &f.NoticiasCount,
 		)
 		if err != nil {
@@ -149,10 +170,11 @@ func GetFeedByID(c *gin.Context) {
 
 	var f models.Feed
 	err = db.GetPool().QueryRow(c.Request.Context(), `
-		SELECT id, nombre, descripcion, url, categoria_id, pais_id, idioma, activo, fallos, last_fetch
+		SELECT id, nombre, descripcion, url, categoria_id, pais_id, idioma, activo, fallos, last_fetch, traducido
 		FROM feeds WHERE id = $1`, id).Scan(
 		&f.ID, &f.Nombre, &f.Descripcion, &f.URL,
 		&f.CategoriaID, &f.PaisID, &f.Idioma, &f.Activo, &f.Fallos, &f.LastFetched,
+		&f.Traducido,
 	)
 	if err != nil {
 		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: "Feed not found"})
@@ -258,22 +280,141 @@ func DeleteFeed(c *gin.Context) {
 		return
 	}
 
-	result, err := db.GetPool().Exec(c.Request.Context(), "DELETE FROM feeds WHERE id = $1", id)
+	ctx := c.Request.Context()
+	tx, err := db.GetPool().Begin(ctx)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to delete feed", Message: err.Error()})
 		return
 	}
+	defer tx.Rollback(ctx)
 
+	// Las noticias cuelgan del feed por la FK (ON DELETE CASCADE), y en cascada
+	// se van tambien traducciones, tags, embeddings y clusters. Sin esto el
+	// feed se borraba y sus noticias quedaban huerfanas en la base.
+	var noticias int64
+	if err := tx.QueryRow(ctx, `
+		SELECT count(*) FROM noticias WHERE feed_id = $1`, id).Scan(&noticias); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to count feed news", Message: err.Error()})
+		return
+	}
+
+	result, err := tx.Exec(ctx, "DELETE FROM feeds WHERE id = $1", id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to delete feed", Message: err.Error()})
+		return
+	}
 	if result.RowsAffected() == 0 {
 		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: "Feed not found"})
 		return
 	}
 
-	// Invalidate feed cache
-	cache.InvalidateFeed(c.Request.Context(), id)
-	cache.InvalidateFeedList(c.Request.Context())
+	if err := tx.Commit(ctx); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to delete feed", Message: err.Error()})
+		return
+	}
 
-	c.JSON(http.StatusOK, models.SuccessResponse{Message: "Feed deleted successfully"})
+	// Invalidate feed cache
+	cache.InvalidateFeed(ctx, id)
+	cache.InvalidateFeedList(ctx)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":         "Feed deleted successfully",
+		"noticias_deleted": noticias,
+	})
+}
+
+// BulkDeleteFeeds borra varios canales de golpe, opcionalmente todos los que
+// casan con una busqueda (p.ej. las Wikipedia de cambios recientes).
+//
+// body: { "ids": [1,2,3] } y/o { "q": "wikipedia", "confirmar": true }
+//
+// Exige "confirmar": true. Sin el, un DELETE accidental (o un curl mal
+// escrito) borraria miles de canales y sus noticias: el confirm() del
+// navegador no protege a quien use la API directamente.
+func BulkDeleteFeeds(c *gin.Context) {
+	var req struct {
+		IDs       []int64 `json:"ids"`
+		Query     string  `json:"q"`
+		Confirmar bool    `json:"confirmar"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Invalid request", Message: err.Error()})
+		return
+	}
+
+	ctx := c.Request.Context()
+	tx, err := db.GetPool().Begin(ctx)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to delete feeds", Message: err.Error()})
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	// Seleccion de los feeds a borrar.
+	var feeds []int64
+	if len(req.IDs) > 0 {
+		feeds = req.IDs
+	}
+	if q := strings.TrimSpace(req.Query); q != "" {
+		rows, err := tx.Query(ctx, `
+			SELECT id FROM feeds
+			WHERE nombre ILIKE $1 OR url ILIKE $1 OR COALESCE(descripcion, '') ILIKE $1`,
+			"%"+q+"%")
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to find feeds", Message: err.Error()})
+			return
+		}
+		for rows.Next() {
+			var id int64
+			if err := rows.Scan(&id); err == nil {
+				feeds = append(feeds, id)
+			}
+		}
+		rows.Close()
+	}
+	if len(feeds) == 0 {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "No feeds to delete (ids or q)"})
+		return
+	}
+
+	// Cuantas noticias se van a llevar por delante (para informarlo y para
+	// que el llamante pueda decidir).
+	var noticias int64
+	if err := tx.QueryRow(ctx, `
+		SELECT count(*) FROM noticias WHERE feed_id = ANY($1)`, feeds).Scan(&noticias); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to count news", Message: err.Error()})
+		return
+	}
+
+	if !req.Confirmar {
+		// Se responde con el impacto previsto y NO se borra nada.
+		c.JSON(http.StatusPreconditionRequired, gin.H{
+			"error":            "confirma la operacion",
+			"message":          "Falta 'confirmar': true. Esta operacion borra las fuentes y sus noticias de forma irreversible.",
+			"feeds_affected":   len(feeds),
+			"noticias_affected": noticias,
+		})
+		return
+	}
+
+	result, err := tx.Exec(ctx, "DELETE FROM feeds WHERE id = ANY($1)", feeds)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to delete feeds", Message: err.Error()})
+		return
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to delete feeds", Message: err.Error()})
+		return
+	}
+
+	cache.InvalidateFeedList(ctx)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":          "Feeds deleted",
+		"feeds_deleted":    result.RowsAffected(),
+		"noticias_deleted": noticias,
+	})
 }
 
 func DeleteInactiveFeeds(c *gin.Context) {
@@ -329,6 +470,72 @@ func ToggleFeedActive(c *gin.Context) {
 	cache.InvalidateFeedList(c.Request.Context())
 
 	c.JSON(http.StatusOK, models.SuccessResponse{Message: "Feed toggled successfully"})
+}
+
+// SetFeedTraducido marca (o desmarca) un canal como "ya traducido": sus
+// noticias se insertan con lang = idioma destino y el pipeline no las
+// procesa (ni langdetect ni traduccion).
+func SetFeedTraducido(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Invalid feed ID"})
+		return
+	}
+
+	var req struct {
+		Traducido *bool `json:"traducido"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || req.Traducido == nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Invalid request", Message: "traducido (bool) es obligatorio"})
+		return
+	}
+
+	result, err := db.GetPool().Exec(c.Request.Context(), `
+		UPDATE feeds SET traducido = $1 WHERE id = $2`, *req.Traducido, id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to update feed", Message: err.Error()})
+		return
+	}
+	if result.RowsAffected() == 0 {
+		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: "Feed not found"})
+		return
+	}
+
+	cache.InvalidateFeed(c.Request.Context(), id)
+	cache.InvalidateFeedList(c.Request.Context())
+
+	c.JSON(http.StatusOK, models.SuccessResponse{Message: "Feed actualizado"})
+}
+
+// BulkSetFeedsTraducido marca (o desmarca) varios canales de una vez: es la
+// forma practica de montar la lista de canales que ya estan en espanol.
+func BulkSetFeedsTraducido(c *gin.Context) {
+	var req struct {
+		IDs        []int64 `json:"ids"`
+		Traducido  bool    `json:"traducido"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Invalid request", Message: err.Error()})
+		return
+	}
+	if len(req.IDs) == 0 {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "ids no puede estar vacio"})
+		return
+	}
+
+	result, err := db.GetPool().Exec(c.Request.Context(), `
+		UPDATE feeds SET traducido = $1 WHERE id = ANY($2)`, req.Traducido, req.IDs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "Failed to update feeds", Message: err.Error()})
+		return
+	}
+
+	cache.InvalidateFeedList(c.Request.Context())
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Feeds actualizados",
+		"updated": result.RowsAffected(),
+	})
 }
 
 func ReactivateFeed(c *gin.Context) {

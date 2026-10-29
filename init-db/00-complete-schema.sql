@@ -9,6 +9,13 @@
 -- SECCIÓN 1: TABLAS BASE (sin foreign keys a otras tablas del schema)
 -- =============================================================================
 
+-- La extension vector tiene que existir ANTES de este script: 00, 01, 09 y
+-- 34 ya usan el tipo vector. Antes se creaba en 47-pgvector-init.sh, que se
+-- ejecuta mas tarde, y solo "funcionaba" porque plpgsql no valida el cuerpo
+-- de las funciones hasta la primera llamada. Aqui se crea de forma
+-- determinista (la creacion es idempotente).
+CREATE EXTENSION IF NOT EXISTS vector CASCADE;
+
 -- Tabla de usuarios (Auth)
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
@@ -47,7 +54,7 @@ CREATE TABLE IF NOT EXISTS categorias (
 
 CREATE TABLE IF NOT EXISTS paises (
     id SERIAL PRIMARY KEY,
-    nombre VARCHAR(100) NOT NULL,
+    nombre VARCHAR(100) NOT NULL UNIQUE,
     continente_id INTEGER REFERENCES continentes(id) ON DELETE SET NULL
 );
 

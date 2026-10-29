@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -46,14 +47,34 @@ func apiBase() string {
 	return "http://127.0.0.1:8888/api"
 }
 
+// apiToken devuelve el token de las pruebas contra la API real.
+//
+// `/api/alerts` exige JWT, así que sin token esas pruebas no se pueden ejecutar.
+// Nunca se incrusta una credencial en el repositorio: el token se pasa por
+// entorno. Sin token, los tests que hitan un endpoint protegido se saltan
+// (t.Skip) en lugar de fallar, para no romper `make test` en un entorno sin
+// credenciales.
+//
+//	API_TOKEN=<jwt> API_URL=http://127.0.0.1:8888/api go test ./internal/entitycheck -v
+func apiToken() string {
+	return strings.TrimSpace(os.Getenv("API_TOKEN"))
+}
+
 func apiGet(t *testing.T, path string, params url.Values) []byte {
 	t.Helper()
 	u := apiBase() + path
 	if len(params) > 0 {
 		u += "?" + params.Encode()
 	}
+	req, err := http.NewRequest(http.MethodGet, u, nil)
+	if err != nil {
+		t.Skipf("no se pudo construir la petición (%s): %v", u, err)
+	}
+	if tok := apiToken(); tok != "" {
+		req.Header.Set("Authorization", "Bearer "+tok)
+	}
 	client := &http.Client{Timeout: 20 * time.Second}
-	resp, err := client.Get(u)
+	resp, err := client.Do(req)
 	if err != nil {
 		t.Skipf("API no disponible (%s): %v", apiBase(), err)
 	}
@@ -61,6 +82,11 @@ func apiGet(t *testing.T, path string, params url.Values) []byte {
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
 	if err != nil {
 		t.Fatalf("leyendo %s: %v", u, err)
+	}
+	if resp.StatusCode == http.StatusUnauthorized {
+		// Endpoint protegido y sin token configurado: no es un fallo del
+		// código, es que faltan credenciales para esta prueba.
+		t.Skipf("%s exige autenticación y no hay API_TOKEN configurado", path)
 	}
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("%s -> HTTP %d: %s", u, resp.StatusCode, cut(string(body), 300))
@@ -76,7 +102,14 @@ func checkPopulares(t *testing.T, nombre string, params url.Values) {
 	if err := json.Unmarshal(apiGet(t, "/entities", params), &r); err != nil {
 		t.Fatalf("%s: decodificando respuesta: %v", nombre, err)
 	}
-	if r.Total == 0 {
+	// OJO: con `country_id` (y con otros filtros) la API devuelve `total = 0`
+	// a propósito: hace un COUNT DISTINCT carísimo sobre
+	// tags_noticia ⋈ tags ⋈ traducciones ⋈ noticias y la UI muestra
+	// "Página X" sin "de Y" (ver handlers/news.go, "Skip slow COUNT DISTINCT
+	// for entities"). Comprobar `total` aquí detectaría como roto un
+	// endpoint que funciona: lo que hay que mirar es que la lista de
+	// entidades no venga vacía.
+	if len(r.Entities) == 0 {
 		t.Errorf("%s: /entities devuelve 0 entidades (¿parámetros rotos?)", nombre)
 		return
 	}

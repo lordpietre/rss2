@@ -1,6 +1,6 @@
 # RSS2 Workers Makefile
 
-.PHONY: all build clean deps ingestor scraper discovery topics related server test parity sanitize sanitize-dry-run sanitize-restore sanitize-local entities-scan entities-scan-apply entities-scan-local alerts-prune alerts-prune-apply alerts-prune-local event-clustering
+.PHONY: all build clean deps ingestor scraper discovery topics related server test parity sanitize sanitize-dry-run sanitize-restore sanitize-local entities-scan entities-scan-apply entities-scan-local alerts-prune alerts-prune-apply alerts-prune-local dedupe-noticias event-clustering tts-models tts-test-db tts-test tts-test-local
 
 # Binary output directory
 BIN_DIR := bin
@@ -57,6 +57,24 @@ test:
 	cd backend && go test ./...
 	cd rss-ingestor-go && go test ./...
 
+# Tests del frontend. Se ejecutan dentro de la imagen node:20-alpine para no
+# depender de Node instalado en el host. El tmpfs sobre node_modules/.vite
+# evita que el contenedor (que corre con el usuario actual) intente escribir en
+# un directorio de node_modules propiedad de root.
+#
+# Requiere node_modules ya instalado en frontend/ (npm install dentro del
+# contenedor si no lo está: `make frontend-deps`).
+test-frontend:
+	docker run --rm --user $$(id -u):$$(id -g) -e HOME=/tmp \
+		--tmpfs /app/node_modules/.vite:rw,uid=$$(id -u),gid=$$(id -g) \
+		-v $(PWD)/frontend:/app -w /app node:20-alpine npx vitest run
+
+# Instala las dependencias del frontend dentro del contenedor (sin tocar el host).
+frontend-deps:
+	docker run --rm --user $$(id -u):$$(id -g) -e HOME=/tmp \
+		--tmpfs /app/node_modules:rw,uid=$$(id -u),gid=$$(id -g) \
+		-v $(PWD)/frontend:/app -w /app node:20-alpine npm install
+
 # textclean está duplicado a propósito: ingestor y backend se construyen con
 # contextos de Docker separados. Este target garantiza que no haya deriva.
 parity:
@@ -103,6 +121,18 @@ alerts-prune-apply:
 alerts-prune-local:
 	cd backend && go run ./cmd/entityscan -alertas -apply
 
+# Elimina noticias duplicadas (mismo articulo con variantes de URL) y
+# regenera los contadores por fuente. Es idempotente: se puede repetir.
+dedupe-noticias:
+	docker compose exec -T db psql -v ON_ERROR_STOP=1 -U $${POSTGRES_USER:-rss} -d $${POSTGRES_DB:-rss} \
+		-f /docker-entrypoint-initdb.d/63-dedupe-noticias.sql
+
+# Comprueba que la base tiene todo lo que declaran los scripts de init-db/.
+# init-db/ solo se ejecuta en la PRIMERA inicializacion: una migracion
+# anadida despues no se aplica nunca y el sistema se rompe en silencio.
+check-schema:
+	DB_PASS=$${POSTGRES_PASSWORD} python3 scripts/check-schema-drift.py
+
 # Run workers locally (requires DB and services)
 run-scraper:
 	DB_HOST=localhost DB_PORT=5432 DB_NAME=rss DB_USER=rss DB_PASS=rss $(SCRAPER)
@@ -119,8 +149,48 @@ run-related:
 run-event-clustering:
 	DB_HOST=localhost DB_PORT=5432 DB_NAME=rss DB_USER=rss DB_PASS=rss CLUSTERING_SLEEP=900 CLUSTERING_BATCH=500 $(EVENT_CLUSTERING)
 
+# ---------------------------------------------------------------------------
+# Subsistema de sintesis de voz (TTS)
+# ---------------------------------------------------------------------------
+# Intérprete para las pruebas de Python. Debe tener las dependencias de
+# workers/requirements-tts.txt (numpy, soundfile, flask, psycopg2-binary,
+# redis, pytest). Por defecto, el del entorno actual.
+PYTHON ?= python3
+
+# Prepara los pesos (Chatterbox V3 + OpenVoice V2 + voz espanola de MeloTTS)
+# en los volumenes ./models/chatterbox y ./models/openvoice. No se ejecuta al
+# arrancar el servicio.
+tts-models:
+	./scripts/prepare_tts_models.sh
+
+# Base de datos de pruebas del subsistema TTS (rss_tts_test).
+tts-test-db:
+	./scripts/setup_tts_test_db.sh
+
+# Pruebas del subsistema TTS. Las unitarias no necesitan modelo ni pesos.
+# Las de integracion necesitan TEST_DATABASE_URL (ver `make tts-test-db`).
+#
+# Se ejecutan en un contenedor: la imagen del servicio ya trae las
+# dependencias (soundfile, librosa, psycopg2) y solo anade pytest. En el
+# host fallaban con "No module named soundfile" (el host tiene Python
+# 3.14 y las versiones fijadas no tienen ruedas para esa version).
+tts-test:
+	docker compose build tts
+	docker build -f Dockerfile.tts.test -t rss2-tts-test .
+	docker run --rm --network rss2_backend \
+		-e TEST_DATABASE_URL="$${TEST_DATABASE_URL:-}" \
+		rss2-tts-test
+
+# Variante local: requiere un entorno con workers/requirements-tts.txt
+# instalado (python -m venv .venv-tts && . .venv-tts/bin/activate).
+tts-test-local:
+	$(PYTHON) -m pytest workers/tests -v
+
+# ---------------------------------------------------------------------------
 # Docker builds (vía compose: los Dockerfiles legacy de raíz se eliminaron;
 # los workers Go reutilizan la imagen backend, ver docker-compose.yml)
+# ---------------------------------------------------------------------------
 docker-build:
 	docker compose build backend frontend ingestor translator
 	docker compose build translation-scheduler langdetect ner embeddings
+	docker compose build tts

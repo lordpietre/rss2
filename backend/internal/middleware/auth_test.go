@@ -3,6 +3,7 @@ package middleware
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -12,6 +13,7 @@ import (
 func init() {
 	gin.SetMode(gin.TestMode)
 	auth.SetJWTSecret("test-secret-key-12345")
+	os.Setenv("SECRET_KEY", "test-secret-key-12345")
 }
 
 func TestAuthRequiredNoHeader(t *testing.T) {
@@ -109,18 +111,36 @@ func TestAdminRequiredIsAdmin(t *testing.T) {
 }
 
 func TestCORSMiddleware(t *testing.T) {
+	// CORSMiddleware() lee la configuracion, que exige SECRET_KEY, y solo
+	// devuelve la cabecera CORS para origenes permitidos.
+	os.Setenv("SECRET_KEY", "test-secret-key")
+	os.Setenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000")
+
 	router := gin.New()
 	router.Use(CORSMiddleware())
 	router.GET("/test", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
+	// Origen permitido: debe devolverse la cabecera.
 	req, _ := http.NewRequest("GET", "/test", nil)
+	req.Header.Set("Origin", "http://localhost:5173")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	if w.Header().Get("Access-Control-Allow-Origin") == "" {
-		t.Error("expected CORS header to be set")
+	if w.Header().Get("Access-Control-Allow-Origin") != "http://localhost:5173" {
+		t.Errorf("expected CORS header for allowed origin, got %q", w.Header().Get("Access-Control-Allow-Origin"))
+	}
+
+	// Origen no permitido: NO debe devolverse la cabecera (CORS no es
+	// "*": con credenciales, permitir cualquier origen seria inseguro).
+	req2, _ := http.NewRequest("GET", "/test", nil)
+	req2.Header.Set("Origin", "https://sitio-malicioso.example")
+	w2 := httptest.NewRecorder()
+	router.ServeHTTP(w2, req2)
+
+	if w2.Header().Get("Access-Control-Allow-Origin") != "" {
+		t.Errorf("expected no CORS header for disallowed origin, got %q", w2.Header().Get("Access-Control-Allow-Origin"))
 	}
 }
 

@@ -46,7 +46,7 @@ MAX_SRC_TOKENS = int(os.environ.get("MAX_SRC_TOKENS", "2048"))
 MAX_NEW_TOKENS = int(os.environ.get("MAX_NEW_TOKENS", "2048"))
 MAX_BODY_CHARS = int(os.environ.get("MAX_BODY_CHARS", "80000"))
 BODY_CHARS_CHUNK = int(os.environ.get("BODY_CHARS_CHUNK", "2000"))
-MAX_SEQ_PER_CALL = int(os.environ.get("MAX_SEQ_PER_CALL", "32"))
+MAX_SEQ_PER_CALL = int(os.environ.get("MAX_SEQ_PER_CALL", "8"))
 
 LANG_CODE_MAP = {
     "en": "eng_Latn", "es": "spa_Latn", "fr": "fra_Latn", "de": "deu_Latn",

@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -15,20 +16,23 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 	"github.com/mmcdole/gofeed"
 	"rss-ingestor-go/textclean"
 )
 
 // Config holds the configuration loaded from environment variables
 type Config struct {
-	DBHost       string
-	DBPort       string
-	DBUser       string
-	DBPass       string
-	DBName       string
-	MaxWorkers   int
-	MaxFailures  int
+	DBHost      string
+	DBPort      string
+	DBUser      string
+	DBPass      string
+	DBName      string
+	MaxWorkers  int
+	MaxFailures int
+	// TargetLang: idioma destino de la traduccion. Las noticias de los
+	// canales marcados como "traducidos" se insertan ya en este idioma.
+	TargetLang   string
 	PokeInterval time.Duration
 	FeedTimeout  int
 	HostDelay    time.Duration
@@ -49,6 +53,10 @@ type Feed struct {
 	LastEtag     sql.NullString
 	LastModified sql.NullString
 	Fallos       int
+	// Traducido: el canal ya publica en el idioma destino. Sus noticias se
+	// insertan con lang = destino y el pipeline las salta (no pasan por
+	// langdetect ni generan job de traduccion).
+	Traducido bool
 }
 
 // Noticia represents a news item to be inserted
@@ -62,6 +70,13 @@ type Noticia struct {
 	FuenteNombre string
 	CategoriaID  sql.NullInt64
 	PaisID       sql.NullInt64
+	// Lang: idioma de la noticia. Se rellena con el idioma destino cuando el
+	// canal esta marcado como traducido; si no, queda vacio y lo detecta
+	// langdetect.
+	Lang string
+	// FeedID: id del feed de origen. Permite borrar un canal con precision
+	// (la FK de noticias.feed_id va en cascada).
+	FeedID int
 }
 
 var (
@@ -92,17 +107,30 @@ func politeDelay(host string) {
 
 func loadConfig() {
 	config = Config{
-		DBHost:       getEnv("DB_HOST", "localhost"),
-		DBPort:       getEnv("DB_PORT", "5432"),
-		DBUser:       getEnv("DB_USER", "rss"),
-		DBPass:       getEnv("DB_PASS", "x"),
-		DBName:       getEnv("DB_NAME", "rss"),
-		MaxWorkers:   getEnvInt("RSS_MAX_WORKERS", 20), // Default to higher concurrency in Go
-		MaxFailures:  getEnvInt("RSS_MAX_FAILURES", 10),
+		DBHost:      getEnv("DB_HOST", "localhost"),
+		DBPort:      getEnv("DB_PORT", "5432"),
+		DBUser:      getEnv("DB_USER", "rss"),
+		DBPass:      getEnv("DB_PASS", "x"),
+		DBName:      getEnv("DB_NAME", "rss"),
+		MaxWorkers:  getEnvInt("RSS_MAX_WORKERS", 20), // Default to higher concurrency in Go
+		MaxFailures: getEnvInt("RSS_MAX_FAILURES", 10),
+		// Idioma destino de la traduccion (el primero de TARGET_LANGS).
+		TargetLang:   firstLang(getEnv("TARGET_LANGS", "es")),
 		PokeInterval: time.Duration(getEnvInt("RSS_POKE_INTERVAL_MIN", 15)) * time.Minute,
 		FeedTimeout:  getEnvInt("RSS_FEED_TIMEOUT", 60),
 		HostDelay:    time.Duration(getEnvInt("RSS_HOST_DELAY_MS", 500)) * time.Millisecond,
 	}
+}
+
+// firstLang devuelve el primer idioma de una lista "es,en,fr".
+func firstLang(langs string) string {
+	for _, l := range strings.Split(langs, ",") {
+		l = strings.TrimSpace(l)
+		if l != "" {
+			return l
+		}
+	}
+	return "es"
 }
 
 func initHTTPClient() {
@@ -149,15 +177,26 @@ func initDB() {
 	db.SetMaxIdleConns(config.MaxWorkers)
 	db.SetConnMaxLifetime(5 * time.Minute)
 
-	if err = db.Ping(); err != nil {
-		log.Fatalf("Error connecting to DB: %v", err)
+	// Al arrancar el host todos los contenedores levantan a la vez: el
+	// Postgres puede tardar unos segundos en aceptar conexiones. Sin esta
+	// espera el proceso muere y Docker lo reinicia con backoff (varios
+	// reinicios por arranque).
+	for attempt := 1; attempt <= 30; attempt++ {
+		if err = db.Ping(); err == nil {
+			break
+		}
+		if attempt == 30 {
+			log.Fatalf("Error connecting to DB: %v", err)
+		}
+		log.Printf("Waiting for database (%d/30): %v", attempt, err)
+		time.Sleep(2 * time.Second)
 	}
 	log.Println("Database connection established")
 }
 
 func getActiveFeeds() ([]Feed, error) {
 	query := `
-		SELECT id, nombre, url, categoria_id, pais_id, last_etag, last_modified, COALESCE(fallos, 0)
+		SELECT id, nombre, url, categoria_id, pais_id, last_etag, last_modified, COALESCE(fallos, 0), traducido
 		FROM feeds
 		WHERE activo = TRUE AND (fallos IS NULL OR fallos < $1)
 		ORDER BY id
@@ -171,7 +210,7 @@ func getActiveFeeds() ([]Feed, error) {
 	var feeds []Feed
 	for rows.Next() {
 		var f Feed
-		if err := rows.Scan(&f.ID, &f.Nombre, &f.URL, &f.CategoriaID, &f.PaisID, &f.LastEtag, &f.LastModified, &f.Fallos); err != nil {
+		if err := rows.Scan(&f.ID, &f.Nombre, &f.URL, &f.CategoriaID, &f.PaisID, &f.LastEtag, &f.LastModified, &f.Fallos, &f.Traducido); err != nil {
 			log.Printf("Error scanning feed: %v", err)
 			continue
 		}
@@ -180,9 +219,133 @@ func getActiveFeeds() ([]Feed, error) {
 	return feeds, nil
 }
 
+// trackingParams son parametros de campana que no identifican el articulo:
+// el mismo articulo aparece con distintos valores y se guardaba N veces
+// (mismo titulo, mismo feed, distintas URLs -> distintos ids).
+var trackingParams = map[string]bool{
+	"fbclid": true, "gclid": true, "dclid": true, "msclkid": true,
+	"yclid": true, "twclid": true, "igshid": true, "mc_cid": true,
+	"mc_eid": true, "_ga": true, "ref": true, "referrer": true,
+	"ref_src": true, "ref_url": true, "source": true, "campaign_id": true,
+	"spm": true, "s_kwcid": true, "cmpid": true, "ito": true,
+}
+
+// normalizeURL deja una URL en una forma canonica para que el mismo
+// articulo tenga siempre el mismo id: sin esquema, sin 'www.', sin barra
+// final y sin parametros de tracking.
+//
+// Sin esto, un feed que sirve el mismo articulo como
+// 'https://www.x.com/a', 'https://x.com/a' y 'http://www.x.com/a' generaba
+// tres noticias distintas (y tres trabajos de traduccion).
+func normalizeURL(link string) string {
+	raw := strings.TrimSpace(link)
+	if raw == "" {
+		return ""
+	}
+
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		// URL no parseable: se usa tal cual.
+		return raw
+	}
+
+	host := strings.ToLower(u.Host)
+	host = strings.TrimPrefix(host, "www.")
+	// Puerto por defecto implicito.
+	if strings.HasSuffix(host, ":80") {
+		host = strings.TrimSuffix(host, ":80")
+	} else if strings.HasSuffix(host, ":443") {
+		host = strings.TrimSuffix(host, ":443")
+	}
+
+	path := strings.TrimRight(u.EscapedPath(), "/")
+
+	q := u.Query()
+	for k := range q {
+		if trackingParams[strings.ToLower(k)] || strings.HasPrefix(strings.ToLower(k), "utm_") {
+			q.Del(k)
+		}
+	}
+	query := q.Encode() // Encode() ordena los parametros.
+	if query == "" {
+		return host + path
+	}
+	return host + path + "?" + query
+}
+
 func generateID(link string) string {
-	hash := md5.Sum([]byte(link))
+	hash := md5.Sum([]byte(normalizeURL(link)))
 	return hex.EncodeToString(hash[:])
+}
+
+// Tolerancia hacia adelante: un feed puede publicar con la fecha un poco
+// por delante (reloj del servidor desincronizado, o articulos programados).
+// Pasada esta ventana se considera que la fecha del feed es erronea.
+//
+// Dos horas es un margen holgado para el caso legitimo (las noticias
+// hemoglobinadas arriba llegaban 14-58 minutos por delante) y descarta a
+// los feeds que publican la hora local etiquetada como UTC: CNN Turk
+// (+2h, dice 'GMT') o el filipino Inquirer (+8h, dice '+0000'). Con un
+// margen de 48h esos se colaban en la cabecera de la portada durante
+// horas.
+const maxFutureSkew = 2 * time.Hour
+
+// Anio minimo creible. Por debajo (epoch de Unix, year 1 del zero time de
+// Go, o fechas inventadas por el feed) la fecha no significa nada.
+const minSaneYear = 1971
+
+// sanitizeDate descarta las fechas que el feed declara pero que no son
+// creibles, y las sustituye por el momento de la ingesta.
+//
+// Sin esto, un feed que sirve una fecha de 3000-01-01 en su pagina indice
+// colocaba esa noticia al principio de /api/news (que ordena por fecha
+// DESC) y, peor, el scraper se quedaba enriching esa misma noticia para
+// siempre: seleccionaba `contenido IS NULL ORDER BY fecha DESC LIMIT 20` y
+// esas 20 noticias jamas se enriquecen, con lo que el enriquecimiento se
+// quedaba congelado.
+//
+// Los feeds con contenido de archivo (fechas de 2003, 2010...) se respetan:
+// son noticias reales, solo que antiguas.
+//
+// OJO con la zona horaria: el resultado se normaliza a UTC (ver el .UTC()
+// del llamante). La columna 'fecha' es 'timestamp without time zone', asi
+// que Postgres ignora el offset que le llegue y se queda con la hora de
+// pared de la zona original. Sin normalizar, una noticia de un feed
+// japones (dc:date con +09:00) se guardaba 9 horas por delante y salia
+// por delante de todo en la portada.
+func sanitizeDate(d time.Time, now time.Time) time.Time {
+	if d.Year() < minSaneYear {
+		return now
+	}
+	if d.After(now.Add(maxFutureSkew)) {
+		return now
+	}
+	return d
+}
+
+// resolveURL convierte un link del feed en una URL absoluta, resolviendolo
+// contra la base (el sitio del feed o la propia URL del feed).
+//
+// Hay feeds que sirven links relativos ("/tour", "noticias/x",
+// "//sitio.com/a"). Guardarlos tal cual rompia dos cosas: el scraper no
+// podia descargarlos ("unsupported protocol scheme") y el id de la noticia
+// (md5 de la URL normalizada) colisionaba entre feeds distintos, porque
+// "/tour" es el mismo texto en todos ellos.
+func resolveURL(base, link string) string {
+	raw := strings.TrimSpace(link)
+	if raw == "" {
+		return ""
+	}
+
+	b, err := url.Parse(base)
+	if err != nil || b.Host == "" {
+		return raw
+	}
+	l, err := url.Parse(raw)
+	if err != nil {
+		return raw
+	}
+	return b.ResolveReference(l).String()
 }
 
 // cleanHTML deja el texto del feed listo para guardar: quita HTML, separa los
@@ -321,17 +484,36 @@ func processFeed(fp *gofeed.Parser, feed Feed, results chan<- int) {
 
 	// Prepare news items
 	var noticias []Noticia
+
+	// Base para resolver los links relativos del feed: el <link> del propio
+	// feed (la web del medio) y, si no lo hay, la URL del feed.
+	base := feed.URL
+	if parsedFeed.Link != "" {
+		if u, err := url.Parse(parsedFeed.Link); err == nil && u.Host != "" {
+			base = parsedFeed.Link
+		}
+	}
+
+	now := time.Now()
+
 	for _, item := range parsedFeed.Items {
 		if item.Link == "" {
 			continue
 		}
 
-		pubDate := time.Now()
+		// Link absoluto: los relativos se resuelven contra la base del feed.
+		link := resolveURL(base, item.Link)
+		if link == "" {
+			continue
+		}
+
+		pubDate := now
 		if item.PublishedParsed != nil {
 			pubDate = *item.PublishedParsed
 		} else if item.UpdatedParsed != nil {
 			pubDate = *item.UpdatedParsed
 		}
+		pubDate = sanitizeDate(pubDate, now).UTC()
 
 		// HTML cleanup simply takes Description or Content
 		resumen := item.Description
@@ -340,20 +522,26 @@ func processFeed(fp *gofeed.Parser, feed Feed, results chan<- int) {
 		}
 
 		noticia := Noticia{
-			ID:           generateID(item.Link),
+			ID:           generateID(link),
 			Titulo:       textclean.CleanTitle(item.Title),
 			Resumen:      cleanHTML(resumen),
-			URL:          item.Link,
+			URL:          link,
 			Fecha:        pubDate,
 			ImagenURL:    extractImage(item),
 			FuenteNombre: feed.Nombre,
 			CategoriaID:  feed.CategoriaID,
 			PaisID:       feed.PaisID,
+			FeedID:       feed.ID,
+		}
+		// Canal marcado como ya traducido: la noticia nace en el idioma
+		// destino y el pipeline la salta (no la detecta ni la traduce).
+		if feed.Traducido {
+			noticia.Lang = config.TargetLang
 		}
 		noticias = append(noticias, noticia)
 	}
 
-	inserted := insertNoticias(noticias)
+	inserted := insertNoticias(feed.ID, noticias)
 
 	// Get new headers
 	newEtag := resp.Header.Get("ETag")
@@ -367,15 +555,24 @@ func processFeed(fp *gofeed.Parser, feed Feed, results chan<- int) {
 	results <- inserted
 }
 
-func insertNoticias(noticias []Noticia) int {
+func insertNoticias(feedID int, noticias []Noticia) int {
 	// Bulk insert with INSERT ... ON CONFLICT DO NOTHING.
 	// NOTE: do NOT use pq.CopyIn here: preparing a CopyIn leaves the backend in
 	// COPY mode waiting for data, which can hold an ACCESS EXCLUSIVE lock on the
 	// table and block the whole database if the stream is never completed.
-	return insertNoticiasWithConflict(noticias)
+	return insertNoticiasWithConflict(feedID, noticias)
 }
 
-func insertNoticiasWithConflict(noticias []Noticia) int {
+// isForeignKeyViolation detecta un error de clave foranea de Postgres (23503).
+func isForeignKeyViolation(err error) bool {
+	var pgErr *pq.Error
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "23503"
+	}
+	return false
+}
+
+func insertNoticiasWithConflict(feedID int, noticias []Noticia) int {
 	// Efficient bulk insert for Postgres using unnest
 	// Or standard multi-value insert.
 
@@ -393,22 +590,38 @@ func insertNoticiasWithConflict(noticias []Noticia) int {
 		vals := []interface{}{}
 
 		for j, n := range chunk {
-			offset := j * 9
-			placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)",
-				offset+1, offset+2, offset+3, offset+4, offset+5, offset+6, offset+7, offset+8, offset+9))
+			offset := j * 11
+			placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)",
+				offset+1, offset+2, offset+3, offset+4, offset+5, offset+6, offset+7, offset+8, offset+9, offset+10, offset+11))
 
-			vals = append(vals, n.ID, n.Titulo, n.Resumen, n.URL, n.Fecha, n.ImagenURL, n.FuenteNombre, n.CategoriaID, n.PaisID)
+			// Lang vacio = idioma todavia desconocido (lo detectara
+			// langdetect). Se escribe NULL, no '', para que el estado sea
+			// inequivoco: noticias.lang es TEXT y 'sin idioma' es NULL.
+			var lang interface{}
+			if n.Lang != "" {
+				lang = n.Lang
+			}
+
+			vals = append(vals, n.ID, n.Titulo, n.Resumen, n.URL, n.Fecha, n.ImagenURL, n.FuenteNombre, n.CategoriaID, n.PaisID, lang, n.FeedID)
 		}
 
 		query := fmt.Sprintf(`
-			INSERT INTO noticias (id, titulo, resumen, url, fecha, imagen_url, fuente_nombre, categoria_id, pais_id)
+			INSERT INTO noticias (id, titulo, resumen, url, fecha, imagen_url, fuente_nombre, categoria_id, pais_id, lang, feed_id)
 			VALUES %s
 			ON CONFLICT DO NOTHING
 		`, strings.Join(placeholders, ","))
 
 		res, err := db.Exec(query, vals...)
 		if err != nil {
-			log.Printf("Batch insert error: %v", err)
+			// Lo mas probable es que el feed se borrara (la FK
+			// noticias.feed_id va en cascada) mientras se descargaba: sus
+			// noticias ya no existen y reinsertarlas las dejaria huerfanas.
+			// Se comprueba y se avisa en vez de perder el lote en silencio.
+			if isForeignKeyViolation(err) {
+				log.Printf("Feed %d ya no existe (borrado durante la descarga): se descartan sus %d items", feedID, len(chunk))
+			} else {
+				log.Printf("Batch insert error (%d items): %v", len(chunk), err)
+			}
 			continue
 		}
 

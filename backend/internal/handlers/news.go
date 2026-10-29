@@ -128,9 +128,14 @@ func GetSharePreview(c *gin.Context) {
 		CategoriaNombre *string
 	}
 
+	// lang puede ser NULL (noticia sin idioma detectado todavia): se escanea
+	// en un *string porque pgx no puede convertir NULL en un string de Go
+	// (fallaria el Scan y la API responderia 404 por una noticia que si existe).
+	var langRaw *string
+
 	err := db.GetPool().QueryRow(c.Request.Context(), sqlQuery, targetLang, id).Scan(
 		&n.ID, &n.Titulo, &n.Resumen, &n.Contenido, &n.URL, &n.Fecha,
-		&n.ImagenURL, &n.FuenteNombre, &n.Lang,
+		&n.ImagenURL, &n.FuenteNombre, &langRaw,
 		&n.TituloTrad, &n.ResumenTrad, &n.ContenidoTrad,
 		&n.PaisNombre, &n.CategoriaNombre,
 	)
@@ -138,6 +143,11 @@ func GetSharePreview(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: "News not found"})
 		return
+	}
+
+	if langRaw != nil {
+		lang := strings.TrimSpace(*langRaw)
+		n.Lang = &lang
 	}
 
 	// Use translated content if available
@@ -321,78 +331,80 @@ func GetNews(c *gin.Context) {
 		argNum++
 	}
 	if translatedOnly {
-		where += " AND t.status = 'done' AND t.titulo_trad IS NOT NULL AND t.titulo_trad != n.titulo"
+		// Mismo criterio que en /api/search: entra la noticia si su texto ya
+		// esta en espanol, bien porque la traduccion esta terminada o bien
+		// porque la noticia nacio en espanol (los canales marcados como
+		// traducidos no generan fila en traducciones, pero su texto original
+		// ya sirve para locutar).
+		where += fmt.Sprintf(` AND (
+			(t.status = 'done' AND t.titulo_trad IS NOT NULL AND t.titulo_trad != n.titulo)
+			OR n.lang = $%d
+		)`, argNum)
 	}
 
-	// Count results for page 1 - now fast with FTS index
+	// Conteo del total de resultados.
+	//
+	// Antes solo se calculaba en la pagina 1 y, sin 'q', devolvia el conteo
+	// global aproximado (reltuples de la tabla noticias): los filtros de
+	// pais y categoria se ignoraban y a partir de la pagina 2 'total' salia
+	// en 0 (total_pages=1), lo que rompia la paginacion del frontend.
+	//
+	// Ahora el conteo usa el MISMO WHERE que el listado (con los mismos
+	// parametros posicionales) y se calcula en todas las paginas.
 	var total int
-	if page == 1 {
-		if query == "" {
-			// Browse mode - need to count properly with translatedOnly filter
-			if translatedOnly {
-				// Count only news that have translations done
-				countQuery := `
-					SELECT COUNT(*) FROM noticias n
-					INNER JOIN traducciones t ON t.noticia_id = n.id AND t.lang_to = $1
-					WHERE t.status = 'done' AND t.titulo_trad IS NOT NULL AND t.titulo_trad != n.titulo`
-				err := db.GetPool().QueryRow(c.Request.Context(), countQuery, targetLang).Scan(&total)
-				if err != nil {
-					log.Printf("Count query error (translatedOnly): %v", err)
-					total = 0
-				}
-			} else {
-				// Use approximate count for all news
-				countQuery := "SELECT reltuples::bigint FROM pg_class WHERE relname = 'noticias'"
-				db.GetPool().QueryRow(c.Request.Context(), countQuery).Scan(&total)
-			}
-		} else {
-			// Build separate query for COUNT with proper JOIN
-			if translatedOnly {
-				// Need JOIN with traducciones for translatedOnly
-				countQuery := fmt.Sprintf(`
-					SELECT COUNT(*) FROM noticias n
-					INNER JOIN traducciones t ON t.noticia_id = n.id AND t.lang_to = $3
-					WHERE %s`, where)
-				countArgs := []interface{}{query, query, targetLang}
-				err := db.GetPool().QueryRow(c.Request.Context(), countQuery, countArgs...).Scan(&total)
-				if err != nil {
-					log.Printf("Count query error: %v", err)
-					total = 0
-				}
-			} else {
-				countArgs := []interface{}{query}
-				countQuery := fmt.Sprintf("SELECT COUNT(*) FROM noticias n WHERE %s", where)
-				err := db.GetPool().QueryRow(c.Request.Context(), countQuery, countArgs...).Scan(&total)
-				if err != nil {
-					log.Printf("Count query error: %v", err)
-					total = 0
-				}
-			}
+	if query != "" || categoryID != "" || countryID != "" || translatedOnly {
+		countQuery := fmt.Sprintf("SELECT COUNT(*) FROM noticias n WHERE %s", where)
+		countArgs := append([]interface{}{}, args...)
+		if translatedOnly {
+			// El WHERE referencia t.* y n.lang: JOIN LEFT con el mismo
+			// parametro posicional que usa el listado (INNER JOIN excluiria
+			// las noticias en espanol que no tienen fila de traduccion).
+			countQuery = fmt.Sprintf(`
+				SELECT COUNT(*) FROM noticias n
+				LEFT JOIN traducciones t ON t.noticia_id = n.id AND t.lang_to = $%d
+				WHERE %s`, argNum, where)
+			countArgs = append(countArgs, targetLang)
+		}
+		if err := db.GetPool().QueryRow(c.Request.Context(), countQuery, countArgs...).Scan(&total); err != nil {
+			log.Printf("Count query error: %v", err)
+			total = 0
+		}
+	} else {
+		// Browse sin filtros: conteo aproximado global (instantaneo).
+		countQuery := "SELECT reltuples::bigint FROM pg_class WHERE relname = 'noticias'"
+		if err := db.GetPool().QueryRow(c.Request.Context(), countQuery).Scan(&total); err != nil {
+			log.Printf("Count query error: %v", err)
+			total = 0
 		}
 	}
 
 	// Append targetLang for the JOIN condition (needed for main query)
 	args = append(args, targetLang)
 
-	var joinType string
-	if translatedOnly {
-		joinType = "INNER JOIN"
-	} else {
-		joinType = "LEFT JOIN"
-	}
+	// El JOIN con traducciones es siempre LEFT: el filtro translated_only
+	// vive en el WHERE y tiene dos ramas (traducida o ya en espanol), y con
+	// INNER JOIN las noticias en espanol sin fila de traduccion (las de los
+	// canales ya traducidos) quedarian fuera.
+	const joinType = "LEFT JOIN"
 
 	sqlQuery := `
 		SELECT n.id, COALESCE(n.titulo, ''), COALESCE(n.resumen, ''), COALESCE(n.contenido, '') AS contenido, n.url, n.fecha, n.imagen_url,
 		       n.categoria_id, n.pais_id, n.fuente_nombre, n.lang,
+		       n.created_at, n.updated_at,
 		       t.titulo_trad,
 		       t.resumen_trad,
 		       t.contenido_trad,
 		       t.lang_to as lang_trad,
-		       ec.id as cluster_id
+		       (
+		           SELECT ec.id
+		           FROM noticia_clusters nc
+		           JOIN event_clusters ec ON nc.cluster_id = ec.id
+		           WHERE nc.noticia_id = n.id
+		           ORDER BY nc.es_principal DESC, ec.id
+		           LIMIT 1
+		       ) as cluster_id
 		FROM noticias n
 		` + joinType + ` traducciones t ON t.noticia_id = n.id AND t.lang_to = $` + strconv.Itoa(argNum) + `
-		LEFT JOIN noticia_clusters nc ON nc.noticia_id = n.id
-		LEFT JOIN event_clusters ec ON nc.cluster_id = ec.id
 		WHERE ` + where + `
 		ORDER BY n.fecha DESC LIMIT $` + strconv.Itoa(argNum+1) + ` OFFSET $` + strconv.Itoa(argNum+2)
 
@@ -413,16 +425,24 @@ func GetNews(c *gin.Context) {
 		var imagenURL, fuenteNombre, langRaw *string
 		var categoriaID, paisID *int32
 		var clusterID sql.NullInt64
+		var createdAt, updatedAt *time.Time
 
 		err := rows.Scan(
 			&id, &titulo, &resumen, &contenido, &url, &fecha, &imagenURL,
 			&categoriaID, &paisID, &fuenteNombre, &langRaw,
+			&createdAt, &updatedAt,
 			&n.TitleTranslated, &n.SummaryTranslated, &n.ContentTranslated, &n.LangTranslated,
 			&clusterID,
 		)
 		if err != nil {
 			log.Printf("GetNews: scan error: %v", err)
 			continue
+		}
+		if createdAt != nil {
+			n.CreatedAt = *createdAt
+		}
+		if updatedAt != nil {
+			n.UpdatedAt = *updatedAt
 		}
 		n.ID = id
 		n.Titulo = titulo
@@ -516,6 +536,26 @@ func GetEntityNews(c *gin.Context) {
 	next := 4
 	timeCond := ""
 	switch {
+	case c.Query("periodo") != "":
+		// Hora exacta (la del pico de una alerta): la ventana es
+		// [periodo, periodo + 1h), que es como el detector de alertas
+		// agrupa las menciones (date_trunc('hour', n.fecha)).
+		// Acepta los formatos en los que llega la hora: el de la API de
+		// alertas ('YYYY-MM-DD HH24:MI'), RFC3339 y sin zona horaria.
+		periodo, err := time.Parse("2006-01-02 15:04", c.Query("periodo"))
+		if err != nil {
+			periodo, err = time.Parse(time.RFC3339, c.Query("periodo"))
+		}
+		if err != nil {
+			periodo, err = time.Parse("2006-01-02T15:04:05", c.Query("periodo"))
+		}
+		if err != nil {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "Invalid periodo", Message: "Se espera una marca de tiempo ISO 8601"})
+			return
+		}
+		timeCond = fmt.Sprintf(" AND n.fecha >= $%d AND n.fecha < $%d + interval '1 hour'", next, next)
+		params = append(params, periodo)
+		next++
 	case useDayOffset:
 		// Día exacto: desde el inicio del día (hoy - offset) hasta el inicio del día siguiente
 		timeCond = fmt.Sprintf(
@@ -627,6 +667,7 @@ func GetNewsByID(c *gin.Context) {
 		SELECT 
 			n.id, COALESCE(n.titulo, ''), COALESCE(n.resumen, ''), COALESCE(n.contenido, '') AS contenido, n.url, n.fecha, n.imagen_url, 
 		       n.categoria_id, n.pais_id, n.fuente_nombre, n.lang,
+		       n.created_at, n.updated_at,
 		       t.titulo_trad,
 		       t.resumen_trad,
 		       t.contenido_trad,
@@ -656,6 +697,7 @@ func GetNewsByID(c *gin.Context) {
 		WHERE n.id = $2
 		GROUP BY n.id, n.titulo, n.resumen, n.contenido, n.url, n.fecha, n.imagen_url, 
 		         n.categoria_id, n.pais_id, n.fuente_nombre, n.lang,
+		         n.created_at, n.updated_at,
 		         t.titulo_trad, t.resumen_trad, t.contenido_trad, t.lang_to,
 		         ec.id
 	`
@@ -667,10 +709,12 @@ func GetNewsByID(c *gin.Context) {
 	var categoriaID, paisID *int32
 	var entitiesJSON *string
 	var clusterID sql.NullInt64
+	var createdAt, updatedAt *time.Time
 
 	err := db.GetPool().QueryRow(c.Request.Context(), sqlQuery, targetLang, id).Scan(
 		&id, &titulo, &resumen, &contenido, &url, &fecha, &imagenURL,
 		&categoriaID, &paisID, &fuenteNombre, &langRaw,
+		&createdAt, &updatedAt,
 		&n.TitleTranslated, &n.SummaryTranslated, &n.ContentTranslated, &n.LangTranslated,
 		&entitiesJSON,
 		&clusterID,
@@ -678,6 +722,13 @@ func GetNewsByID(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: "News not found"})
 		return
+	}
+
+	if createdAt != nil {
+		n.CreatedAt = *createdAt
+	}
+	if updatedAt != nil {
+		n.UpdatedAt = *updatedAt
 	}
 
 	n.ID = id
@@ -1209,16 +1260,74 @@ func RefreshEntityStatsStartup() error {
 	return nil
 }
 
+// StartEntityStatsRefresher refresca entity_stats de forma periodica.
+//
+// Sin esto, la tabla solo se actualizaba al arrancar el backend (o cuando
+// un admin llamaba a POST /api/admin/entities/refresh-stats): los recuentos
+// de /api/entities se quedaban congelados mientras el corpus crecia. La
+// idea original era un cron de Postgres, pero pg_cron no viene en la
+// imagen pgvector/pgvector:pg16 (y la llamada a cron.schedule esta
+// comentada en init-db/50), asi que el refresco se hace desde aqui.
+//
+// El refresco hace TRUNCATE + INSERT, asi que bloquea la tabla mientras
+// dura. Se comprueba antes que no haya otro refresco en marcha (el
+// endpoint de administracion puede lanzar uno en cualquier momento).
+func StartEntityStatsRefresher() {
+	intervalMin := envInt("ENTITY_STATS_REFRESH_INTERVAL_MIN", 60)
+
+	go func() {
+		// Espera a que la BD este lista (el arranque ya refresca).
+		time.Sleep(90 * time.Second)
+		for {
+			if !entityStatsRefreshInFlight() {
+				if err := RefreshEntityStatsStartup(); err != nil {
+					log.Printf("entity_stats: error en el refresco periodico: %v", err)
+				}
+			}
+			time.Sleep(time.Duration(intervalMin) * time.Minute)
+		}
+	}()
+}
+
+// entityStatsRefreshInFlight indica si hay ya un refresco de entity_stats
+// en marcha.
+func entityStatsRefreshInFlight() bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	var running bool
+	err := db.GetPool().QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM pg_stat_activity
+			WHERE query LIKE '%refresh_entity_stats%'
+			  AND state = 'active'
+			  AND pid <> pg_backend_pid()
+		)
+	`).Scan(&running)
+	if err != nil {
+		// Si no se puede comprobar, se asume que no hay nada en marcha:
+		// el refresco es idempotente y el TRUNCATE serializa igual.
+		return false
+	}
+	return running
+}
+
 // RefreshEntityStats refreshes the entity_stats table (HTTP handler)
 func RefreshEntityStats(c *gin.Context) {
 	ctx := c.Request.Context()
 
-	// Check if refresh is already running
+	// Check if refresh is already running.
+	//
+	// El pid propio se excluye: la consulta en si misma contiene la cadena
+	// 'refresh_entity_stats', asi que sin el filtro la comprobacion se
+	// detectaba a si misma y el endpoint respondia siempre 409.
 	var isRefreshing bool
 	err := db.GetPool().QueryRow(ctx, `
 		SELECT EXISTS(
-			SELECT 1 FROM pg_stat_activity 
-			WHERE query LIKE '%refresh_entity_stats%' AND state = 'active'
+			SELECT 1 FROM pg_stat_activity
+			WHERE query LIKE '%refresh_entity_stats%'
+			  AND state = 'active'
+			  AND pid <> pg_backend_pid()
 		)
 	`).Scan(&isRefreshing)
 	if err != nil {

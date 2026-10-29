@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strconv"
@@ -28,6 +29,14 @@ var (
 	enrichLimit    = 20
 	scraperWorkers = 5
 	maxBodyBytes   = int64(512 << 10)
+	// Intentos de enriquecimiento antes de saltarse una noticia. Sin esto
+	// el worker reintentaba eternamente las mismas URLs (404, 403, URL
+	// relativa) y el enriquecimiento no avanzaba nunca.
+	enrichMaxAttempts = 3
+	// Periodo de enfriamiento tras un fallo: la noticia vuelve a la cola
+	// pasado este tiempo por si el problema era pasajero (el site estaba
+	// caido, por ejemplo).
+	enrichCooldownHours = 168 // 7 dias
 )
 
 type URLSource struct {
@@ -84,6 +93,16 @@ func loadConfig() {
 			scraperWorkers = i
 		}
 	}
+	if v := os.Getenv("SCRAPER_ENRICH_MAX_ATTEMPTS"); v != "" {
+		if i, err := strconv.Atoi(v); err == nil && i > 0 {
+			enrichMaxAttempts = i
+		}
+	}
+	if v := os.Getenv("SCRAPER_ENRICH_COOLDOWN_HOURS"); v != "" {
+		if i, err := strconv.Atoi(v); err == nil && i > 0 {
+			enrichCooldownHours = i
+		}
+	}
 }
 
 func getEnvInt(key string, defaultValue int) int {
@@ -130,14 +149,29 @@ func updateSourceStatus(ctx context.Context, sourceID int64, status, message str
 	return err
 }
 
+// getNoticiasToEnrich devuelve las noticias que aun no tienen contenido.
+//
+// La ordenacion es por created_at DESC (no por fecha): 'fecha' es la fecha
+// que declara el feed, que puede estar corrupta (algunos feeds sirven
+// paginas indice fechadas en el ano 3000), y con ella las primeras 20 filas
+// eran siempre las mismas, que nunca se enriquecian.
+//
+// Las noticias que ya fallaron varias veces se saltan (hasta que pase el
+// periodo de enfriamiento) para que la cola siga avanzando.
 func getNoticiasToEnrich(ctx context.Context, limit int) ([]Noticia, error) {
 	rows, err := pool.Query(ctx, `
-	SELECT id, titulo, COALESCE(resumen, ''), COALESCE(contenido, ''), url, fuente_nombre
-	FROM noticias
-	WHERE contenido IS NULL
-	ORDER BY fecha DESC
-	LIMIT $1
-	`, limit)
+		SELECT n.id, n.titulo, COALESCE(n.resumen, ''), COALESCE(n.contenido, ''), n.url, n.fuente_nombre
+		FROM noticias n
+		LEFT JOIN noticias_enrich_log e ON e.noticia_id = n.id
+		WHERE n.contenido IS NULL
+		  AND (
+			e.noticia_id IS NULL
+			OR e.attempts < $2
+			OR e.last_attempt < NOW() - ($3 * INTERVAL '1 hour')
+		  )
+		ORDER BY n.created_at DESC
+		LIMIT $1
+	`, limit, enrichMaxAttempts, enrichCooldownHours)
 	if err != nil {
 		return nil, err
 	}
@@ -152,6 +186,50 @@ func getNoticiasToEnrich(ctx context.Context, limit int) ([]Noticia, error) {
 		noticias = append(noticias, n)
 	}
 	return noticias, nil
+}
+
+// markEnrichFailed registra un intento fallido. Tras enrichMaxAttempts
+// intentos la noticia se salta durante el periodo de enfriamiento.
+//
+// El registro va en noticias_enrich_log y no en 'noticias' a proposito: un
+// UPDATE sobre 'noticias' refresca updated_at (trigger) y la ruta de
+// catch-up del translation_scheduler crearia trabajos de traduccion
+// espurios.
+func markEnrichFailed(ctx context.Context, noticiaID, reason string) {
+	if len(reason) > 200 {
+		reason = reason[:200]
+	}
+	_, err := pool.Exec(ctx, `
+		INSERT INTO noticias_enrich_log (noticia_id, attempts, last_attempt, last_error)
+		VALUES ($1, 1, NOW(), $2)
+		ON CONFLICT (noticia_id) DO UPDATE
+		SET attempts = noticias_enrich_log.attempts + 1,
+		    last_attempt = NOW(),
+		    last_error = EXCLUDED.last_error
+	`, noticiaID, reason)
+	if err != nil {
+		logger.Error().Err(err).Str("id", noticiaID).Msg("Error registrando fallo de enriquecimiento")
+	}
+}
+
+// clearEnrichFailure borra el registro de fallos tras un enriquecimiento
+// correcto.
+func clearEnrichFailure(ctx context.Context, noticiaID string) {
+	_, err := pool.Exec(ctx, `DELETE FROM noticias_enrich_log WHERE noticia_id = $1`, noticiaID)
+	if err != nil {
+		logger.Error().Err(err).Str("id", noticiaID).Msg("Error limpiando fallos de enriquecimiento")
+	}
+}
+
+// isFetchableURL indica si una URL se puede descargar. Las URLs relativas
+// ("/tour", "//sitio/a") no lo son: http.NewRequest falla con "unsupported
+// protocol scheme" y el intento se repite para siempre.
+func isFetchableURL(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return false
+	}
+	return u.Scheme == "http" || u.Scheme == "https"
 }
 
 func updateNoticiaResumen(ctx context.Context, noticiaID, newResumen string) error {
@@ -321,16 +399,24 @@ func extractContentFromURL(url string) (string, error) {
 }
 
 func processEnrichment(ctx context.Context, noticia Noticia) bool {
-	logger.Info().Str("title", noticia.Titulo).Msg("Enriching")
+	// Las URLs que no son http(s) no se pueden descargar. Se marcan como
+	// fallidas para que no se reintenten eternamente.
+	if !isFetchableURL(noticia.URL) {
+		logger.Warn().Str("url", noticia.URL).Msg("URL no descargable, se omite")
+		markEnrichFailed(ctx, noticia.ID, "URL no absoluta")
+		return false
+	}
 
 	content, err := extractContentFromURL(noticia.URL)
 	if err != nil {
 		logger.Error().Err(err).Str("url", noticia.URL).Msg("Error extracting content")
+		markEnrichFailed(ctx, noticia.ID, err.Error())
 		return false
 	}
 
 	if len(content) < 50 {
 		logger.Warn().Str("url", noticia.URL).Msg("Not enough content extracted")
+		markEnrichFailed(ctx, noticia.ID, "contenido insuficiente")
 		return false
 	}
 
@@ -339,6 +425,8 @@ func processEnrichment(ctx context.Context, noticia Noticia) bool {
 		logger.Error().Err(err).Str("id", noticia.ID).Msg("Error updating contenido")
 		return false
 	}
+
+	clearEnrichFailure(ctx, noticia.ID)
 
 	logger.Info().Str("title", noticia.Titulo).Int("length", len(content)).Msg("Enriched")
 	return true

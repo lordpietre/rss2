@@ -305,6 +305,34 @@ func processBatch(ctx context.Context, topics []Topic, countries []Country) (int
 		}
 	}
 
+	// Bloqueo ordenado de las filas del lote.
+	//
+	// langdetect actualiza 'noticias' fila a fila en orden de id ASC y
+	// topics lo hace en bloque. Postgres toma los bloqueos de fila en el
+	// orden en que el PLAN lee las filas, no en el orden del array, asi que
+	// los dos workers bloqueaban el mismo lote en distinto orden y Postgres
+	// abortaba uno de los dos con deadlock (SQLSTATE 40P01) unas 3 veces
+	// por minuto.
+	//
+	// Bloqueando aqui con ORDER BY id, ambos workers toman siempre los
+	// bloqueos en el mismo orden y el deadlock desaparece. El SELECT ...
+	// FOR UPDATE se resuelve antes de tocar nada mas, de modo que el lote
+	// entero queda bloqueado en orden y las UPDATE siguientes ya no
+	// compiten por el orden.
+	sort.Strings(processedIDs)
+
+	tx, err := dbPool.Begin(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("no se pudo iniciar la transaccion: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, `
+		SELECT id FROM noticias WHERE id = ANY($1::varchar[]) ORDER BY id FOR UPDATE
+	`, processedIDs); err != nil {
+		return 0, fmt.Errorf("bloqueo ordenado fallido: %w", err)
+	}
+
 	// Update country (single bulk UPDATE)
 	if len(countryUpdates) > 0 {
 		paisSlice := make([]int32, len(countryUpdates))
@@ -313,12 +341,17 @@ func processBatch(ctx context.Context, topics []Topic, countries []Country) (int
 			paisSlice[i] = int32(cu.PaisID)
 			idSlice[i] = cu.NoticiaID
 		}
-		if _, err := dbPool.Exec(ctx, `
+		if _, err := tx.Exec(ctx, `
 			UPDATE noticias n SET pais_id = u.pais
 			FROM unnest($1::int[], $2::varchar[]) AS u(pais, noticia_id)
 			WHERE n.id = u.noticia_id
 		`, paisSlice, idSlice); err != nil {
+			// La transaccion queda abortada: no se puede seguir con el
+			// UPDATE de topics_processed ni hacer commit. Se devuelve el
+			// error para que el lote no se marque como procesado (la
+			// asignacion de pais se perderia en silencio).
 			logger.Error().Err(err).Msg("Error bulk updating countries")
+			return 0, fmt.Errorf("error actualizando paises: %w", err)
 		}
 	}
 
@@ -327,13 +360,15 @@ func processBatch(ctx context.Context, topics []Topic, countries []Country) (int
 		// Mismo criterio de bloqueo que langdetect (id ascendente): ambos
 		// transaccionan UPDATEs sobre `noticias` y, en orden distinto,
 		// Postgres abortaba uno con deadlock (SQLSTATE 40P01).
-		sort.Strings(processedIDs)
-		_, err := dbPool.Exec(ctx, `
+		if _, err := tx.Exec(ctx, `
 			UPDATE noticias SET topics_processed = TRUE WHERE id = ANY($1)
-		`, processedIDs)
-		if err != nil {
+		`, processedIDs); err != nil {
 			return 0, err
 		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return 0, err
 	}
 
 	return len(items), nil

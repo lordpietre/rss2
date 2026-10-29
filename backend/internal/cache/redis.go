@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -13,22 +14,23 @@ var Client *redis.Client
 
 // Cache TTL constants
 const (
-	TTLShort   = 5 * time.Minute    // 5 min for frequently changing data
-	TTLMedium  = 1 * time.Hour     // 1 hour for semi-static data (increased from 30 min)
-	TTLLong    = 4 * time.Hour     // 4 hours for stable data (increased from 2 hours)
-	TTLNoExpire = 0                // No expiration (manual invalidation)
+	TTLShort    = 5 * time.Minute // 5 min for frequently changing data
+	TTLMedium   = 1 * time.Hour   // 1 hour for semi-static data (increased from 30 min)
+	TTLLong     = 4 * time.Hour   // 4 hours for stable data (increased from 2 hours)
+	TTLNoExpire = 0               // No expiration (manual invalidation)
 )
 
 const (
-	KeyPrefixSearch  = "search"
-	KeyPrefixNews    = "news"
-	KeyPrefixFeed    = "feed"
-	KeyPrefixFeedList = "feedlist"
+	KeyPrefixSearch     = "search"
+	KeyPrefixNews       = "news"
+	KeyPrefixFeed       = "feed"
+	KeyPrefixFeedList   = "feedlist"
 	KeyPrefixCategories = "categories"
 	KeyPrefixCountries  = "countries"
-	KeyPrefixStats     = "stats"
-	KeyPrefixEntities  = "entities"
-	KeyPrefixStatsTop  = "statstop"
+	KeyPrefixStats      = "stats"
+	KeyPrefixEntities   = "entities"
+	KeyPrefixStatsTop   = "statstop"
+	KeyPrefixTTSQueue   = "tts:queue"
 )
 
 func Connect(redisURL string) error {
@@ -59,8 +61,17 @@ func GetClient() *redis.Client {
 	return Client
 }
 
-func SearchKey(query, lang string, page, perPage int) string {
-	return fmt.Sprintf("%s:%s:%s:%d:%d", KeyPrefixSearch, query, lang, page, perPage)
+// SearchKey construye la clave de cache de una busqueda.
+//
+// Los filtros forman parte de la clave: si no, una busqueda con ventana
+// temporal devolveria el resultado cacheado de la misma consulta sin
+// filtros.
+func SearchKey(query, lang string, page, perPage int, filters ...string) string {
+	base := fmt.Sprintf("%s:%s:%s:%d:%d", KeyPrefixSearch, query, lang, page, perPage)
+	if len(filters) == 0 {
+		return base
+	}
+	return base + ":" + strings.Join(filters, ":")
 }
 
 func NewsKey(newsID int64, lang string) string {
@@ -93,6 +104,18 @@ func StatsTopKey(typ string) string {
 
 func EntityKey(entityType, query string, page, perPage int) string {
 	return fmt.Sprintf("%s:%s:%s:%d:%d", KeyPrefixEntities, entityType, query, page, perPage)
+}
+
+// PushTTSJob avisa al worker de TTS de que hay una tarea en cola.
+//
+// Redis es solo el canal de despacho: la tarea sigue siendo la fuente de
+// verdad en Postgres, asi que si Redis no esta disponible el worker la
+// recupera igualmente consultando la base de datos.
+func PushTTSJob(ctx context.Context, jobID int64) error {
+	if Client == nil {
+		return fmt.Errorf("redis no inicializado")
+	}
+	return Client.LPush(ctx, KeyPrefixTTSQueue, jobID).Err()
 }
 
 func Set(ctx context.Context, key string, value interface{}, expiration time.Duration) error {

@@ -29,11 +29,27 @@ func Connect(databaseURL string) error {
 		return fmt.Errorf("failed to create pool: %w", err)
 	}
 
-	if err = Pool.Ping(context.Background()); err != nil {
-		return fmt.Errorf("failed to ping database: %w", err)
+	// Al arrancar el host todos los contenedores levantan a la vez: el
+	// Postgres puede tardar unos segundos en aceptar conexiones. Sin esta
+	// espera el proceso muere y Docker lo reinicia con backoff (varios
+	// reinicios por arranque). Se reintenta un numero acotado de veces.
+	// Cada intento usa su propio contexto: un unico timeout global podria
+	// expirar antes de agotar los intentos y los ultimos "reintentos" se
+	// quedarian sin probar de verdad.
+	for attempt := 1; attempt <= 30; attempt++ {
+		pingCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		err = Pool.Ping(pingCtx)
+		cancel()
+		if err == nil {
+			return nil
+		}
+		if attempt == 30 {
+			break
+		}
+		time.Sleep(2 * time.Second)
 	}
 
-	return nil
+	return fmt.Errorf("failed to ping database: %w", err)
 }
 
 func Close() {

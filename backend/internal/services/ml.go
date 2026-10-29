@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/rss2/backend/internal/config"
@@ -147,7 +149,16 @@ func ExtractEntities(ctx context.Context, text string) ([]Entity, error) {
 	return result.Entities, nil
 }
 
-func SemanticSearch(ctx context.Context, query, lang string, page, perPage int) (*models.NewsListResponse, error) {
+// SemanticFilters acota la busqueda semantica. Todos los campos son
+// opcionales: si se omiten el comportamiento es el de siempre.
+type SemanticFilters struct {
+	Desde    *time.Time
+	MinChars int
+	Dedup    bool
+}
+
+// SemanticSearch busca noticias por significado (embeddings + pgvector).
+func SemanticSearch(ctx context.Context, query, lang string, page, perPage int, filters ...SemanticFilters) (*models.NewsListResponse, error) {
 	// Get embedding for the query from Ollama
 	embeddings, err := GetEmbeddings(ctx, []string{query})
 	if err != nil {
@@ -160,22 +171,65 @@ func SemanticSearch(ctx context.Context, query, lang string, page, perPage int) 
 
 	queryEmbedding := embeddings[0]
 
+	// Filtros opcionales (ventana temporal, longitud minima, deduplicacion).
+	filter := SemanticFilters{}
+	if len(filters) > 0 {
+		filter = filters[0]
+	}
+	extraWhere := ""
+	extraArgs := []interface{}{}
+	if filter.Desde != nil {
+		extraWhere += " AND n.fecha >= $" + strconv.Itoa(len(extraArgs)+2)
+		extraArgs = append(extraArgs, *filter.Desde)
+	}
+	// Se acota por arriba: hay noticias con fecha corrupta (ano 3000).
+	extraWhere += " AND (n.fecha IS NULL OR n.fecha <= NOW() + INTERVAL '1 day')"
+	if filter.MinChars > 0 {
+		extraWhere += " AND length(COALESCE(NULLIF(t.contenido_trad, ''), NULLIF(n.contenido, ''), NULLIF(t.resumen_trad, ''), NULLIF(n.resumen, ''), '')) >= $" + strconv.Itoa(len(extraArgs)+2)
+		extraArgs = append(extraArgs, filter.MinChars)
+	}
+	if filter.Dedup {
+		extraWhere += ` AND NOT EXISTS (
+			SELECT 1 FROM noticia_clusters nc2
+			JOIN noticia_clusters nc1 ON nc1.cluster_id = nc2.cluster_id
+			WHERE nc2.noticia_id = n.id AND nc1.es_principal AND nc1.noticia_id <> n.id
+		)`
+	}
+
 	// Build the SQL query to find similar translations using vector similarity
 	offset := (page - 1) * perPage
 
 	// First get total count
+	//
+	// Dos fuentes: las traducciones terminadas y el texto ORIGINAL de las
+	// noticias que ya estan en el idioma destino (canales marcados como
+	// traducidos), que no tienen fila en traducciones pero tambien deben
+	// aparecer en la busqueda.
 	var total int
 	countQuery := `
-		SELECT COUNT(DISTINCT te.traduccion_id)
-		FROM traduccion_embeddings te
-		JOIN traducciones t ON te.traduccion_id = t.id
-		WHERE te.embedding_vector IS NOT NULL
-		  AND te.embedding_vector::text != '[]'
-		  AND te.embedding_vector::text != '0'
-		  AND t.lang_to = $1
-		  AND t.status = 'done'
-	`
-	err = db.GetPool().QueryRow(ctx, countQuery, lang).Scan(&total)
+		SELECT COUNT(*) FROM (
+			SELECT t.noticia_id AS nid
+			FROM traduccion_embeddings te
+			JOIN traducciones t ON te.traduccion_id = t.id
+			JOIN noticias n ON t.noticia_id = n.id
+			WHERE te.embedding_vector IS NOT NULL
+			  AND te.embedding_vector::text != '[]'
+			  AND te.embedding_vector::text != '0'
+			  AND t.lang_to = $1
+			  AND t.status = 'done'` + extraWhere + `
+			UNION ALL
+			SELECT n.id AS nid
+			FROM traduccion_embeddings te
+			JOIN noticias n ON n.id = te.noticia_id
+			LEFT JOIN traducciones t ON t.noticia_id = n.id AND t.lang_to = $1
+			WHERE te.traduccion_id IS NULL
+			  AND te.embedding_vector IS NOT NULL
+			  AND te.embedding_vector::text != '[]'
+			  AND te.embedding_vector::text != '0'
+			  AND n.lang = $1` + extraWhere + `
+		) x`
+	countArgs := append([]interface{}{lang}, extraArgs...)
+	err = db.GetPool().QueryRow(ctx, countQuery, countArgs...).Scan(&total)
 	if err != nil {
 		return nil, fmt.Errorf("failed to count results: %w", err)
 	}
@@ -195,25 +249,50 @@ func SemanticSearch(ctx context.Context, query, lang string, page, perPage int) 
 
 	// Search for similar translations using cosine distance
 	// Note: pgvector <=> operator works with string casting
+	// El idioma destino es SIEMPRE el primer argumento ($1): los filtros van
+	// despues (searchArgs = [lang] + extraArgs + [perPage, offset]). Antes se
+	// calculaba el placeholder como len(extraArgs)+1, que con filtros
+	// apuntava al argumento equivocado y colisionaba con el de extraWhere
+	// ("operator does not exist: integer >= character"): la busqueda
+	// semantica con filtros fallaba siempre.
 	searchQuery := fmt.Sprintf(`
-		SELECT 
-			n.id, COALESCE(n.titulo, ''), COALESCE(n.resumen, ''), COALESCE(n.contenido, ''), 
-			n.url, n.fecha, n.imagen_url, n.fuente_nombre, n.lang,
-			t.titulo_trad, t.resumen_trad, t.contenido_trad,
-			1 - (te.embedding_vector <=> '%s'::vector) AS score
-		FROM traduccion_embeddings te
-		JOIN traducciones t ON te.traduccion_id = t.id
-		JOIN noticias n ON t.noticia_id = n.id
-		WHERE te.embedding_vector IS NOT NULL
-		  AND te.embedding_vector::text != '[]'
-		  AND te.embedding_vector::text != '0'
-		  AND t.lang_to = $1
-		  AND t.status = 'done'
-		ORDER BY te.embedding_vector <=> '%s'::vector
-		LIMIT $2 OFFSET $3
-	`, embeddingStr, embeddingStr)
+		SELECT * FROM (
+			SELECT
+				n.id, COALESCE(n.titulo, ''), COALESCE(n.resumen, ''), COALESCE(n.contenido, ''),
+				n.url, n.fecha, n.imagen_url, n.fuente_nombre, n.lang,
+				t.titulo_trad, t.resumen_trad, t.contenido_trad,
+				1 - (te.embedding_vector <=> '%s'::vector) AS score
+			FROM traduccion_embeddings te
+			JOIN traducciones t ON te.traduccion_id = t.id
+			JOIN noticias n ON t.noticia_id = n.id
+			WHERE te.embedding_vector IS NOT NULL
+			  AND te.embedding_vector::text != '[]'
+			  AND te.embedding_vector::text != '0'
+			  AND t.lang_to = $%d
+			  AND t.status = 'done'%s
+			UNION ALL
+			SELECT
+				n.id, COALESCE(n.titulo, ''), COALESCE(n.resumen, ''), COALESCE(n.contenido, ''),
+				n.url, n.fecha, n.imagen_url, n.fuente_nombre, n.lang,
+				t.titulo_trad, t.resumen_trad, t.contenido_trad,
+				1 - (te.embedding_vector <=> '%s'::vector) AS score
+			FROM traduccion_embeddings te
+			JOIN noticias n ON n.id = te.noticia_id
+			LEFT JOIN traducciones t ON t.noticia_id = n.id AND t.lang_to = $%d
+			WHERE te.traduccion_id IS NULL
+			  AND te.embedding_vector IS NOT NULL
+			  AND te.embedding_vector::text != '[]'
+			  AND te.embedding_vector::text != '0'
+			  AND n.lang = $%d%s
+		) x
+		ORDER BY score DESC
+		LIMIT $%d OFFSET $%d
+	`, embeddingStr, 1, extraWhere, embeddingStr, 1, 1, extraWhere, len(extraArgs)+2, len(extraArgs)+3)
 
-	rows, err := db.GetPool().Query(ctx, searchQuery, lang, perPage, offset)
+	searchArgs := append([]interface{}{lang}, extraArgs...)
+	searchArgs = append(searchArgs, perPage, offset)
+
+	rows, err := db.GetPool().Query(ctx, searchQuery, searchArgs...)
 	if err != nil {
 		return nil, fmt.Errorf("semantic search query failed: %w", err)
 	}
@@ -245,7 +324,7 @@ func SemanticSearch(ctx context.Context, query, lang string, page, perPage int) 
 			n.ImagenURL = &img.String
 		}
 		n.FuenteNombre = fuenteNombre.String
-		n.Lang = langRaw.String
+		n.Lang = strings.TrimSpace(langRaw.String)
 
 		news = append(news, n)
 	}

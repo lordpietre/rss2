@@ -452,6 +452,12 @@ def process_batch(conn, rows):
 
         if lang_from == lang_to:
             # Same language: copy original text with confidence 1.0
+            #
+            # NO se hace commit aqui. El commit liberaria los locks de
+            # FOR UPDATE de TODO el lote (128 filas) antes de que el resto
+            # tuviera `locked_at` puesto, y otro traductor podria reclamar
+            # esas mismas filas -> trabajo duplicado. El commit lo hace el
+            # final de process_group.
             cursor = conn.cursor()
             cursor.execute("""
                 UPDATE traducciones 
@@ -459,7 +465,6 @@ def process_batch(conn, rows):
                     status = 'done', confidence = 1.0, locked_at = NULL
                 WHERE id = %s
             """, (titulo, resumen, contenido, r.get("tr_id")))
-            conn.commit()
             cursor.close()
             continue
 
@@ -473,6 +478,10 @@ def process_batch(conn, rows):
         })
 
     if not todo:
+        # Todo el lote era del mismo idioma: los UPDATE de arriba quedan
+        # pendientes de confirmar (no hay commit intermedio para no liberar
+        # los locks antes de tiempo).
+        conn.commit()
         return
 
     # Bloquear registros
@@ -677,6 +686,11 @@ def fetch_pending_translations(conn):
         if not lang:
             continue
 
+        # `FOR UPDATE OF t`: sin `OF t` el JOIN hace que PostgreSQL bloquee
+        # tambien las filas de `noticias`, y es lo que compite con
+        # los UPDATE masivos de `langdetect` y `topics` sobre la misma tabla
+        # (deadlock 40P01). El orden (`n.fecha DESC`, "mas reciente primero")
+        # NO cambia.
         cursor.execute("""
             SELECT t.id as tr_id, t.lang_from, t.lang_to,
                    n.titulo, n.resumen, n.contenido, n.id as noticia_id
@@ -689,7 +703,7 @@ def fetch_pending_translations(conn):
               AND (t.locked_at IS NULL OR t.locked_at < NOW() - INTERVAL '10 minutes')
             ORDER BY n.fecha DESC
             LIMIT 128
-            FOR UPDATE SKIP LOCKED
+            FOR UPDATE OF t SKIP LOCKED
         """, (lang,))
 
         rows = cursor.fetchall()

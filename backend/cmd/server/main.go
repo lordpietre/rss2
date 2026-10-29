@@ -403,6 +403,9 @@ func Main() {
 			feeds.DELETE("/:id", middleware.AuthRequired(), handlers.DeleteFeed)
 			feeds.DELETE("/inactive", middleware.AuthRequired(), handlers.DeleteInactiveFeeds)
 			feeds.POST("/:id/toggle", middleware.AuthRequired(), handlers.ToggleFeedActive)
+			feeds.POST("/:id/traducido", middleware.AuthRequired(), handlers.SetFeedTraducido)
+			feeds.POST("/traducido/bulk", middleware.AuthRequired(), handlers.BulkSetFeedsTraducido)
+			feeds.POST("/bulk-delete", middleware.AuthRequired(), handlers.BulkDeleteFeeds)
 			feeds.POST("/:id/reactivate", middleware.AuthRequired(), handlers.ReactivateFeed)
 		}
 
@@ -516,6 +519,55 @@ func Main() {
 			app.GET("/usage", handlers.GetUsage)
 			app.GET("/limits/check", handlers.CheckPlanLimits)
 		}
+
+		// Narracion de noticias (TTS).
+		//
+		// El servicio de TTS es interno (no se publica por nginx). El backend
+		// expone la API editorial: guiones, tareas y audios. El audio se sirve
+		// con autenticacion y queda 'pending_review' hasta que un editor lo
+		// aprueba: nada se publica automaticamente.
+		tts := api.Group("/tts")
+		tts.Use(middleware.AuthRequired())
+		{
+			tts.GET("/status", handlers.GetTTSStatus)
+			tts.GET("/voices", handlers.ListTTSVoice)
+			tts.GET("/speakers", handlers.ListTTSSpeakers)
+			tts.POST("/speakers", handlers.RegisterTTSSpeaker)
+			// Tendencias: historias consolidadas y temas en tendencia, para
+			// elegir que va en el informativo sin repetir el mismo tema.
+			tts.GET("/trends", handlers.GetTTSTrends)
+
+			// Gestion de muestras de voz propias: solo administradores.
+			tts.POST("/voices", middleware.AdminRequired(), handlers.CreateTTSVoice)
+			tts.DELETE("/voices/:id", middleware.AdminRequired(), handlers.DeleteTTSVoice)
+			tts.GET("/voices/:id/quality", middleware.AdminRequired(), handlers.GetTTSVoiceQuality)
+
+			tts.GET("/scripts", handlers.ListTTSScripts)
+			tts.POST("/scripts", handlers.CreateTTSScript)
+			tts.POST("/scripts/prepare", handlers.PrepareTTSScripts)
+			tts.GET("/scripts/:id", handlers.GetTTSScript)
+			tts.PUT("/scripts/:id", handlers.UpdateTTSScript)
+			tts.POST("/scripts/:id/status", handlers.SetTTSScriptStatus)
+
+			tts.GET("/jobs", handlers.ListTTSJobs)
+			tts.POST("/jobs", handlers.CreateTTSJob)
+			tts.GET("/jobs/:id", handlers.GetTTSJob)
+			tts.POST("/jobs/:id/cancel", handlers.CancelTTSJob)
+
+			tts.GET("/audios", handlers.ListTTSAudios)
+			tts.GET("/audios/:id", handlers.GetTTSAudio)
+			tts.GET("/audios/:id/file", handlers.GetTTSAudioFile)
+			tts.POST("/audios/:id/status", middleware.AdminRequired(), handlers.SetTTSAudioStatus)
+
+			// Noticiario: varias narraciones unidas en un solo audio.
+			tts.GET("/bulletins", handlers.ListTTSBulletins)
+			tts.POST("/bulletins", handlers.CreateTTSBulletin)
+			tts.GET("/bulletins/:id", handlers.GetTTSBulletin)
+			tts.GET("/bulletins/:id/file", handlers.GetTTSBulletinFile)
+			tts.POST("/bulletins/:id/approve", handlers.ApproveTTSBulletin)
+			tts.POST("/bulletins/:id/cancel", handlers.CancelTTSBulletin)
+			tts.POST("/bulletins/:id/status", middleware.AdminRequired(), handlers.SetTTSBulletinStatus)
+		}
 	}
 
 	auth.SetJWTSecret(cfg.SecretKey)
@@ -542,6 +594,7 @@ func Main() {
 	handlers.StartJobAssigner()
 	handlers.StartAlertScanner()
 	handlers.StartStaleJobCleanup() // Cleanup stuck jobs from disconnected workers
+	handlers.StartEntityStatsRefresher()
 
 	// Refresh entity stats on startup (in background to not block server start)
 	go func() {

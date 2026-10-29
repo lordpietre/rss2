@@ -1,12 +1,13 @@
 package handlers
 
 import (
-	"database/sql"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 	"github.com/rss2/backend/internal/db"
 	"github.com/rss2/backend/internal/models"
 )
@@ -16,16 +17,16 @@ import (
 // ============================================================================
 
 type EventCluster struct {
-	ID                int64      `json:"id"`
-	ClusterHash       string     `json:"cluster_hash"`
-	TituloTemplate    string     `json:"titulo_template"`
-	PrimerNoticiaID   string     `json:"primer_noticia_id"`
-	FechaInicio       *time.Time `json:"fecha_inicio"`
-	FechaFin          *time.Time `json:"fecha_fin"`
-	Popularidad       int        `json:"popularidad"`
-	Importancia       string     `json:"importancia"`
-	CreatedAt         *time.Time `json:"created_at"`
-	UpdatedAt         *time.Time `json:"updated_at"`
+	ID              int64      `json:"id"`
+	ClusterHash     string     `json:"cluster_hash"`
+	TituloTemplate  string     `json:"titulo_template"`
+	PrimerNoticiaID string     `json:"primer_noticia_id"`
+	FechaInicio     *time.Time `json:"fecha_inicio"`
+	FechaFin        *time.Time `json:"fecha_fin"`
+	Popularidad     int        `json:"popularidad"`
+	Importancia     string     `json:"importancia"`
+	CreatedAt       *time.Time `json:"created_at"`
+	UpdatedAt       *time.Time `json:"updated_at"`
 }
 
 type EventClusterDetail struct {
@@ -34,14 +35,14 @@ type EventClusterDetail struct {
 }
 
 type EventNews struct {
-	ID                string    `json:"id"`
-	Titulo            string    `json:"titulo"`
-	Resumen           string    `json:"resumen"`
-	URL               string    `json:"url"`
-	Fecha             *time.Time `json:"fecha"`
-	FuenteNombre      string    `json:"fuente_nombre"`
-	Similitud         float64   `json:"similitud"`
-	EsPrincipal       bool      `json:"es_principal"`
+	ID           string     `json:"id"`
+	Titulo       string     `json:"titulo"`
+	Resumen      string     `json:"resumen"`
+	URL          string     `json:"url"`
+	Fecha        *time.Time `json:"fecha"`
+	FuenteNombre string     `json:"fuente_nombre"`
+	Similitud    float64    `json:"similitud"`
+	EsPrincipal  bool       `json:"es_principal"`
 }
 
 type EventListResponse struct {
@@ -230,7 +231,8 @@ func GetEventByID(c *gin.Context) {
 	`, id).Scan(&e.ID, &e.ClusterHash, &e.TituloTemplate, &e.PrimerNoticiaID,
 		&e.FechaInicio, &e.FechaFin, &e.Popularidad, &e.Importancia, &e.CreatedAt, &e.UpdatedAt)
 
-	if err == sql.ErrNoRows {
+	// pgx.ErrNoRows: con sql.ErrNoRows un evento inexistente devolvia 500.
+	if errors.Is(err, pgx.ErrNoRows) {
 		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: "Event not found"})
 		return
 	}

@@ -315,7 +315,18 @@ func RunAlertScan(ctx context.Context) (int, error) {
 		),
 		base AS (
 			SELECT c.tag_id,
-			       AVG(h.cnt::float / v.noticias) * r.noticias AS baseline,
+			       -- Baseline POOLED (ponderado por volumen): menciones de la
+			       -- entidad / noticias de las horas en las que aparece, llevadas
+			       -- a la escala de la hora de referencia.
+			       --
+			       -- Antes se hacia AVG(cnt/noticias) por bucket. Con un bucket
+			       -- de 9 noticias y una sola mencion, su ratio (1/9 = 11%)
+			       -- dominaba la media y el baseline de TODAS las entidades que
+			       -- aparecian en esa hora se inflaba hasta invalidar el pico:
+			       -- el detector devolvia 0 alertas siempre. El pooled pondera cada
+			       -- hora por su volumen real y es el estimador correcto de
+			       -- "menciones esperadas en la hora de referencia".
+			       SUM(h.cnt::float) / NULLIF(SUM(v.noticias), 0) * r.noticias AS baseline,
 			       COUNT(DISTINCT h.hora) AS n_buckets
 			FROM current_h c
 			JOIN hourly h ON h.tag_id = c.tag_id
@@ -445,10 +456,10 @@ const hourlyCTE = `
 `
 
 // StartAlertScanner lanza una goroutine que revisa picos de actividad
-// periódicamente (cada ALERTS_SCAN_INTERVAL_MIN, por defecto 60 min: con
+// periódicamente (cada ALERTS_SCAN_INTERVAL_MIN, por defecto 15 min: con
 // 120 min solo se cubrían ~12 de las 24 horas ref al día).
 func StartAlertScanner() {
-	interval := envInt("ALERTS_SCAN_INTERVAL_MIN", 60)
+	interval := envInt("ALERTS_SCAN_INTERVAL_MIN", 15)
 
 	go func() {
 		time.Sleep(45 * time.Second)

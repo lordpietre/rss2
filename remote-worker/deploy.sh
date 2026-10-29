@@ -233,7 +233,7 @@ docker run -d \
     -e MAX_NEW_TOKENS=2048 \
     -e MAX_BODY_CHARS=80000 \
     -e BODY_CHARS_CHUNK=2000 \
-    -e MAX_SEQ_PER_CALL=32 \
+    -e MAX_SEQ_PER_CALL=8 \
     -v "${MODELS_DIR}:/app/models" \
     "${IMAGE_NAME}"
 

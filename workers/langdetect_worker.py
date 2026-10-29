@@ -13,6 +13,13 @@ from collections import Counter
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from langdetect import detect, LangDetectException
+from langdetect import DetectorFactory
+
+# Semilla fija: sin esto la deteccion de idioma es NO DETERMINISTA entre
+# procesos (langdetect usa numeros aleatorios para los perfiles). El traductor
+# ya lo hace (ctranslator_worker.py); aqui faltaba, y hacia que el mismo texto
+# pudiera clasificarse de forma distinta en cada reinicio del worker.
+DetectorFactory.seed = 0
 
 logging.basicConfig(
     level=logging.INFO,

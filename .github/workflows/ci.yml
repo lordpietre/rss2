@@ -1,0 +1,116 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+# Cancela ejecuciones anteriores del mismo commit: ahorra runner.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (Go)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache-dependency-path: |
+            backend/go.sum
+            rss-ingestor-go/go.sum
+
+      # La suite estaba en rojo desde antes de que existiera CI: config.Load()
+      # aborta sin SECRET_KEY y dos tests lo llamaban tras os.Clearenv().
+      - name: Tests
+        run: make test
+        env:
+          SECRET_KEY: ci-secret-key
+
+      - name: go vet
+        run: |
+          cd backend && go vet ./...
+          cd ../rss-ingestor-go && go vet ./...
+
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l backend/cmd backend/internal rss-ingestor-go)
+          if [ -n "$unformatted" ]; then
+            echo "Ficheros sin gofmt:"; echo "$unformatted"; exit 1
+          fi
+
+  frontend:
+    name: Frontend (React)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Dependencias
+        working-directory: frontend
+        run: npm ci
+
+      - name: Tests
+        working-directory: frontend
+        run: npm test -- --run
+
+      - name: Build (tsc + vite)
+        working-directory: frontend
+        run: npm run build
+
+  schema:
+    name: Esquema (init-db desde cero)
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: rss
+          POSTGRES_PASSWORD: rss
+          POSTGRES_DB: rss
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U rss -d rss"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar psql
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      # Los scripts de init-db/ solo se ejecutan en la PRIMERA inicializacion
+      # de la base: una migracion anadida despues no se aplica nunca. Eso
+      # dejo fuera las migraciones 51 y 52 y el trigger
+      # update_noticias_updated_at, y el sistema se rompio en silencio.
+      - name: Aplicar init-db desde cero
+        env:
+          PGPASSWORD: rss
+        run: |
+          for f in init-db/*.sql; do
+            echo "== $f"
+            psql -h 127.0.0.1 -U rss -d rss -v ON_ERROR_STOP=1 -f "$f" || {
+              echo "FALLO en $f"; exit 1;
+            }
+          done
+
+      - name: Comprobar deriva de esquema
+        env:
+          PGPASSWORD: rss
+          DB_HOST: 127.0.0.1
+          DB_NAME: rss
+          DB_USER: rss
+          DB_PASS: rss
+        run: python3 scripts/check-schema-drift.py

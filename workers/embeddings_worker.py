@@ -1,7 +1,8 @@
 import os
+from datetime import datetime
 import time
 import logging
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 import psycopg2
@@ -67,13 +68,24 @@ def get_conn():
 def ensure_schema(conn):
     """
     Asegura que la tabla de embeddings existe. Idempotente.
+
+    El DDL tiene que coincidir con init-db/60-add-embeddings-noticia-id.sql:
+    `traduccion_id` es NULLABLE y existe `noticia_id`, porque los originales
+    que ya estan en el idioma destino (canales marcados `feeds.traducido`)
+    NO tienen fila en `traducciones` y se guardan con `traduccion_id IS NULL`.
+    Antes esta tabla se creaba con `traduccion_id INT NOT NULL` y sin
+    `noticia_id`: en una base nueva, la ruta de los originales fallaria.
+
+    La tabla ya existe en produccion, asi que este CREATE no hace nada
+    (IF NOT EXISTS). El esquema canonico sigue siendo init-db/.
     """
     with conn.cursor() as cur:
         cur.execute(
             """
             CREATE TABLE IF NOT EXISTS traduccion_embeddings (
                 id SERIAL PRIMARY KEY,
-                traduccion_id INT NOT NULL REFERENCES traducciones(id) ON DELETE CASCADE,
+                traduccion_id INT NULL REFERENCES traducciones(id) ON DELETE CASCADE,
+                noticia_id VARCHAR(32) NULL REFERENCES noticias(id) ON DELETE CASCADE,
                 model TEXT NOT NULL,
                 dim INT NOT NULL,
                 embedding DOUBLE PRECISION[] NOT NULL,
@@ -89,6 +101,11 @@ def ensure_schema(conn):
         cur.execute("""
             CREATE INDEX IF NOT EXISTS idx_tr_emb_traduccion_id
                 ON traduccion_embeddings(traduccion_id);
+        """)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_tr_emb_noticia_lookup
+                ON traduccion_embeddings(noticia_id, model)
+                WHERE noticia_id IS NOT NULL AND traduccion_id IS NULL;
         """)
 
     conn.commit()
@@ -126,6 +143,45 @@ def fetch_batch_pending(conn) -> List[psycopg2.extras.DictRow]:
         return cur.fetchall()
 
 
+def fetch_batch_pending_original(conn, after: Optional[datetime] = None) -> List[psycopg2.extras.DictRow]:
+    """
+    Noticias que ya estan en el idioma destino (canales marcados como
+    'traducido' o detectadas por langdetect).
+
+    No tienen fila en traducciones (el scheduler no encola traducciones para
+    ellas) pero su texto original ya esta en espanol: hay que embeberlo para
+    que tambien aparezcan en la busqueda semantica. Se guardan con
+    traduccion_id NULL y noticia_id informado.
+
+    'after' es un cursor sobre created_at: el id de las noticias es un md5
+    (no ordenable), asi que created_at es lo unico que permite no recorrer
+    toda la tabla en cada ciclo. Sin el cursor la consulta hacia un seq scan
+    de 'noticias' de ~2 s cada 5 s.
+    """
+    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+        cur.execute(
+            """
+            SELECT
+                n.id AS noticia_id,
+                COALESCE(n.titulo, '') AS titulo,
+                COALESCE(n.resumen, '') AS resumen,
+                n.created_at AS created_at
+            FROM noticias n
+            WHERE n.lang = ANY(%s)
+              AND (COALESCE(n.resumen, '') <> '' OR COALESCE(n.contenido, '') <> '')
+              AND n.created_at > %s
+              AND NOT EXISTS (
+                  SELECT 1 FROM traduccion_embeddings e
+                  WHERE e.noticia_id = n.id AND e.model = %s AND e.traduccion_id IS NULL
+              )
+            ORDER BY n.created_at
+            LIMIT %s;
+            """,
+            (EMB_LANGS, after or datetime(1970, 1, 1), EMB_MODEL, EMB_LIMIT),
+        )
+        return cur.fetchall()
+
+
 # ================================================================
 # Preparación de textos
 # ================================================================
@@ -144,6 +200,19 @@ def texts_from_rows(rows: List[psycopg2.extras.DictRow]) -> List[str]:
         else:
             texts.append(title or body or "")
 
+    return texts
+
+
+def texts_from_original_rows(rows: List[psycopg2.extras.DictRow]) -> List[str]:
+    """Textos (titulo + resumen) de noticias ya en el idioma destino."""
+    texts = []
+    for r in rows:
+        title = (r["titulo"] or "").strip()
+        body = (r["resumen"] or "").strip()
+        if title and body:
+            texts.append(f"{title}\n{body}")
+        else:
+            texts.append(title or body or "")
     return texts
 
 
@@ -205,6 +274,58 @@ def upsert_embeddings(conn, rows, embs: np.ndarray, model_name: str):
         
     conn.commit()
     log.info(f"Upserted {len(rows)} embeddings to pgvector column")
+
+
+def upsert_embeddings_original(conn, rows, embs: np.ndarray, model_name: str):
+    """
+    Inserta los embeddings del texto ORIGINAL de noticias ya en el idioma
+    destino (traduccion_id NULL, noticia_id informado).
+    """
+    if embs.size == 0 or not rows:
+        return
+
+    dim = int(embs.shape[1])
+
+    data = [
+        (
+            None,  # traduccion_id: NULL, es el embedding del texto original
+            r["noticia_id"],
+            model_name,
+            dim,
+            embs[i].astype(float).tolist(),
+        )
+        for i, r in enumerate(rows)
+    ]
+
+    with conn.cursor() as cur:
+        execute_values(
+            cur,
+            """
+            INSERT INTO traduccion_embeddings
+                (traduccion_id, noticia_id, model, dim, embedding)
+            VALUES %s
+            ON CONFLICT (noticia_id, model) WHERE noticia_id IS NOT NULL
+            DO UPDATE SET
+                embedding  = EXCLUDED.embedding,
+                dim        = EXCLUDED.dim,
+                created_at = NOW();
+            """,
+            data,
+        )
+
+    conn.commit()
+
+    for i, r in enumerate(rows):
+        vector_str = '[' + ','.join(str(v) for v in embs[i].astype(float).tolist()) + ']'
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE traduccion_embeddings
+                SET embedding_vector = %s::vector
+                WHERE noticia_id = %s AND model = %s AND traduccion_id IS NULL
+            """, (vector_str, r["noticia_id"], model_name))
+
+    conn.commit()
+    log.info(f"Upserted {len(rows)} original-text embeddings to pgvector column")
 
 
 # ================================================================
@@ -319,31 +440,55 @@ def run_worker():
 
     worker_model = load_model()
 
+    # Cursor sobre created_at para las noticias de texto original: evita
+    # recorrer toda la tabla en cada ciclo.
+    orig_cursor: Optional[datetime] = None
+
     while True:
         try:
             with get_conn() as conn:
                 ensure_schema(conn)
 
+                # 1) Embeddings de las traducciones terminadas.
                 rows = fetch_batch_pending(conn)
-                if not rows:
+                if rows:
+                    texts = texts_from_rows(rows)
+                    embs = worker_model.encode(
+                        texts,
+                        batch_size=EMB_BATCH,
+                        convert_to_numpy=True,
+                        show_progress_bar=False,
+                        normalize_embeddings=True,
+                    )
+                    upsert_embeddings(conn, rows, embs, EMB_MODEL)
+                    log.info(f"Embeddings generados: {len(rows)}")
+
+                # 2) Embeddings del texto original de las noticias que ya
+                #    estan en el idioma destino (sin fila en traducciones).
+                #    El cursor sobre created_at evita recorrer toda la tabla
+                #    en cada ciclo.
+                orig_rows = fetch_batch_pending_original(conn, orig_cursor)
+                if orig_rows:
+                    orig_texts = texts_from_original_rows(orig_rows)
+                    orig_embs = worker_model.encode(
+                        orig_texts,
+                        batch_size=EMB_BATCH,
+                        convert_to_numpy=True,
+                        show_progress_bar=False,
+                        normalize_embeddings=True,
+                    )
+                    upsert_embeddings_original(conn, orig_rows, orig_embs, EMB_MODEL)
+                    log.info(f"Embeddings de texto original generados: {len(orig_rows)}")
+                    orig_cursor = orig_rows[-1]["created_at"]
+                else:
+                    # Nada nuevo: el cursor se reinicia para volver a barrer
+                    # desde el principio (por si quedo algo pendiente) y se
+                    # espera mas.
+                    orig_cursor = None
                     time.sleep(SLEEP_IDLE)
+
+                if not rows and not orig_rows:
                     continue
-
-                texts = texts_from_rows(rows)
-
-                # Encode
-                embs = worker_model.encode(
-                    texts,
-                    batch_size=EMB_BATCH,
-                    convert_to_numpy=True,
-                    show_progress_bar=False,
-                    normalize_embeddings=True,
-                )
-
-                # Upsert
-                upsert_embeddings(conn, rows, embs, EMB_MODEL)
-
-                log.info(f"Embeddings generados: {len(rows)}")
 
         except Exception as e:
             log.exception(f"Error en embeddings_worker: {e}")

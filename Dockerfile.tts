@@ -1,0 +1,121 @@
+# Servicio de sintesis de voz (TTS) de RSS2.
+#
+# La imagen NO lleva los pesos del modelo: se descargan antes de arrancar
+# (scripts/prepare_tts_models.sh) y se montan en un volumen. El servicio no
+# descarga nada ni ejecuta codigo remoto al iniciarse.
+#
+# torch se instala desde el indice de CPU: la build con CUDA multiplica por
+# diez el tamano de la imagen y esta maquina no tiene GPU.
+FROM python:3.11-slim
+
+WORKDIR /app
+
+ENV PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    HF_HOME=/cache \
+    NLTK_DATA=/usr/local/share/nltk_data \
+    TOKENIZERS_PARALLELISM=false \
+    OMP_NUM_THREADS=2 \
+    MKL_NUM_THREADS=2
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq-dev \
+    gcc \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir --upgrade pip
+
+# torch/torchaudio solo para CPU.
+RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu \
+    torch torchaudio
+
+# numpy se fija por debajo de 2: melo, librosa y soundfile no son compatibles
+# con numpy 2 todavia.
+RUN pip install --no-cache-dir "numpy==1.26.4" \
+    librosa \
+    soundfile \
+    flask \
+    redis \
+    psycopg2-binary
+
+# Motor de sintesis base (voz espanola). Sus dependencias las trae el propio
+# repositorio.
+RUN pip install --no-cache-dir git+https://github.com/myshell-ai/MeloTTS.git
+
+# El paquete `unidic` completo se instala sin diccionario (hay que bajarlo
+# aparte) y MeCab lo prefiere sobre `unidic_lite`, que si viene incluido: el
+# resultado es un fallo al inicializar el segmentador japones. Se desinstala
+# para que MeloTTS use el diccionario de unidic_lite. La comprobacion final
+# falla la build si el segmentador no arranca.
+RUN pip uninstall -y unidic \
+    && python -c "import MeCab; MeCab.Tagger(); print('mecab listo')"
+
+# Conversion de timbre. Se instala sin dependencias porque setup.py fija
+# numpy==1.22 y librosa==0.9.1, incompatibles con Python 3.11. Sus
+# dependencias reales se instalan a continuacion.
+RUN pip install --no-cache-dir --no-deps git+https://github.com/myshell-ai/OpenVoice.git
+RUN pip install --no-cache-dir \
+    eng_to_ipa \
+    inflect \
+    unidecode \
+    pypinyin \
+    cn2an \
+    jieba \
+    langid
+
+# Motor por defecto: Chatterbox Multilingual (Resemble AI, MIT).
+#
+# Se instala SIN dependencias a proposito: su pyproject tira de
+# librosa==0.11.0 (romperia MeloTTS y OpenVoice, que van con 0.9.1) y de
+# gradio==6.8.0 (solo sirve para su demo web). Despues se instalan a mano las
+# dependencias que de verdad usa chatterbox.mtl_tts.
+#
+# transformers se sube a 5.2.0: la que trae la imagen (4.27.4) no tiene
+# LlamaModel, que T3 importa al arrancar. MeloTTS solo usa AutoTokenizer y
+# AutoModelForMaskedLM, siguen estando en 5.x (se comprueba abajo).
+RUN pip install --no-cache-dir --no-deps git+https://github.com/resemble-ai/chatterbox.git
+RUN pip install --no-cache-dir \
+    "transformers==5.2.0" \
+    "diffusers==0.29.0" \
+    "conformer==0.3.2" \
+    "safetensors==0.5.3" \
+    "einops" \
+    "omegaconf" \
+    s3tokenizer \
+    "resemble-perth>=1.0.0" \
+    spacy-pkuseg \
+    "pykakasi==2.3.0"
+
+# spacy-pkuseg descarga su diccionario (34 MB) la primera vez que se
+# construye el segmentador chino. Se pre-descarga aqui: en tiempo de
+# ejecucion el servicio no debe tener red.
+RUN python -c "from spacy_pkuseg import pkuseg; pkuseg(); print('pkuseg listo')"
+
+# El paquete de Chatterbox se importa aqui para que una dependencia ausente
+# rompa el build y no la primera narracion. No descarga pesos: solo importa.
+RUN python -c "from chatterbox.mtl_tts import ChatterboxMultilingualTTS; print('chatterbox listo')"
+
+# MeloTTS carga los datos de NLTK al importar el limpiador. Se descargan
+# aqui para que el servicio no descargue nada en tiempo de ejecucion.
+RUN mkdir -p /usr/local/share/nltk_data \
+    && python -c "import nltk; [nltk.download(p) for p in ('averaged_perceptron_tagger', 'averaged_perceptron_tagger_eng', 'cmudict')]"
+
+# Regresion de la subida de transformers: MeloTTS se apoya en AutoTokenizer y
+# AutoModelForMaskedLM y Chatterbox en LlamaModel. Si una de ellas desaparece,
+# el build falla aqui en vez de romper un motor durante una narracion.
+RUN python -c "from transformers import AutoTokenizer, AutoModelForMaskedLM, LlamaModel; import transformers; print('transformers', transformers.__version__, 'listo')" \
+    && python -c "import melo.api, openvoice.api; print('melo/openvoice listos')"
+
+COPY workers/ ./workers/
+
+ENV DB_HOST=db \
+    DB_PORT=5432 \
+    DB_NAME=rss \
+    DB_USER=rss \
+    DB_PASS=${DB_PASS}
+
+EXPOSE 7000
+
+CMD ["python", "workers/tts_worker.py"]

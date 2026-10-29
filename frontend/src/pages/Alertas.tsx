@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { apiService, api, Alerta, News } from '../services/api'
-import { CheckCheck, ChevronDown, ChevronUp, FileText, XCircle } from 'lucide-react'
+import { CheckCheck, ChevronDown, ChevronUp, FileText, XCircle, Heart, FolderPlus } from 'lucide-react'
 import { WikiTooltip } from '../components/ui/WikiTooltip'
+import { CreateListModal } from '../components/CreateListModal'
+import { useApiFavorites, useApiLists } from '../hooks/useApiFavorites'
 
 const TIPO_LABEL: Record<string, string> = {
   persona: 'Person',
@@ -24,6 +26,16 @@ export function Alertas() {
   const [entityNews, setEntityNews] = useState<News[]>([])
   const [newsLoading, setNewsLoading] = useState(false)
   const [newsTotal, setNewsTotal] = useState(0)
+  // Por defecto solo se listan las noticias de la hora del pico (es lo que
+  // hace que la alerta saltara). Se puede cambiar a todas las del concepto.
+  const [soloHora, setSoloHora] = useState(true)
+
+  // Favoritos y listas: las mismas acciones que en la seccion de
+  // Inteligencia al seleccionar un concepto.
+  const [showListModal, setShowListModal] = useState(false)
+  const [selectedNewsForList, setSelectedNewsForList] = useState<News | null>(null)
+  const { toggleFavorite, isFavorite } = useApiFavorites()
+  const { lists, createList, addToList } = useApiLists()
 
   const load = async () => {
     setLoading(true)
@@ -58,7 +70,8 @@ export function Alertas() {
     load()
   }
 
-  const openNews = async (alerta: Alerta) => {
+  const openNews = async (alerta: Alerta, soloPeriodo?: boolean) => {
+    const soloLaHora = soloPeriodo ?? soloHora
     setNewsModal(alerta)
     setNewsLoading(true)
     setEntityNews([])
@@ -68,6 +81,8 @@ export function Alertas() {
       params.append('valor', alerta.valor)
       params.append('tipo', alerta.tipo)
       params.append('per_page', '50')
+      // La hora exacta del pico: es lo que hace que la alerta saltara.
+      if (soloLaHora) params.append('periodo', alerta.periodo)
       const res = await api.get(`/entities/news?${params}`)
       setEntityNews(res.data.news || [])
       setNewsTotal(res.data.total || 0)
@@ -76,6 +91,28 @@ export function Alertas() {
     } finally {
       setNewsLoading(false)
     }
+  }
+
+  const handleAddToList = (news: News) => {
+    setSelectedNewsForList(news)
+    setShowListModal(true)
+  }
+
+  const handleSelectList = async (listId: number) => {
+    if (selectedNewsForList) {
+      await addToList(listId, selectedNewsForList.id)
+    }
+    setShowListModal(false)
+    setSelectedNewsForList(null)
+  }
+
+  const handleCreateAndAdd = async (name: string) => {
+    const newListId = await createList(name)
+    if (selectedNewsForList) {
+      await addToList(newListId, selectedNewsForList.id)
+    }
+    setShowListModal(false)
+    setSelectedNewsForList(null)
   }
 
   return (
@@ -259,12 +296,26 @@ export function Alertas() {
             className="bg-gray-900 rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col border border-gray-700"
             onClick={e => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
+            <div className="flex items-start justify-between px-6 py-4 border-b border-gray-700 gap-4">
               <div>
                 <h2 className="text-lg font-bold text-gray-50">News about &quot;{newsModal.valor}&quot;</h2>
                 <p className="text-sm text-gray-400 mt-0.5">
                   {newsTotal} news found · {TIPO_LABEL[newsModal.tipo] || newsModal.tipo} · {newsModal.periodo}
                 </p>
+                <button
+                  onClick={() => {
+                    // Se pasa el valor nuevo explicitamente: setSoloHora es
+                    // asincrono y openNews leeria el valor anterior.
+                    const nuevo = !soloHora
+                    setSoloHora(nuevo)
+                    if (newsModal) openNews(newsModal, nuevo)
+                  }}
+                  className="mt-1 text-xs text-primary-300 hover:text-primary-50 underline"
+                >
+                  {soloHora
+                    ? 'Ver todas las noticias del concepto (no solo esa hora)'
+                    : 'Ver solo las noticias de esa hora'}
+                </button>
               </div>
               <button
                 onClick={() => setNewsModal(null)}
@@ -282,36 +333,61 @@ export function Alertas() {
               ) : (
                 <ul className="space-y-2">
                   {entityNews.map((n) => (
-                    <li key={n.id}>
+                    <li
+                      key={n.id}
+                      className="flex items-start gap-2 p-3 rounded-lg hover:bg-gray-800 transition-colors border border-gray-700"
+                    >
                       <Link
                         to={`/news/${n.id}`}
                         onClick={() => setNewsModal(null)}
-                        className="block p-3 rounded-lg hover:bg-gray-800 transition-colors border border-gray-700"
+                        className="flex items-start gap-3 min-w-0 flex-1"
                       >
-                        <div className="flex items-start gap-3">
-                          {n.imagen_url && (
-                            <img
-                              src={n.imagen_url}
-                              alt=""
-                              className="w-20 h-14 object-cover rounded-md shrink-0"
-                              onError={(e) => (e.currentTarget.style.display = 'none')}
-                            />
-                          )}
-                          <div className="min-w-0">
-                            <div className="font-medium text-sm text-gray-50 line-clamp-2">
-                              {n.title_translated || n.titulo}
-                            </div>
-                            <p className="text-xs text-gray-400 mt-1 line-clamp-2">
-                              {n.summary_translated || n.resumen}
-                            </p>
-                            {n.fecha && (
-                              <span className="text-[11px] text-gray-500 mt-1 block font-mono">
-                                {new Date(n.fecha).toLocaleDateString('es-ES')}
-                              </span>
-                            )}
+                        {n.imagen_url && (
+                          <img
+                            src={n.imagen_url}
+                            alt=""
+                            className="w-20 h-14 object-cover rounded-md shrink-0"
+                            onError={(e) => (e.currentTarget.style.display = 'none')}
+                          />
+                        )}
+                        <div className="min-w-0">
+                          <div className="font-medium text-sm text-gray-50 line-clamp-2">
+                            {n.title_translated || n.titulo}
                           </div>
+                          <p className="text-xs text-gray-400 mt-1 line-clamp-2">
+                            {n.summary_translated || n.resumen}
+                          </p>
+                          {n.fecha && (
+                            <span className="text-[11px] text-gray-500 mt-1 block font-mono">
+                              {new Date(n.fecha).toLocaleDateString('es-ES')}
+                            </span>
+                          )}
                         </div>
                       </Link>
+                      {/* Mismas acciones que en la seccion de Inteligencia:
+                          guardar en favoritos y anadir a una lista. */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => toggleFavorite(n)}
+                          className={`p-1 rounded-full transition-colors ${
+                            isFavorite(n.id)
+                              ? 'text-red-500 bg-red-50 hover:bg-red-100'
+                              : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
+                          }`}
+                          title={isFavorite(n.id) ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+                          aria-label={isFavorite(n.id) ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+                        >
+                          <Heart className={`h-3.5 w-3.5 ${isFavorite(n.id) ? 'fill-current' : ''}`} />
+                        </button>
+                        <button
+                          onClick={() => handleAddToList(n)}
+                          className="p-1 rounded-full text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
+                          title="Añadir a lista"
+                          aria-label="Añadir a lista"
+                        >
+                          <FolderPlus className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -320,6 +396,24 @@ export function Alertas() {
           </div>
         </div>
       )}
+
+      {/* Anadir la noticia seleccionada a una lista (o crear una nueva) */}
+      <CreateListModal
+        isOpen={showListModal}
+        onClose={() => {
+          setShowListModal(false)
+          setSelectedNewsForList(null)
+        }}
+        onCreate={handleCreateAndAdd}
+        mode="add-to"
+        existingLists={lists.map((l) => ({ id: l.id, name: l.name }))}
+        onSelectList={handleSelectList}
+        initialName={
+          selectedNewsForList
+            ? (selectedNewsForList.title_translated || selectedNewsForList.titulo || '').slice(0, 60)
+            : ''
+        }
+      />
     </div>
   )
 }

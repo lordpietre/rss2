@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiService, Feed, Category, Country } from '../services/api'
-import { Plus, Trash2, ExternalLink, Upload, Download, RefreshCw, Power, PowerOff, AlertCircle, Trash } from 'lucide-react'
+import { Plus, Trash2, ExternalLink, Upload, Download, RefreshCw, Power, PowerOff, AlertCircle, Trash, Languages, CheckSquare, Square } from 'lucide-react'
 
 export function Feeds() {
   const queryClient = useQueryClient()
@@ -13,13 +13,18 @@ export function Feeds() {
   const [page, setPage] = useState(1)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number; failed: number; message: string } | null>(null)
+  // Seleccion multiple para montar la lista de canales ya en espanol.
+  const [selected, setSelected] = useState<number[]>([])
+  // Busqueda simple por nombre/URL de la fuente.
+  const [busqueda, setBusqueda] = useState('')
 
   const { data: feedsData, isLoading } = useQuery({
-    queryKey: ['feeds', filtroActivo, filtroCategoria, filtroPais, page],
+    queryKey: ['feeds', filtroActivo, filtroCategoria, filtroPais, page, busqueda],
     queryFn: () => apiService.getFeeds({
       activo: filtroActivo || undefined,
       categoria_id: filtroCategoria || undefined,
       pais_id: filtroPais || undefined,
+      q: busqueda || undefined,
       page,
       per_page: 50,
     }),
@@ -62,6 +67,40 @@ export function Feeds() {
     mutationFn: apiService.reactivateFeed,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['feeds'] })
+    },
+  })
+
+  const setFeedTraducido = useMutation({
+    mutationFn: ({ id, traducido }: { id: number; traducido: boolean }) =>
+      apiService.setFeedTraducido(id, traducido),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feeds'] })
+    },
+  })
+
+  const bulkTraducido = useMutation({
+    mutationFn: ({ ids, traducido }: { ids: number[]; traducido: boolean }) =>
+      apiService.bulkSetFeedsTraducido(ids, traducido),
+    onSuccess: () => {
+      setSelected([])
+      queryClient.invalidateQueries({ queryKey: ['feeds'] })
+    },
+  })
+
+  const toggleSelected = (id: number) => {
+    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  }
+
+  const bulkDelete = useMutation({
+    mutationFn: (params: { ids?: number[]; q?: string }) => apiService.bulkDeleteFeeds(params),
+    onSuccess: (data) => {
+      setSelected([])
+      setBusqueda('')
+      queryClient.invalidateQueries({ queryKey: ['feeds'] })
+      queryClient.invalidateQueries({ queryKey: ['news'] })
+      alert(
+        `Se han eliminado ${data.feeds_deleted} fuentes y ${data.noticias_deleted} noticias.`
+      )
     },
   })
 
@@ -178,6 +217,16 @@ export function Feeds() {
 
       <div className="panel">
         <div className="flex flex-wrap gap-4 items-center">
+          <div className="flex-1 min-w-[240px]">
+            <input
+              type="search"
+              value={busqueda}
+              onChange={(e) => { setBusqueda(e.target.value); setPage(1) }}
+              placeholder="Buscar fuente por nombre o URL (p.ej. wikipedia)"
+              className="input w-full"
+              title="Busqueda simple sobre el nombre, la descripcion y la URL de la fuente"
+            />
+          </div>
           <select
             value={filtroActivo}
             onChange={(e) => { setFiltroActivo(e.target.value); setPage(1) }}
@@ -298,6 +347,77 @@ export function Feeds() {
         Total: {feedsData?.total || 0} feeds
       </div>
 
+      {selected.length > 0 && (
+        <div className="panel flex flex-wrap items-center gap-3 text-sm">
+          <span className="text-gray-300">
+            {selected.length} canal{selected.length === 1 ? '' : 'es'} seleccionado
+            {selected.length === 1 ? '' : 'es'}
+          </span>
+          <button
+            onClick={() => bulkTraducido.mutate({ ids: selected, traducido: true })}
+            className="btn-secondary flex items-center gap-2"
+            disabled={bulkTraducido.isPending}
+            title="Anadir al listado de canales ya traducidos: sus noticias no se procesan"
+          >
+            <Languages className="h-4 w-4" />
+            Marcar como ya traducidos
+          </button>
+          <button
+            onClick={() => bulkTraducido.mutate({ ids: selected, traducido: false })}
+            className="btn-secondary"
+            disabled={bulkTraducido.isPending}
+            title="Quitar del listado de canales ya traducidos: volveran a traducirse"
+          >
+            Quitar del listado
+          </button>
+          <button onClick={() => setSelected([])} className="text-gray-400 hover:text-gray-200 underline">
+            Cancelar
+          </button>
+          <button
+            onClick={() => {
+              if (
+                confirm(
+                  `Eliminar ${selected.length} fuentes seleccionadas y todas sus noticias?`
+                )
+              ) {
+                bulkDelete.mutate({ ids: selected })
+              }
+            }}
+            className="btn-secondary flex items-center gap-2 text-rss-red"
+            disabled={bulkDelete.isPending}
+            title="Elimina las fuentes seleccionadas y sus noticias (con traducciones, tags y embeddings)"
+          >
+            <Trash2 className="h-4 w-4" />
+            Eliminar seleccionadas
+          </button>
+        </div>
+      )}
+
+      {busqueda.trim() !== '' && (
+        <div className="panel flex flex-wrap items-center gap-3 text-sm">
+          <span className="text-gray-300">
+            {feedsData?.total || 0} fuentes coinciden con «{busqueda}»
+          </span>
+          <button
+            onClick={() => {
+              if (
+                confirm(
+                  `Eliminar TODAS las fuentes que coinciden con «${busqueda}» y sus noticias?`
+                )
+              ) {
+                bulkDelete.mutate({ q: busqueda.trim() })
+              }
+            }}
+            className="btn-secondary flex items-center gap-2 text-rss-red"
+            disabled={bulkDelete.isPending}
+            title="Borra todas las fuentes que casan con la busqueda, no solo las de esta pagina"
+          >
+            <Trash2 className="h-4 w-4" />
+            Eliminar todas las que coinciden
+          </button>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="flex justify-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-50"></div>
@@ -307,12 +427,32 @@ export function Feeds() {
           <table className="w-full">
             <thead className="border-b border-gray-700">
               <tr>
+                <th className="px-4 py-3 text-left text-xs font-mono uppercase text-gray-400">
+                  <button
+                    onClick={() => {
+                      const ids = (feedsData?.feeds || []).map((f) => f.id)
+                      setSelected(selected.length === ids.length ? [] : ids)
+                    }}
+                    title="Seleccionar todo"
+                    className="text-gray-400 hover:text-gray-200"
+                  >
+                    {selected.length > 0 &&
+                    selected.length === (feedsData?.feeds || []).length ? (
+                      <CheckSquare className="h-4 w-4" />
+                    ) : (
+                      <Square className="h-4 w-4" />
+                    )}
+                  </button>
+                </th>
                 <th className="px-4 py-3 text-left text-xs font-mono uppercase text-gray-400">Name</th>
                 <th className="px-4 py-3 text-left text-xs font-mono uppercase text-gray-400">URL</th>
                 <th className="px-4 py-3 text-left text-xs font-mono uppercase text-gray-400">Lang</th>
                 <th className="px-4 py-3 text-left text-xs font-mono uppercase text-gray-400">Category</th>
                 <th className="px-4 py-3 text-left text-xs font-mono uppercase text-gray-400">Country</th>
                 <th className="px-4 py-3 text-left text-xs font-mono uppercase text-gray-400">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-mono uppercase text-gray-400" title="El canal ya esta en espanol: sus noticias no se traducen">
+                  Translated
+                </th>
                 <th className="px-4 py-3 text-left text-xs font-mono uppercase text-gray-400">News</th>
                 <th className="px-4 py-3 text-left text-xs font-mono uppercase text-gray-400">Errors</th>
                 <th className="px-4 py-3 text-left text-xs font-mono uppercase text-gray-400">Actions</th>
@@ -321,6 +461,19 @@ export function Feeds() {
             <tbody className="divide-y divide-gray-800">
               {feedsData?.feeds?.map((feed) => (
                 <tr key={feed.id} className="hover:bg-gray-800/50">
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => toggleSelected(feed.id)}
+                      className="text-gray-400 hover:text-gray-200"
+                      title="Seleccionar"
+                    >
+                      {selected.includes(feed.id) ? (
+                        <CheckSquare className="h-4 w-4" />
+                      ) : (
+                        <Square className="h-4 w-4" />
+                      )}
+                    </button>
+                  </td>
                   <td className="px-4 py-3">
                     <div className="font-medium text-gray-50">{feed.nombre}</div>
                     {feed.descripcion && (
@@ -345,6 +498,26 @@ export function Feeds() {
                     <span className={`text-xs px-2 py-1 rounded ${feed.activo ? 'bg-primary-900/30 text-primary-50' : 'bg-gray-800 text-gray-400'}`}>
                       {feed.activo ? 'Active' : 'Inactive'}
                     </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() =>
+                        setFeedTraducido.mutate({ id: feed.id, traducido: !feed.traducido })
+                      }
+                      className={`text-xs px-2 py-1 rounded ${
+                        feed.traducido
+                          ? 'bg-green-900/40 text-green-300'
+                          : 'bg-gray-800 text-gray-500 hover:text-gray-300'
+                      }`}
+                      title={
+                        feed.traducido
+                          ? 'Ya en espanol: sus noticias no se traducen. Pulsa para volver a traducirlas.'
+                          : 'Marcar como canal ya en espanol (no se procesa)'
+                      }
+                      disabled={setFeedTraducido.isPending}
+                    >
+                      {feed.traducido ? 'Traducido' : 'Traducir'}
+                    </button>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-400">{feed.noticias_count || 0}</td>
                   <td className="px-4 py-3">

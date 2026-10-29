@@ -22,6 +22,14 @@ type Config struct {
 	DockerComposeDir   string
 	WikiImagesPath     string
 	AllowedOrigins     string
+
+	// Subsistema de sintesis de voz (TTS).
+	TTSURL            string
+	TTSAPIKey         string
+	TTSEngine         string
+	TTSAudioPath      string
+	TTSMaxScriptChars int
+	TTSMaxAttempts    int
 }
 
 func Load() *Config {
@@ -51,6 +59,12 @@ func Load() *Config {
 		DockerComposeDir:     getEnv("DOCKER_COMPOSE_DIR", "/datos/rss2"),
 		WikiImagesPath:       getEnv("WIKI_IMAGES_PATH", "/app/data/wiki_images"),
 		AllowedOrigins:       allowedOrigins,
+		TTSURL:               getEnv("TTS_URL", "http://tts:7000"),
+		TTSAPIKey:            getEnv("TTS_API_KEY", ""),
+		TTSEngine:            getEnv("TTS_ENGINE", "chatterbox"),
+		TTSAudioPath:         getEnv("TTS_AUDIO_PATH", "/app/data/tts_audio"),
+		TTSMaxScriptChars:    getEnvInt("TTS_MAX_SCRIPT_CHARS", 8000),
+		TTSMaxAttempts:       getEnvInt("TTS_MAX_ATTEMPTS", 2),
 	}
 }
 

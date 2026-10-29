@@ -8,7 +8,12 @@ import (
 
 func TestLoadDefaults(t *testing.T) {
 	os.Clearenv()
-	
+	// Load() aborta (panic) si no hay SECRET_KEY: en produccion es
+	// deliberado (fallar rapido en vez de arrancar con una clave debil).
+	// En el test se fija explicitamente para poder comprobar el resto de
+	// valores por defecto.
+	os.Setenv("SECRET_KEY", "change-this-secret-key")
+
 	cfg := Load()
 	
 	if cfg.ServerPort != "8080" {
@@ -29,8 +34,11 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.WikiImagesPath != "/app/data/wiki_images" {
 		t.Errorf("expected WikiImagesPath '/app/data/wiki_images', got %s", cfg.WikiImagesPath)
 	}
-	if cfg.AllowedOrigins != "*" {
-		t.Errorf("expected AllowedOrigins '*', got %s", cfg.AllowedOrigins)
+	// El valor por defecto ya no es "*": la configuracion restringe los
+	// origenes a los servidores de desarrollo. Un "*" por defecto permitiria
+	// que cualquiera llame a la API con las credenciales de un usuario.
+	if cfg.AllowedOrigins != "http://localhost:5173,http://localhost:3000" {
+		t.Errorf("expected AllowedOrigins 'http://localhost:5173,http://localhost:3000', got %s", cfg.AllowedOrigins)
 	}
 }
 
@@ -79,6 +87,7 @@ func TestLoadFromEnv(t *testing.T) {
 
 func TestLoadInvalidInt(t *testing.T) {
 	os.Clearenv()
+	os.Setenv("SECRET_KEY", "change-this-secret-key")
 	os.Setenv("NEWS_PER_PAGE", "invalid")
 	
 	cfg := Load()
@@ -90,6 +99,7 @@ func TestLoadInvalidInt(t *testing.T) {
 
 func TestLoadInvalidDuration(t *testing.T) {
 	os.Clearenv()
+	os.Setenv("SECRET_KEY", "change-this-secret-key")
 	os.Setenv("JWT_EXPIRATION", "invalid")
 	
 	cfg := Load()

@@ -82,7 +82,7 @@ docker run -d \
   -e MAX_NEW_TOKENS=2048 \
   -e MAX_BODY_CHARS=80000 \
   -e BODY_CHARS_CHUNK=2000 \
-  -e MAX_SEQ_PER_CALL=32 \
+  -e MAX_SEQ_PER_CALL=8 \
   -v $(pwd)/models:/app/models \
   rss2-remote-worker:latest
 ```
@@ -130,7 +130,7 @@ ls -la models/nllb-ct2/
 | `MAX_NEW_TOKENS` | `2048` | Tokens máximos traducción |
 | `MAX_BODY_CHARS` | `80000` | Caracteres máximos por texto |
 | `BODY_CHARS_CHUNK` | `2000` | Tamaño de chunks |
-| `MAX_SEQ_PER_CALL` | `32` | Secuencias por llamada |
+| `MAX_SEQ_PER_CALL` | `8` | Secuencias por llamada (limita el KV cache de CTranslate2) |
 
 ## Arquitectura
 

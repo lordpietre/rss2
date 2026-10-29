@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { 
   Search, Rss, BarChart3, Home as HomeIcon, Heart, User, Flame, Settings, 
   Users, Tags, Database, Server, TrendingUp, Bell, Menu, X, Globe, Zap,
-  Activity, Map, Network, AlertTriangle, Radio, Monitor
+  Activity, Map, Network, AlertTriangle, Radio, Monitor, Mic
 } from 'lucide-react'
 import { apiService } from '../../services/api'
 
@@ -97,6 +97,7 @@ export function IntelligenceLayout() {
     { name: 'Entities', path: '/populares', icon: Network },
     { name: 'Evolution', path: '/analisis', icon: Activity },
     { name: 'Alerts', path: '/alertas', icon: AlertTriangle, badge: nuevasAlertas },
+    { name: 'Noticiario', path: '/noticiario', icon: Mic },
     { name: 'Sources', path: '/feeds', icon: Radio },
   ]
 
@@ -140,6 +141,10 @@ export function IntelligenceLayout() {
     '/alertas': {
       title: 'Alert Center',
       description: 'Consola de alertas de actividad informativa anómala. Detecta incrementos de cobertura sobre entidades, temas o lugares específicos.'
+    },
+    '/noticiario': {
+      title: 'Noticiario por voz',
+      description: 'Busca noticias, elige las que forman el informativo y genera la locución en español. Cada audio pasa por aprobación editorial antes de poder usarse.'
     },
     '/feeds': {
       title: 'Sources Management',

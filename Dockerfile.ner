@@ -5,6 +5,11 @@ WORKDIR /app
 ENV PYTHONUNBUFFERED=1
 
 RUN pip install --no-cache-dir --upgrade pip
+# preshed se fija a 3.0.13: la 3.0.14 rompe la carga de cualquier modelo
+# spaCy con "OverflowError: Python int too large to convert to C ssize_t"
+# en Tokenizer._flush_specials (PreshMap itera claves uint64 >= 2^63).
+# Upstream: https://github.com/explosion/spaCy/issues/14047
+RUN pip install --no-cache-dir "preshed==3.0.13"
 RUN pip install --no-cache-dir spacy psycopg2-binary beautifulsoup4
 RUN python -m spacy download es_core_news_lg
 RUN python -m spacy download en_core_web_lg

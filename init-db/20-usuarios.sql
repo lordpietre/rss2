@@ -28,6 +28,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- El trigger ya lo crea otra migracion (o este mismo script reejecutado):
+-- sin el DROP el init ABORTA aqui (ON_ERROR_STOP=1) y las migraciones
+-- siguientes no se aplican.
+DROP TRIGGER IF EXISTS trigger_update_usuario_timestamp ON usuarios;
 CREATE TRIGGER trigger_update_usuario_timestamp
     BEFORE UPDATE ON usuarios
     FOR EACH ROW

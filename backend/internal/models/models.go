@@ -112,6 +112,9 @@ type Feed struct {
 	LastFetched *time.Time `json:"last_fetched"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
+	// Traducido: el canal ya publica en el idioma destino, sus noticias no
+	// necesitan traduccion y el pipeline las salta.
+	Traducido bool `json:"traducido"`
 }
 
 type Category struct {
