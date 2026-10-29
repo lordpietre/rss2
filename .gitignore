@@ -64,11 +64,24 @@ service-account.json
 models/
 models/nllb-ct2/
 models/nllb-ct2-1.3b/
+# El patron "models/" tambien alcanzaba el paquete Go backend/internal/models
+# (que ya estaba versionado): se excluye de forma explicita para que los
+# ficheros nuevos de ese paquete no se queden sin seguimiento.
+!backend/internal/models/
 
 # Wikipedia images - downloaded by wiki_worker
 data/wiki_images/
 data/backups/
+data/backup/
 backups/
+
+# Narraciones de voz (TTS): audios generados, muestras de voz propias y
+# temporales. Nunca se versionan: son datos y material personal.
+data/tts_audio/
+data/tts_voices/
+data/tts_tmp/
+models/openvoice/
+models/chatterbox/
 
 # Database storage (PostgreSQL)
 data/pgdata/
@@ -128,3 +141,12 @@ PM/
 # ==================================================================================
 backend/bin/
 bin/
+backend/server
+backend/wiki_worker
+rss-ingestor-go/rss-ingestor
+
+# ==================================================================================
+# Node dependencies (installed at build time, never versioned)
+# ==================================================================================
+node_modules/
+frontend/node_modules/
